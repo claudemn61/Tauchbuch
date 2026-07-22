@@ -212,8 +212,32 @@
     try {
       const runApp = new Function("React", "ReactDOM", compiled + "\n; return StatistikApp;");
       const StatistikApp = runApp(React, ReactDOM);
+
+      // Error Boundary: catches errors thrown during render/lifecycle — even
+      // ones happening later (e.g. after data finishes loading from storage),
+      // which the outer try/catch below can't see since those happen outside
+      // this synchronous call. React hands componentDidCatch the real Error
+      // object directly, so the message is never masked the way a global
+      // window "error" event can be for cross-origin script code.
+      class AppErrorBoundary extends React.Component {
+        constructor(props) { super(props); this.state = { error: null }; }
+        static getDerivedStateFromError(error) { return { error }; }
+        componentDidCatch(error, info) {
+          console.error("App-Fehler:", error, info);
+        }
+        render() {
+          if (this.state.error) {
+            const e = this.state.error;
+            return React.createElement("div", {
+              style: { padding: "20px 16px", color: "#f87171", fontFamily: "monospace", fontSize: 12, whiteSpace: "pre-wrap", lineHeight: 1.6 }
+            }, "APP-FEHLER:\n\n" + (e && (e.stack || e.message) || String(e)));
+          }
+          return this.props.children;
+        }
+      }
+
       const root = ReactDOM.createRoot(document.getElementById("root"));
-      root.render(React.createElement(StatistikApp));
+      root.render(React.createElement(AppErrorBoundary, null, React.createElement(StatistikApp)));
       setTimeout(function() {
         if (!status.textContent.includes("FEHLER")) status.style.display = "none";
       }, 800);
@@ -222,6 +246,7 @@
       status.textContent = "RENDER-FEHLER:\n" + (e.message || String(e)) + "\n\n" + (e.stack || "");
     }
   }
+
 
   window.addEventListener("load", function() {
     setTimeout(checkAndRender, 300);
