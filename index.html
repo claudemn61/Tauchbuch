@@ -190,7 +190,7 @@
 
     let appSource;
     try {
-      const resp = await fetch("tauchbuch.jsx");
+      const resp = await fetch("tauchbuch.jsx?v=" + Date.now(), { cache: "no-store" });
       if (!resp.ok) { status.textContent = "FEHLER beim Laden von tauchbuch.jsx: HTTP " + resp.status; status.style.color = "#f87171"; return; }
       appSource = await resp.text();
       status.textContent = "Code geladen ✓ (" + appSource.length + " Zeichen) — kompiliere…";
