@@ -465,7 +465,7 @@ function InlineField({label, value, onSave, multiline, unit}) {
 // Tauchgängen vorkommende Ort wird beim Laden automatisch als eigene Reise
 // angelegt (siehe ensureReisen), zusätzlich frei erweiter-/umbenennbar auf
 // der Reisen-Seite.
-function ReiseSelect({ value, onSave }) {
+function ReiseSelect({ label, value, onSave }) {
   const [names, setNames] = useState([]);
   useEffect(() => {
     (async () => {
@@ -478,7 +478,7 @@ function ReiseSelect({ value, onSave }) {
   const options = value && !names.includes(value) ? [value, ...names] : names;
   return (
     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 0",borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
-      <span style={{fontSize:13,color:"rgba(232,244,253,0.45)",minWidth:90}}>Reise</span>
+      <span style={{fontSize:13,color:"rgba(232,244,253,0.45)",minWidth:90}}>{label || "Reise"}</span>
       <select value={value||""} onChange={e=>onSave(e.target.value)}
         style={{background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:8,padding:"4px 8px",color:value?"#e8f4fd":"rgba(232,244,253,0.4)",fontSize:13,textAlign:"right",maxWidth:180}}>
         <option value="" style={{background:"#0a1628"}}>—</option>
@@ -680,8 +680,8 @@ function DetailContent({ d, dives, setDives, setSelected, setView, saveDive, con
     setDives(prev => prev.map(x => x.id === upd.id ? upd : x));
     setSelected(upd);
   };
-  const saveReiseField = async (v) => {
-    const upd = { ...d, customFields: { ...(d.customFields||{}), reise: v } };
+  const saveOrtReiseField = async (v) => {
+    const upd = { ...d, ort: v, customFields: { ...(d.customFields||{}), reise: v } };
     await saveDive(upd);
     setDives(prev => prev.map(x => x.id === upd.id ? upd : x));
     setSelected(upd);
@@ -809,8 +809,7 @@ function DetailContent({ d, dives, setDives, setSelected, setView, saveDive, con
         <div style={{background:"rgba(255,255,255,0.04)",borderRadius:14,padding:"4px 15px",marginBottom:14,border:"1px solid rgba(255,255,255,0.06)"}}>
           <InlineField label="Datum" value={d.date} onSave={v=>saveField({date:v, year: parseDateToTs(v)?String(new Date(parseDateToTs(v)).getFullYear()):d.year})} />
           <InlineField label="Land" value={d.land} onSave={v=>saveField({land:v})} />
-          <InlineField label="Ort" value={d.ort} onSave={v=>saveField({ort:v})} />
-          <ReiseSelect value={d.customFields?.reise} onSave={saveReiseField} />
+          <ReiseSelect label="Ort, Reise" value={d.customFields?.reise || d.ort} onSave={saveOrtReiseField} />
           <InlineField label="TG-Nr." value={d.tgNr} onSave={v=>saveField({tgNr:v})} />
           <InlineField label="Tauchspot" value={d.tauchspot} onSave={v=>saveField({tauchspot:v})} />
           <InlineField label="Anzug" value={d.anzug} onSave={v=>saveField({anzug:v})} />
