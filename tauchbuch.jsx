@@ -398,7 +398,7 @@ function DiveTile({ tileKey, d, onPick, onSave }) {
   const commit = () => { setEditing(false); onSave(opt.save(val)); };
   const commitSelect = (v) => { onSave(opt.save(v)); };
   return (
-    <div style={{background:"rgba(255,255,255,0.05)",borderRadius:12,padding:"8px 6px",textAlign:"center",border:"1px solid rgba(255,255,255,0.06)"}}>
+    <div style={{background:"rgba(255,255,255,0.05)",borderRadius:12,padding:"8px 6px",textAlign:"center",border:"1px solid rgba(255,255,255,0.06)",display:"flex",flexDirection:"column",justifyContent:"space-between",height:"100%",boxSizing:"border-box"}}>
       <div onClick={onPick} style={{fontSize:9,color:"rgba(232,244,253,0.4)",textTransform:"uppercase",letterSpacing:0.4,cursor:"pointer",marginBottom:3,display:"flex",alignItems:"center",justifyContent:"center",gap:3}}>
         <span>{opt.label}</span><span style={{fontSize:8,opacity:0.6}}>⚙</span>
       </div>
@@ -521,11 +521,11 @@ function DiveRow({ d, onClick, sortId, selectMode, isSelected, onToggleSelect, r
           <div style={{display:"flex",alignItems:"center",gap:6,minWidth:0}}>
             <span style={{fontWeight:700,fontSize:15,flexShrink:0}}>{d.name}</span>
             {badge && <span style={{fontSize:11,fontWeight:700,color:"#fbbf24",flexShrink:0}}>{badge}</span>}
-            {d.buddy && <span style={{border:"1px solid rgba(232,244,253,0.15)",borderRadius:20,padding:"1px 7px",fontSize:9,color:"rgba(232,244,253,0.5)",flexShrink:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>👤 {d.buddy}</span>}
+            {d.time && <span style={{fontSize:11,fontWeight:600,color:"#38bdf8",flexShrink:0}}>{d.time}</span>}
+            {d.buddy && <span style={{fontSize:11,fontWeight:600,color:"#f87171",flexShrink:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>👤 {d.buddy}</span>}
           </div>
           <div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
             {d.rating>0 && <span style={{fontSize:10,fontWeight:700,color:"#fde047"}}>{d.rating}⭐️</span>}
-            {d.time && <span style={{fontSize:11,fontWeight:600,color:"#38bdf8"}}>{d.time}</span>}
           </div>
         </div>
         <div style={{fontSize:11,color:"rgba(232,244,253,0.4)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
@@ -753,11 +753,11 @@ function DetailContent({ d, dives, setDives, setSelected, setView, saveDive, con
                 style={{fontSize:24,cursor:"pointer",color:s<=(d.rating||0)?"#f59e0b":"rgba(232,244,253,0.2)"}}>★</span>
             ))}
           </span>
-          <select value={d.nitrox||""} onChange={e=>saveField({nitrox:e.target.value})}
-            style={{background:d.nitrox==="Nitrox"?"rgba(34,197,94,0.2)":"rgba(255,255,255,0.08)",border:`1px solid ${d.nitrox==="Nitrox"?"rgba(34,197,94,0.4)":"rgba(255,255,255,0.12)"}`,borderRadius:20,padding:"6px 14px",color:d.nitrox==="Nitrox"?"#4ade80":"#e8f4fd",fontSize:14,fontWeight:700,cursor:"pointer"}}>
-            <option value="" style={{background:"#0a1628"}}>—</option>
-            {NITROX_OPTIONS.map(o => <option key={o} value={o} style={{background:"#0a1628"}}>{o}</option>)}
-          </select>
+          {d.nitrox && (
+            <span style={{background:d.nitrox==="Nitrox"?"rgba(34,197,94,0.2)":"rgba(255,255,255,0.08)",border:`1px solid ${d.nitrox==="Nitrox"?"rgba(34,197,94,0.4)":"rgba(255,255,255,0.12)"}`,borderRadius:20,padding:"6px 14px",color:d.nitrox==="Nitrox"?"#4ade80":"#e8f4fd",fontSize:14,fontWeight:700}}>
+              {d.nitrox}
+            </span>
+          )}
         </div>
 
         {/* Bemerkungen — direkt unter Titel/Bewertung */}
@@ -819,6 +819,7 @@ function DetailContent({ d, dives, setDives, setSelected, setView, saveDive, con
           <SelectField label="Blei" value={d.blei} options={BLEI_OPTIONS} unit="kg" onSave={v=>saveField({blei:v})} />
           <SelectField label="Flasche" value={d.flasche} options={FLASCHE_OPTIONS} onSave={v=>saveField({flasche:v})} />
           <SelectField label="Volumen" value={d.volumen} options={VOLUMEN_OPTIONS} onSave={v=>saveField({volumen:v})} />
+          <SelectField label="Nitrox" value={d.nitrox} options={NITROX_OPTIONS} onSave={v=>saveField({nitrox:v})} />
           <InlineField label="Buddy" value={d.buddy} onSave={v=>saveField({buddy:v})} />
         </div>
       </div>
