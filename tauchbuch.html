@@ -173,17 +173,36 @@
     };
   })();
 
+  // Persistenter Log — schreibt Fehler/Ereignisse seitenübergreifend in den
+  // gemeinsamen Storage, damit sie im Settings-Panel der Startseite (Log-
+  // Dateien) einsehbar sind, unabhängig davon, auf welcher Seite sie auftraten.
+  const LOG_PAGE_NAME = (document.title || location.pathname).replace(/^\/|\.html$/g, "") || "app";
+  async function appendLog(message) {
+    try {
+      const key = "settings:logs";
+      let list = [];
+      try { const r = await window.storage.get(key); if (r) list = JSON.parse(r.value) || []; } catch {}
+      list.push({ ts: new Date().toISOString(), page: LOG_PAGE_NAME, message: String(message).slice(0, 2000) });
+      if (list.length > 50) list = list.slice(list.length - 50);
+      await window.storage.set(key, JSON.stringify(list));
+    } catch (e) { console.error("Log-Speicherfehler:", e); }
+  }
+
   window.addEventListener("error", function (e) {
     const el = document.getElementById("load-status");
     el.style.display = "block";
     el.style.color = "#f87171";
-    el.textContent = "JS-FEHLER: " + (e.error ? (e.error.stack || e.error.message) : e.message) + " (Zeile " + e.lineno + ")";
+    const msg = "JS-FEHLER: " + (e.error ? (e.error.stack || e.error.message) : e.message) + " (Zeile " + e.lineno + ")";
+    el.textContent = msg;
+    appendLog(msg);
   });
   window.addEventListener("unhandledrejection", function (e) {
     const el = document.getElementById("load-status");
     el.style.display = "block";
     el.style.color = "#f87171";
-    el.textContent = "PROMISE-FEHLER: " + (e.reason && e.reason.stack ? e.reason.stack : String(e.reason));
+    const msg = "PROMISE-FEHLER: " + (e.reason && e.reason.stack ? e.reason.stack : String(e.reason));
+    el.textContent = msg;
+    appendLog(msg);
   });
 
   async function checkAndRender() {
@@ -212,6 +231,7 @@
     } catch (e) {
       status.style.color = "#f87171";
       status.textContent = "BABEL-KOMPILIER-FEHLER:\n" + (e.message || String(e));
+      appendLog("BABEL-KOMPILIER-FEHLER: " + (e.message || String(e)));
       return;
     }
     try {
@@ -230,6 +250,7 @@
         componentDidCatch(error, info) {
           console.error("App-Fehler:", error, info);
           this.setState({ info });
+          appendLog("APP-FEHLER: " + ((error && (error.stack || error.message)) || String(error)));
         }
         render() {
           if (this.state.error) {
@@ -252,6 +273,7 @@
     } catch (e) {
       status.style.color = "#f87171";
       status.textContent = "RENDER-FEHLER:\n" + (e.message || String(e)) + "\n\n" + (e.stack || "");
+      appendLog("RENDER-FEHLER: " + (e.message || String(e)));
     }
   }
 

@@ -1,6 +1,6 @@
 const { useState, useEffect, useRef, useCallback, useMemo } = React;
 
-const APP_VERSION = "1.1";
+const APP_VERSION = "1.2";
 
 // ── CSV Parsing (Divers Log / Logbuch Export) ───────────────────────────────
 // Column layout of the export (0-indexed):
