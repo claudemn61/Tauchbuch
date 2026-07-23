@@ -1,6 +1,6 @@
 const { useState, useEffect } = React;
 
-const APP_VERSION = "1.2";
+const APP_VERSION = "1.3";
 
 const MATERIAL_FIELDS = [
   { key: "regulator", label: "Regulator", icon: "🫁", hasRevision: true },

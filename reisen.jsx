@@ -1,6 +1,6 @@
 const { useState, useEffect, useCallback } = React;
 
-const APP_VERSION = "1.2";
+const APP_VERSION = "1.3";
 
 function parseDateToTs(d) {
   if (!d) return 0;

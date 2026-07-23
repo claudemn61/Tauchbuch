@@ -1,6 +1,6 @@
 const { useState, useEffect, useRef } = React;
 
-const APP_VERSION = "1.2";
+const APP_VERSION = "1.3";
 
 // ── Startseite ───────────────────────────────────────────────────────────
 // Editierbares Titelbild (per Tap austauschbar, als Data-URL in Storage
@@ -15,6 +15,9 @@ const CHAPTERS = [
 // Änderungsverlauf — neuste zuerst. Wird beim Erhöhen der Version jeweils
 // von Hand ergänzt.
 const CHANGELOG = [
+  { version: "1.3", changes: [
+    "Titel auf der Startseite: „meintauchbuch“ in Kleinbuchstaben, „tauch“ in Orange",
+  ]},
   { version: "1.2", changes: [
     "Settings-Panel (Zahnrad-Button) mit Fehler-Log und Notizen",
     "Fehler-Protokollierung jetzt seitenübergreifend",
@@ -214,7 +217,9 @@ function HomeApp() {
           ✎
         </div>
         <div style={{position:"absolute",bottom:16,left:20,right:20}}>
-          <div style={{fontSize:26,fontWeight:900,letterSpacing:-0.5,textShadow:"0 2px 8px rgba(0,0,0,0.5)"}}>🤿 Tauchbuch</div>
+          <div style={{fontSize:26,fontWeight:900,letterSpacing:-0.5,textShadow:"0 2px 8px rgba(0,0,0,0.5)"}}>
+            🤿 <span style={{color:"#fff"}}>mein</span><span style={{color:"#f5a623"}}>tauch</span><span style={{color:"#fff"}}>buch</span>
+          </div>
         </div>
       </div>
 

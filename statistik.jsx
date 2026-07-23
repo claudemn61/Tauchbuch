@@ -1,6 +1,6 @@
 const { useState, useEffect } = React;
 
-const APP_VERSION = "1.2";
+const APP_VERSION = "1.3";
 
 // ── Statistik (Tauchbuch) ────────────────────────────────────────────────────
 // Platzhalter-Seite im gleichen Design wie das Flugbuch-Pendant (statistik.jsx).
