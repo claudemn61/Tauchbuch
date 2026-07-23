@@ -1,6 +1,6 @@
 const { useState, useEffect, useRef, useCallback, useMemo } = React;
 
-const APP_VERSION = "0.2.0";
+const APP_VERSION = "1.1";
 
 // ── CSV Parsing (Divers Log / Logbuch Export) ───────────────────────────────
 // Column layout of the export (0-indexed):
@@ -1126,7 +1126,7 @@ function TauchbuchApp() {
             🏠
           </button>
           <span style={{fontWeight:900,fontSize:18,letterSpacing:-0.5,flex:1,textAlign:"center",marginLeft:-8}}>
-            🤿 Tauchbuch
+            🤿 Tauchbuch {dives.length > 0 && <span style={{fontSize:12,fontWeight:600,color:"rgba(232,244,253,0.4)"}}>({dives.length})</span>}
           </span>
           <div style={{display:"flex",gap:8,flexShrink:0}}>
             <button onClick={addNewDive} style={{background:"rgba(34,197,94,0.15)",color:"#4ade80",border:"1px solid rgba(34,197,94,0.25)",borderRadius:20,padding:"7px 12px",fontSize:12,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>+ Tauchgang</button>

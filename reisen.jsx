@@ -1,6 +1,6 @@
 const { useState, useEffect, useCallback } = React;
 
-const APP_VERSION = "0.2.0";
+const APP_VERSION = "1.1";
 
 function parseDateToTs(d) {
   if (!d) return 0;
@@ -103,6 +103,16 @@ function ReisenApp() {
     setNewName("");
   };
 
+  const moveName = (name, direction) => {
+    const idx = names.indexOf(name);
+    if (idx < 0) return;
+    const swapWith = idx + direction;
+    if (swapWith < 0 || swapWith >= names.length) return;
+    const next = [...names];
+    [next[idx], next[swapWith]] = [next[swapWith], next[idx]];
+    saveNames(next);
+  };
+
   const renameManagedTrip = async (oldName, newName) => {
     if (!newName.trim()) return;
     saveNames(names.map(n => n === oldName ? newName : n));
@@ -142,10 +152,14 @@ function ReisenApp() {
         </div>
         {manageOpen && (<>
         <div style={{display:"flex",flexDirection:"column",gap:6}}>
-          {names.map((n) => (
+          {names.map((n, idx) => (
             <div key={n} style={{display:"flex",alignItems:"center",gap:8,background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:10,padding:"6px 8px"}}>
               <input value={n} onChange={e=>renameManagedTrip(n, e.target.value)}
                 style={{flex:1,background:"transparent",border:"none",color:"#e8f4fd",fontSize:14,padding:"4px 6px",minWidth:0}} />
+              <button onClick={()=>moveName(n, -1)} disabled={idx===0}
+                style={{background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:8,width:26,height:26,color:idx===0?"rgba(232,244,253,0.2)":"#e8f4fd",fontSize:12,cursor:idx===0?"default":"pointer",flexShrink:0}}>▲</button>
+              <button onClick={()=>moveName(n, 1)} disabled={idx===names.length-1}
+                style={{background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:8,width:26,height:26,color:idx===names.length-1?"rgba(232,244,253,0.2)":"#e8f4fd",fontSize:12,cursor:idx===names.length-1?"default":"pointer",flexShrink:0}}>▼</button>
             </div>
           ))}
         </div>
@@ -160,7 +174,7 @@ function ReisenApp() {
           </button>
         </div>
         <div style={{fontSize:11,color:"rgba(232,244,253,0.35)",marginTop:8,lineHeight:1.5}}>
-          Jeder Ort aus deinen Tauchgängen wird beim Import automatisch als eigene Reise angelegt. Die Reihenfolge der Reisen-Karten unten richtet sich automatisch nach dem Datum des letzten Tauchgangs (neuste zuerst). Hier kannst du Reisen nur umbenennen oder neue anlegen.
+          Jeder Ort aus deinen Tauchgängen wird beim Import automatisch als eigene Reise angelegt. Die Reihenfolge der Reisen-Karten unten richtet sich unabhängig davon automatisch nach dem Datum des letzten Tauchgangs (neuste zuerst). Die Pfeile hier sortieren nur diese Verwaltungsliste (z.B. für Dropdowns im Tauchbuch).
         </div>
         </>)}
       </div>
@@ -213,12 +227,15 @@ function ReisenApp() {
                 </div>
               </div>
 
-              <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
-                <SummaryChip label="Tauchgänge" value={trip.count} />
-                <SummaryChip label="Gesamtzeit" value={fmtDuration(trip.totalMin)} />
-                <SummaryChip label="Zeit/TG" value={fmtDuration(trip.timePerDive)} />
-                <SummaryChip label="max. Tiefe" value={trip.maxDepth?trip.maxDepth+" m":"—"} />
-                <SummaryChip label="Nr." value={trip.numMin && trip.numMax ? `${trip.numMin} – ${trip.numMax}` : "—"} />
+              <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                  <SummaryChip label="Tauchgänge" value={trip.count} />
+                  <SummaryChip label="Gesamtzeit" value={fmtDuration(trip.totalMin)} />
+                  <SummaryChip label="max. Tiefe" value={trip.maxDepth?trip.maxDepth+" m":"—"} />
+                </div>
+                <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                  <SummaryChip label="Nr." value={trip.numMin && trip.numMax ? `${trip.numMin} – ${trip.numMax}` : "—"} />
+                </div>
               </div>
             </div>
           </div>

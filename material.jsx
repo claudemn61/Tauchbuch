@@ -1,33 +1,61 @@
 const { useState, useEffect } = React;
 
-const APP_VERSION = "0.2.0";
+const APP_VERSION = "1.1";
 
 const MATERIAL_FIELDS = [
-  { key: "regulator", label: "Regulator", icon: "🫁" },
-  { key: "bcd", label: "BCD", icon: "🦺" },
-  { key: "anzug", label: "Anzug", icon: "🤿" },
+  { key: "regulator", label: "Regulator", icon: "🫁", hasRevision: true },
+  { key: "bcd", label: "BCD", icon: "🦺", hasRevision: true },
+  { key: "anzug", label: "Anzug", icon: "🤿", hasRevision: true },
   { key: "maske", label: "Maske", icon: "🥽" },
   { key: "finns", label: "Finns", icon: "🩴" },
-  { key: "uhrComputer", label: "Uhr/Computer", icon: "⌚" },
+  { key: "uhrComputer", label: "Uhr/Computer", icon: "⌚", hasRevision: true },
 ];
 
-function MaterialField({ label, icon, value, onSave }) {
+function MaterialField({ label, icon, value, onSave, hasRevision, revisionValue, onSaveRevision }) {
   const [editing, setEditing] = useState(false);
   const [val, setVal] = useState(value || "");
+  const [expanded, setExpanded] = useState(false);
+  const [revEditing, setRevEditing] = useState(false);
+  const [revVal, setRevVal] = useState(revisionValue || "");
   const commit = () => { setEditing(false); if (val !== (value||"")) onSave(val); };
+  const commitRev = () => { setRevEditing(false); if (revVal !== (revisionValue||"")) onSaveRevision(revVal); };
   return (
-    <div style={{display:"flex",alignItems:"center",gap:12,padding:"12px 0",borderBottom:"1px solid rgba(255,255,255,0.06)"}}>
-      <span style={{fontSize:18,width:26,textAlign:"center",flexShrink:0}}>{icon}</span>
-      <span style={{fontSize:13,color:"rgba(232,244,253,0.5)",minWidth:100,flexShrink:0}}>{label}</span>
-      {editing ? (
-        <input value={val} onChange={e=>setVal(e.target.value)} onBlur={commit} autoFocus
-          onKeyDown={e=>{ if(e.key==="Enter"){e.preventDefault();commit();} }}
-          style={{flex:1,background:"rgba(255,255,255,0.08)",border:"1px solid rgba(74,222,128,0.4)",borderRadius:8,padding:"6px 10px",color:"#e8f4fd",fontSize:14}} />
-      ) : (
-        <span onClick={()=>{setVal(value||"");setEditing(true);}}
-          style={{flex:1,fontSize:14,fontWeight:500,color:value?"#e8f4fd":"rgba(232,244,253,0.25)",cursor:"pointer"}}>
-          {value || "Tippen zum Hinzufügen…"}
-        </span>
+    <div style={{padding:"12px 0",borderBottom:"1px solid rgba(255,255,255,0.06)"}}>
+      <div style={{display:"flex",alignItems:"center",gap:12}}>
+        <span style={{fontSize:18,width:26,textAlign:"center",flexShrink:0}}>{icon}</span>
+        <span style={{fontSize:13,color:"rgba(232,244,253,0.5)",minWidth:100,flexShrink:0}}>{label}</span>
+        {editing ? (
+          <input value={val} onChange={e=>setVal(e.target.value)} onBlur={commit} autoFocus
+            onKeyDown={e=>{ if(e.key==="Enter"){e.preventDefault();commit();} }}
+            style={{flex:1,background:"rgba(255,255,255,0.08)",border:"1px solid rgba(74,222,128,0.4)",borderRadius:8,padding:"6px 10px",color:"#e8f4fd",fontSize:14}} />
+        ) : (
+          <span onClick={()=>{setVal(value||"");setEditing(true);}}
+            style={{flex:1,fontSize:14,fontWeight:500,color:value?"#e8f4fd":"rgba(232,244,253,0.25)",cursor:"pointer"}}>
+            {value || "Tippen zum Hinzufügen…"}
+          </span>
+        )}
+        {hasRevision && (
+          <button onClick={()=>setExpanded(e=>!e)}
+            style={{background:"none",border:"none",color:"rgba(232,244,253,0.35)",cursor:"pointer",fontSize:12,flexShrink:0,padding:"2px 4px"}}>
+            {expanded?"▾":"▸"}
+          </button>
+        )}
+      </div>
+      {hasRevision && expanded && (
+        <div style={{display:"flex",alignItems:"center",gap:12,marginTop:8,paddingLeft:38}}>
+          <span style={{fontSize:11,color:"rgba(232,244,253,0.4)",minWidth:74,flexShrink:0}}>Revision</span>
+          {revEditing ? (
+            <input value={revVal} onChange={e=>setRevVal(e.target.value)} onBlur={commitRev} autoFocus
+              onKeyDown={e=>{ if(e.key==="Enter"){e.preventDefault();commitRev();} }}
+              placeholder="TT.MM.JJJJ"
+              style={{flex:1,background:"rgba(255,255,255,0.08)",border:"1px solid rgba(74,222,128,0.4)",borderRadius:8,padding:"5px 9px",color:"#e8f4fd",fontSize:13}} />
+          ) : (
+            <span onClick={()=>{setRevVal(revisionValue||"");setRevEditing(true);}}
+              style={{flex:1,fontSize:13,color:revisionValue?"#e8f4fd":"rgba(232,244,253,0.25)",cursor:"pointer"}}>
+              {revisionValue || "Datum eintragen…"}
+            </span>
+          )}
+        </div>
       )}
     </div>
   );
@@ -71,7 +99,10 @@ function MaterialApp() {
         <div style={{background:"rgba(255,255,255,0.04)",borderRadius:14,padding:"4px 16px",border:"1px solid rgba(255,255,255,0.06)"}}>
           {MATERIAL_FIELDS.map(f => (
             <MaterialField key={f.key} label={f.label} icon={f.icon} value={data[f.key]}
-              onSave={v=>saveField(f.key, v)} />
+              onSave={v=>saveField(f.key, v)}
+              hasRevision={f.hasRevision}
+              revisionValue={data[f.key+"Revision"]}
+              onSaveRevision={v=>saveField(f.key+"Revision", v)} />
           ))}
         </div>
       </div>

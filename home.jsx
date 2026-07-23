@@ -1,6 +1,6 @@
 const { useState, useEffect, useRef } = React;
 
-const APP_VERSION = "0.2.0";
+const APP_VERSION = "1.1";
 
 // ── Startseite ───────────────────────────────────────────────────────────
 // Editierbares Titelbild (per Tap austauschbar, als Data-URL in Storage
@@ -15,6 +15,8 @@ const CHAPTERS = [
 function HomeApp() {
   const [coverSrc, setCoverSrc] = useState("cover.jpg");
   const [loaded, setLoaded] = useState(false);
+  const [diveCount, setDiveCount] = useState(0);
+  const [reiseCount, setReiseCount] = useState(0);
   const fileRef = useRef(null);
 
   useEffect(() => {
@@ -23,6 +25,16 @@ function HomeApp() {
         const r = await window.storage.get("home:coverImage");
         if (r && r.value) setCoverSrc(r.value);
       } catch {}
+      try {
+        const keys = await window.storage.list("dive:");
+        const ids = keys?.keys || [];
+        setDiveCount(ids.length);
+        const raw = await Promise.all(ids.map(async k => {
+          try { const r = await window.storage.get(k); return r ? JSON.parse(r.value) : null; } catch { return null; }
+        }));
+        const reiseSet = new Set(raw.filter(Boolean).map(d => d.customFields?.reise).filter(Boolean));
+        setReiseCount(reiseSet.size);
+      } catch (e) { console.error("Count load error:", e); }
       setLoaded(true);
     })();
   }, []);
@@ -39,6 +51,12 @@ function HomeApp() {
   };
 
   if (!loaded) return null;
+
+  const subtitleFor = (key) => {
+    if (key === "tauchgaenge") return diveCount ? `${diveCount} Tauchgänge` : null;
+    if (key === "reisen") return reiseCount ? `${reiseCount} Reisen` : null;
+    return null;
+  };
 
   return (
     <div style={{minHeight:"100vh",background:"#040e20",color:"#e8f4fd",fontFamily:"-apple-system,BlinkMacSystemFont,sans-serif",paddingBottom:40}}>
@@ -61,13 +79,17 @@ function HomeApp() {
 
       {/* Kapitel */}
       <div style={{padding:"20px 16px",display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
-        {CHAPTERS.map(ch => (
-          <div key={ch.key} onClick={()=>{window.location.href=ch.href;}}
-            style={{background:ch.bg,border:`1px solid ${ch.border}`,borderRadius:16,padding:"22px 16px",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:8,cursor:"pointer",minHeight:110}}>
-            <span style={{fontSize:30}}>{ch.icon}</span>
-            <span style={{fontSize:14,fontWeight:700,color:ch.color}}>{ch.label}</span>
-          </div>
-        ))}
+        {CHAPTERS.map(ch => {
+          const subtitle = subtitleFor(ch.key);
+          return (
+            <div key={ch.key} onClick={()=>{window.location.href=ch.href;}}
+              style={{background:ch.bg,border:`1px solid ${ch.border}`,borderRadius:16,padding:"22px 16px",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:6,cursor:"pointer",minHeight:110}}>
+              <span style={{fontSize:30}}>{ch.icon}</span>
+              <span style={{fontSize:14,fontWeight:700,color:ch.color}}>{ch.label}</span>
+              {subtitle && <span style={{fontSize:11,color:"rgba(232,244,253,0.4)"}}>{subtitle}</span>}
+            </div>
+          );
+        })}
       </div>
 
       <div style={{textAlign:"center",padding:"18px 16px 8px",fontSize:10,color:"rgba(232,244,253,0.25)"}}>Tauchbuch v{APP_VERSION}</div>
