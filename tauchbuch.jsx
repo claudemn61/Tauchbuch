@@ -503,9 +503,8 @@ function SelectField({ label, value, options, unit, onSave }) {
 }
 
 // ── List row ─────────────────────────────────────────────────────────────
-function DiveRow({ d, onClick, sortId, selectMode, isSelected, onToggleSelect, reiseNumbers }) {
+function DiveRow({ d, onClick, sortId, selectMode, isSelected, onToggleSelect }) {
   const showSortValue = sortId && sortId !== "date" && sortId !== "number";
-  const badge = reiseTgBadge(d, reiseNumbers);
   return (
     <div onClick={selectMode ? ()=>onToggleSelect(d.id) : onClick}
       style={{padding:"11px 16px",borderBottom:"1px solid rgba(255,255,255,0.04)",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",background:isSelected?"rgba(56,189,248,0.1)":"transparent"}}
@@ -520,7 +519,6 @@ function DiveRow({ d, onClick, sortId, selectMode, isSelected, onToggleSelect, r
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:6,marginBottom:2}}>
           <div style={{display:"flex",alignItems:"center",gap:6,minWidth:0}}>
             <span style={{fontWeight:700,fontSize:15,flexShrink:0}}>{d.name}</span>
-            {badge && <span style={{fontSize:11,fontWeight:700,color:"#fbbf24",flexShrink:0}}>{badge}</span>}
             {d.time && <span style={{fontSize:11,fontWeight:600,color:"#38bdf8",flexShrink:0}}>{d.time}</span>}
             {d.buddy && <span style={{fontSize:11,fontWeight:600,color:"#f87171",flexShrink:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>👤 {d.buddy}</span>}
           </div>
@@ -862,6 +860,8 @@ function TauchbuchApp() {
   const [sortDir, setSortDir] = useState("desc");
   const [showSortMenu, setShowSortMenu] = useState(false);
   const [collapsedYears, setCollapsedYears] = useState(new Set());
+  const [groupBy, setGroupBy] = useState("year"); // "year" | "reise"
+  const [collapsedReisen, setCollapsedReisen] = useState(new Set());
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [showImportMenu, setShowImportMenu] = useState(false);
   const [showBackupMenu, setShowBackupMenu] = useState(false);
@@ -1100,6 +1100,16 @@ function TauchbuchApp() {
   const years = [...new Set(filtered.map(d => d.year).filter(Boolean))].sort((a,b)=>b-a);
   const noYear = filtered.filter(d => !d.year);
 
+  // Reise-Gruppen: neuste Reise zuerst (nach dem Datum ihres letzten
+  // Tauchgangs), konsistent mit der Sortierung auf der Reisen-Seite.
+  const reiseNamesPresent = [...new Set(filtered.map(d => d.customFields?.reise).filter(Boolean))];
+  const reiseOrder = reiseNamesPresent.map(name => {
+    const lastTs = filtered.filter(d => d.customFields?.reise === name)
+      .reduce((m,d) => Math.max(m, parseDateToTs(d.date)), 0);
+    return { name, lastTs };
+  }).sort((a,b) => b.lastTs - a.lastTs).map(x => x.name);
+  const noReise = filtered.filter(d => !d.customFields?.reise);
+
   const toggleSelect = (id) => setSelectedIds(prev => { const n = new Set(prev); n.has(id)?n.delete(id):n.add(id); return n; });
 
   return (
@@ -1111,7 +1121,10 @@ function TauchbuchApp() {
       {/* Header */}
       <div style={{position:"sticky",top:0,zIndex:10,background:"#040e20"}}>
         <div style={{background:"rgba(255,255,255,0.03)",borderBottom:"1px solid rgba(255,255,255,0.06)",padding:"calc(28px + env(safe-area-inset-top, 0px)) 16px 12px",display:"flex",alignItems:"center",justifyContent:"space-between",backdropFilter:"blur(10px)"}}>
-          <span style={{fontSize:10,color:"rgba(232,244,253,0.3)",flexShrink:0,minWidth:32}}>v{APP_VERSION}</span>
+          <button onClick={()=>{window.location.href="index.html";}} title="Zur Startseite"
+            style={{background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,width:32,height:32,display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,color:"rgba(232,244,253,0.8)",cursor:"pointer",flexShrink:0}}>
+            🏠
+          </button>
           <span style={{fontWeight:900,fontSize:18,letterSpacing:-0.5,flex:1,textAlign:"center",marginLeft:-8}}>
             🤿 Tauchbuch
           </span>
@@ -1120,7 +1133,7 @@ function TauchbuchApp() {
           </div>
         </div>
 
-        {/* Icon-Buttons: Import / Backup / Auswahl / Reisen / Statistik / Richtung / Jahr */}
+        {/* Icon-Buttons: Import / Backup / Auswahl / Gruppierung / Richtung / Auf-Zu */}
         <div style={{padding:"10px 16px 0",display:"flex",gap:6}}>
           <button onClick={()=>{ setShowImportMenu(m=>!m); setShowBackupMenu(false); }} title="CSV Import"
             style={{flex:"1 1 0",minWidth:0,aspectRatio:"1",boxSizing:"border-box",display:"flex",alignItems:"center",justifyContent:"center",background:showImportMenu?"rgba(56,189,248,0.15)":"rgba(255,255,255,0.05)",border:`1px solid ${showImportMenu?"rgba(56,189,248,0.35)":"rgba(255,255,255,0.1)"}`,borderRadius:10,color:"#fff",fontSize:17,cursor:"pointer"}}>
@@ -1134,21 +1147,21 @@ function TauchbuchApp() {
             style={{flex:"1 1 0",minWidth:0,aspectRatio:"1",boxSizing:"border-box",display:"flex",alignItems:"center",justifyContent:"center",background:selectMode?"rgba(14,165,233,0.18)":"rgba(255,255,255,0.05)",border:`1px solid ${selectMode?"rgba(14,165,233,0.4)":"rgba(255,255,255,0.1)"}`,borderRadius:10,color:"#fff",fontSize:21,cursor:"pointer"}}>
             {selectMode?"✕":"☑"}
           </button>
-          <button onClick={()=>{window.location.href="reisen.html";}} title="Reisen"
-            style={{flex:"1 1 0",minWidth:0,aspectRatio:"1",boxSizing:"border-box",display:"flex",alignItems:"center",justifyContent:"center",background:"rgba(245,166,35,0.15)",border:"1px solid rgba(245,166,35,0.25)",borderRadius:10,color:"#fff",fontSize:17,cursor:"pointer"}}>
-            🧭
-          </button>
-          <button onClick={()=>{window.location.href="statistik.html";}} title="Statistik"
-            style={{flex:"1 1 0",minWidth:0,aspectRatio:"1",boxSizing:"border-box",display:"flex",alignItems:"center",justifyContent:"center",background:"rgba(245,158,11,0.15)",border:"1px solid rgba(245,158,11,0.25)",borderRadius:10,color:"#fff",fontSize:17,cursor:"pointer"}}>
-            📊
+          <button onClick={()=>setGroupBy(g=>g==="year"?"reise":"year")} title={groupBy==="year"?"Gruppiert nach Jahr (zu Reise wechseln)":"Gruppiert nach Reise (zu Jahr wechseln)"}
+            style={{flex:"1 1 0",minWidth:0,aspectRatio:"1",boxSizing:"border-box",display:"flex",alignItems:"center",justifyContent:"center",background:groupBy==="reise"?"rgba(245,166,35,0.18)":"rgba(255,255,255,0.05)",border:`1px solid ${groupBy==="reise"?"rgba(245,166,35,0.4)":"rgba(255,255,255,0.1)"}`,borderRadius:10,color:groupBy==="reise"?"#f5a623":"#fff",fontSize:17,cursor:"pointer"}}>
+            {groupBy==="year" ? "📅" : "🧭"}
           </button>
           <button onClick={()=>setSortDir(d=>d==="asc"?"desc":"asc")} title={sortDir==="asc"?"Aufsteigend":"Absteigend"}
             style={{flex:"1 1 0",minWidth:0,aspectRatio:"1",boxSizing:"border-box",display:"flex",alignItems:"center",justifyContent:"center",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,color:"#fff",fontSize:17,cursor:"pointer"}}>
             {sortDir==="asc"?"↑":"↓"}
           </button>
-          <button onClick={()=>setCollapsedYears(s=>s.size===0?new Set(years):new Set())} title={collapsedYears.size===0?"Alle reduzieren":"Alle erweitern"}
+          <button onClick={()=>{
+              if (groupBy==="year") setCollapsedYears(s=>s.size===0?new Set(years):new Set());
+              else setCollapsedReisen(s=>s.size===0?new Set(reiseOrder):new Set());
+            }}
+            title={(groupBy==="year"?collapsedYears:collapsedReisen).size===0?"Alle reduzieren":"Alle erweitern"}
             style={{flex:"1 1 0",minWidth:0,aspectRatio:"1",boxSizing:"border-box",display:"flex",alignItems:"center",justifyContent:"center",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,color:"#fff",fontSize:14,fontWeight:700,letterSpacing:1,cursor:"pointer"}}>
-            {collapsedYears.size===0?"⊟⊟":"⊞⊞"}
+            {(groupBy==="year"?collapsedYears:collapsedReisen).size===0?"⊟⊟":"⊞⊞"}
           </button>
         </div>
 
@@ -1412,9 +1425,10 @@ function TauchbuchApp() {
         <div style={{padding:"40px 16px",textAlign:"center",color:"rgba(232,244,253,0.4)",fontSize:13}}>
           Noch keine Tauchgänge. Über 📥 eine CSV-Datei importieren oder mit „+ Tauchgang" manuell anlegen.
         </div>
-      ) : years.length === 0 && noYear.length === 0 ? (
-        <div style={{padding:"40px 16px",textAlign:"center",color:"rgba(232,244,253,0.4)",fontSize:13}}>Keine Treffer.</div>
-      ) : (
+      ) : groupBy === "year" ? (
+        years.length === 0 && noYear.length === 0 ? (
+          <div style={{padding:"40px 16px",textAlign:"center",color:"rgba(232,244,253,0.4)",fontSize:13}}>Keine Treffer.</div>
+        ) : (
         <div>
           {years.map(yr => {
             const yDives = sortDives(filtered.filter(d => d.year === yr), sortId, sortDir);
@@ -1451,7 +1465,7 @@ function TauchbuchApp() {
                   <span style={{fontSize:12,color:"rgba(232,244,253,0.35)"}}>{fmtDuration(totalMin)} {collapsed?"▸":"▾"}</span>
                 </div>
                 {!collapsed && yDives.map(d => (
-                  <DiveRow key={d.id} d={d} sortId={sortId} reiseNumbers={reiseNumbers}
+                  <DiveRow key={d.id} d={d} sortId={sortId}
                     selectMode={selectMode} isSelected={selectedIds.has(d.id)} onToggleSelect={toggleSelect}
                     onClick={()=>{setSelected(d);setReturnTo(null);setView("detail");}} />
                 ))}
@@ -1459,11 +1473,66 @@ function TauchbuchApp() {
             );
           })}
           {noYear.length > 0 && sortDives(noYear, sortId, sortDir).map(d => (
-            <DiveRow key={d.id} d={d} sortId={sortId} reiseNumbers={reiseNumbers}
+            <DiveRow key={d.id} d={d} sortId={sortId}
               selectMode={selectMode} isSelected={selectedIds.has(d.id)} onToggleSelect={toggleSelect}
               onClick={()=>{setSelected(d);setReturnTo(null);setView("detail");}} />
           ))}
         </div>
+        )
+      ) : (
+        reiseOrder.length === 0 && noReise.length === 0 ? (
+          <div style={{padding:"40px 16px",textAlign:"center",color:"rgba(232,244,253,0.4)",fontSize:13}}>Keine Treffer.</div>
+        ) : (
+        <div>
+          {reiseOrder.map(reiseName => {
+            const rDives = sortDives(filtered.filter(d => d.customFields?.reise === reiseName), sortId, sortDir);
+            const collapsed = collapsedReisen.has(reiseName);
+            const totalMin = rDives.reduce((s,d)=>s+(d.durationMin||0),0);
+            return (
+              <div key={reiseName}>
+                <div onClick={()=>{
+                    if (selectMode) {
+                      const rIds = rDives.map(d=>d.id);
+                      const allSelected = rIds.every(id=>selectedIds.has(id));
+                      setSelectedIds(prev => {
+                        const n = new Set(prev);
+                        rIds.forEach(id => allSelected ? n.delete(id) : n.add(id));
+                        return n;
+                      });
+                    } else {
+                      setCollapsedReisen(s=>{const n=new Set(s);n.has(reiseName)?n.delete(reiseName):n.add(reiseName);return n;});
+                    }
+                  }}
+                  style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 16px",cursor:"pointer",background:"rgba(255,255,255,0.02)",borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
+                  <div style={{display:"flex",alignItems:"center",gap:8,minWidth:0}}>
+                    {selectMode && (() => {
+                      const rIds = rDives.map(d=>d.id);
+                      const allSelected = rIds.length>0 && rIds.every(id=>selectedIds.has(id));
+                      return (
+                        <div style={{flexShrink:0,width:18,height:18,borderRadius:5,border:`2px solid ${allSelected?"#7dd3fc":"rgba(232,244,253,0.3)"}`,background:allSelected?"#7dd3fc":"transparent",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                          {allSelected && <span style={{color:"#0a1628",fontSize:11,fontWeight:900}}>✓</span>}
+                        </div>
+                      );
+                    })()}
+                    <span style={{fontWeight:700,color:"#fbbf24",fontSize:14,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{reiseName} · {rDives.length} Tauchgänge</span>
+                  </div>
+                  <span style={{fontSize:12,color:"rgba(232,244,253,0.35)",flexShrink:0,marginLeft:8}}>{fmtDuration(totalMin)} {collapsed?"▸":"▾"}</span>
+                </div>
+                {!collapsed && rDives.map(d => (
+                  <DiveRow key={d.id} d={d} sortId={sortId}
+                    selectMode={selectMode} isSelected={selectedIds.has(d.id)} onToggleSelect={toggleSelect}
+                    onClick={()=>{setSelected(d);setReturnTo(null);setView("detail");}} />
+                ))}
+              </div>
+            );
+          })}
+          {noReise.length > 0 && sortDives(noReise, sortId, sortDir).map(d => (
+            <DiveRow key={d.id} d={d} sortId={sortId}
+              selectMode={selectMode} isSelected={selectedIds.has(d.id)} onToggleSelect={toggleSelect}
+              onClick={()=>{setSelected(d);setReturnTo(null);setView("detail");}} />
+          ))}
+        </div>
+        )
       )}
     </div>
   );

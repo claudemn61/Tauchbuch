@@ -3,20 +3,20 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
-<title>Tauchbuch</title>
+<title>Tauch-Material</title>
 
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-<meta name="apple-mobile-web-app-title" content="Tauchbuch" />
+<meta name="apple-mobile-web-app-title" content="Tauch-Material" />
 <link rel="apple-touch-icon" href="apple-touch-icon.png" />
 <link rel="apple-touch-icon" sizes="120x120" href="apple-touch-icon-120.png" />
 <link rel="apple-touch-icon" sizes="152x152" href="apple-touch-icon-152.png" />
 <link rel="apple-touch-icon" sizes="167x167" href="apple-touch-icon-167.png" />
 <link rel="icon" href="favicon-32.png" sizes="32x32" />
-<meta name="theme-color" content="#040e20" />
+<meta name="theme-color" content="#0f2a2e" />
 
 <style>
-  html, body { margin:0; padding:0; background:#040e20; -webkit-tap-highlight-color: transparent; }
+  html, body { margin:0; padding:0; background:#0f2a2e; -webkit-tap-highlight-color: transparent; }
   #root { min-height: 100vh; }
   * { -webkit-touch-callout: none; }
   input, textarea, button { -webkit-user-select: text; user-select: text; }
@@ -195,19 +195,19 @@
 
     let appSource;
     try {
-      const resp = await fetch("home.jsx?v=" + Date.now(), { cache: "no-store" });
-      if (!resp.ok) { status.textContent = "FEHLER beim Laden von home.jsx: HTTP " + resp.status; status.style.color = "#f87171"; return; }
+      const resp = await fetch("material.jsx?v=" + Date.now(), { cache: "no-store" });
+      if (!resp.ok) { status.textContent = "FEHLER beim Laden von material.jsx: HTTP " + resp.status; status.style.color = "#f87171"; return; }
       appSource = await resp.text();
       status.textContent = "Code geladen ✓ (" + appSource.length + " Zeichen) — kompiliere…";
     } catch (e) {
       status.style.color = "#f87171";
-      status.textContent = "FEHLER beim Laden von home.jsx:\n" + (e.message || String(e));
+      status.textContent = "FEHLER beim Laden von material.jsx:\n" + (e.message || String(e));
       return;
     }
 
     let compiled;
     try {
-      compiled = Babel.transform(appSource, { presets: ["react"] }).code + "\n//# sourceURL=home.jsx";
+      compiled = Babel.transform(appSource, { presets: ["react"] }).code + "\n//# sourceURL=material.jsx";
       status.textContent = "Kompiliert ✓ — starte Seite…";
     } catch (e) {
       status.style.color = "#f87171";
@@ -215,8 +215,8 @@
       return;
     }
     try {
-      const runApp = new Function("React", "ReactDOM", compiled + "\n; return HomeApp;");
-      const HomeApp = runApp(React, ReactDOM);
+      const runApp = new Function("React", "ReactDOM", compiled + "\n; return MaterialApp;");
+      const MaterialApp = runApp(React, ReactDOM);
 
       // Error Boundary: catches errors thrown during render/lifecycle — even
       // ones happening later (e.g. after data finishes loading from storage),
@@ -245,7 +245,7 @@
       }
 
       const root = ReactDOM.createRoot(document.getElementById("root"));
-      root.render(React.createElement(AppErrorBoundary, null, React.createElement(HomeApp)));
+      root.render(React.createElement(AppErrorBoundary, null, React.createElement(MaterialApp)));
       setTimeout(function() {
         if (!status.textContent.includes("FEHLER")) status.style.display = "none";
       }, 800);

@@ -195,19 +195,19 @@
 
     let appSource;
     try {
-      const resp = await fetch("home.jsx?v=" + Date.now(), { cache: "no-store" });
-      if (!resp.ok) { status.textContent = "FEHLER beim Laden von home.jsx: HTTP " + resp.status; status.style.color = "#f87171"; return; }
+      const resp = await fetch("tauchbuch.jsx?v=" + Date.now(), { cache: "no-store" });
+      if (!resp.ok) { status.textContent = "FEHLER beim Laden von tauchbuch.jsx: HTTP " + resp.status; status.style.color = "#f87171"; return; }
       appSource = await resp.text();
       status.textContent = "Code geladen ✓ (" + appSource.length + " Zeichen) — kompiliere…";
     } catch (e) {
       status.style.color = "#f87171";
-      status.textContent = "FEHLER beim Laden von home.jsx:\n" + (e.message || String(e));
+      status.textContent = "FEHLER beim Laden von tauchbuch.jsx:\n" + (e.message || String(e));
       return;
     }
 
     let compiled;
     try {
-      compiled = Babel.transform(appSource, { presets: ["react"] }).code + "\n//# sourceURL=home.jsx";
+      compiled = Babel.transform(appSource, { presets: ["react"] }).code + "\n//# sourceURL=tauchbuch.jsx";
       status.textContent = "Kompiliert ✓ — starte Seite…";
     } catch (e) {
       status.style.color = "#f87171";
@@ -215,8 +215,8 @@
       return;
     }
     try {
-      const runApp = new Function("React", "ReactDOM", compiled + "\n; return HomeApp;");
-      const HomeApp = runApp(React, ReactDOM);
+      const runApp = new Function("React", "ReactDOM", compiled + "\n; return TauchbuchApp;");
+      const TauchbuchApp = runApp(React, ReactDOM);
 
       // Error Boundary: catches errors thrown during render/lifecycle — even
       // ones happening later (e.g. after data finishes loading from storage),
@@ -245,7 +245,7 @@
       }
 
       const root = ReactDOM.createRoot(document.getElementById("root"));
-      root.render(React.createElement(AppErrorBoundary, null, React.createElement(HomeApp)));
+      root.render(React.createElement(AppErrorBoundary, null, React.createElement(TauchbuchApp)));
       setTimeout(function() {
         if (!status.textContent.includes("FEHLER")) status.style.display = "none";
       }, 800);
