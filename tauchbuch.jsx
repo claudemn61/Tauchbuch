@@ -1,6 +1,6 @@
 const { useState, useEffect, useRef, useCallback, useMemo } = React;
 
-const APP_VERSION = "0.1";
+const APP_VERSION = "0.1.1";
 
 // ── CSV Parsing (Divers Log / Logbuch Export) ───────────────────────────────
 // Column layout of the export (0-indexed):
@@ -501,17 +501,17 @@ function DetailContent({ d, dives, setDives, setSelected, setView, saveDive, con
 
       <div style={{padding:"0 16px"}}>
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:2}}>
+          <span style={{fontSize:11,color:"#38bdf8"}}>{d.date}</span>
           <div style={{display:"flex",alignItems:"center",gap:8}}>
-            <span style={{fontSize:11,color:"#38bdf8"}}>{d.date}</span>
             <span style={{display:"flex",gap:1}}>
               {[1,2,3,4,5].map(s=>(
                 <span key={s} onClick={()=>saveField({rating: (d.rating||0)===s ? 0 : s})}
                   style={{fontSize:13,cursor:"pointer",color:s<=(d.rating||0)?"#f59e0b":"rgba(232,244,253,0.2)"}}>★</span>
               ))}
             </span>
-            {d.time && <span style={{fontSize:11,color:"#38bdf8"}}>· {d.time}</span>}
+            {d.time && <span style={{fontSize:11,color:"#38bdf8"}}>{d.time}</span>}
+            {d.nitrox==="Ja" && <span style={{background:"rgba(34,197,94,0.2)",color:"#4ade80",borderRadius:20,padding:"2px 10px",fontSize:10,fontWeight:700}}>NITROX</span>}
           </div>
-          {d.nitrox==="Ja" && <span style={{background:"rgba(34,197,94,0.2)",color:"#4ade80",borderRadius:20,padding:"2px 10px",fontSize:10,fontWeight:700}}>NITROX</span>}
         </div>
 
         {/* Titel: nur Zahl, darunter gelbe Reise/TG-Nummer (z.B. 31/2) */}
@@ -865,10 +865,7 @@ function TauchbuchApp() {
       {/* Header */}
       <div style={{position:"sticky",top:0,zIndex:10,background:"#040e20"}}>
         <div style={{background:"rgba(255,255,255,0.03)",borderBottom:"1px solid rgba(255,255,255,0.06)",padding:"calc(28px + env(safe-area-inset-top, 0px)) 16px 12px",display:"flex",alignItems:"center",justifyContent:"space-between",backdropFilter:"blur(10px)"}}>
-          <button onClick={()=>{window.location.href="index.html";}} title="Nach oben"
-            style={{background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,width:32,height:32,display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,color:"rgba(232,244,253,0.8)",cursor:"pointer",flexShrink:0}}>
-            🏠
-          </button>
+          <span style={{fontSize:10,color:"rgba(232,244,253,0.3)",flexShrink:0,minWidth:32}}>v{APP_VERSION}</span>
           <span style={{fontWeight:900,fontSize:18,letterSpacing:-0.5,flex:1,textAlign:"center",marginLeft:-8}}>
             🤿 Tauchbuch
           </span>
@@ -1222,7 +1219,6 @@ function TauchbuchApp() {
           ))}
         </div>
       )}
-      <div style={{textAlign:"center",padding:"18px 16px 8px",fontSize:10,color:"rgba(232,244,253,0.2)"}}>Tauchbuch v{APP_VERSION}</div>
     </div>
   );
 }
