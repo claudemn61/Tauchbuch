@@ -1,6 +1,5 @@
 const { useState, useEffect, useCallback } = React;
 
-const APP_VERSION = "1.3";
 
 function parseDateToTs(d) {
   if (!d) return 0;
@@ -242,7 +241,6 @@ function ReisenApp() {
         ))}
         <div style={{flexShrink:0,width:8}} />
       </div>
-      <div style={{textAlign:"center",padding:"18px 16px 8px",fontSize:10,color:"rgba(232,244,253,0.25)"}}>Tauchbuch v{APP_VERSION}</div>
     </div>
   );
 }

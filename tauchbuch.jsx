@@ -1,6 +1,5 @@
 const { useState, useEffect, useRef, useCallback, useMemo } = React;
 
-const APP_VERSION = "1.3";
 
 // ── CSV Parsing (Divers Log / Logbuch Export) ───────────────────────────────
 // Column layout of the export (0-indexed):
@@ -737,10 +736,11 @@ function DetailContent({ d, dives, setDives, setSelected, setView, saveDive, con
           <span style={{fontSize:11,color:"#38bdf8"}}>{d.date}</span>
         </div>
 
-        {/* Titel: nur Zahl, daneben gelbe Reise/TG-Nummer (z.B. 31/2) */}
-        <div style={{display:"flex",alignItems:"baseline",gap:10,marginBottom:8}}>
+        {/* Titel: nur Zahl, daneben gelbe Reise/TG-Nummer (z.B. 31/2), Tauchspot in Rot */}
+        <div style={{display:"flex",alignItems:"baseline",gap:10,marginBottom:8,flexWrap:"wrap"}}>
           <EditableTitle value={d.name} onSave={v=>saveField({name:v})} />
           {badge && <span style={{fontSize:15,fontWeight:700,color:"#fbbf24"}}>{badge}</span>}
+          {d.tauchspot && <span style={{fontSize:15,fontWeight:700,color:"#f87171"}}>{d.tauchspot}</span>}
         </div>
 
         {/* Bewertung + Nitrox/Air — gross, links, direkt unter der TG-Nummer */}
