@@ -1,6 +1,6 @@
 const { useState, useEffect, useRef, useCallback, useMemo } = React;
 
-const APP_VERSION = "0.1.1";
+const APP_VERSION = "0.2.0";
 
 // ── CSV Parsing (Divers Log / Logbuch Export) ───────────────────────────────
 // Column layout of the export (0-indexed):
@@ -38,6 +38,14 @@ function parseDurationToMin(s) {
   const plain = String(s).match(/^\d+$/);
   if (plain) return +s;
   return 0;
+}
+
+// Alte Exporte/Einträge nutzten "Ja"/"Nein"; das Feld heisst inzwischen
+// Air/Nitrox — hier werden bestehende Werte beim Import/Laden mitgezogen.
+function normalizeNitroxValue(v) {
+  if (v === "Ja") return "Nitrox";
+  if (v === "Nein") return "Air";
+  return v;
 }
 
 function fmtDuration(min) {
@@ -79,7 +87,7 @@ function parseDiveCsv(text) {
       blei: clean(cols[16]),
       flasche: clean(cols[17]),
       volumen: clean(cols[18]),
-      nitrox: clean(cols[19]),
+      nitrox: normalizeNitroxValue(clean(cols[19])),
       buddy: clean(cols[20]),
       bemerkungen: clean(cols[21]),
       rating: 0,
@@ -144,6 +152,7 @@ function diveFieldValue(d, id) {
     case "buddy": return d.buddy || "";
     case "reise": return cf.reise || "";
     case "rating": return d.rating || 0;
+    case "bemerkung": return d.bemerkungen || "";
     default: return "";
   }
 }
@@ -195,25 +204,169 @@ function sortDives(dives, sortId, dir) {
   return dir === "asc" ? sorted : sorted.reverse();
 }
 
-// Simple substring search across every field of a dive (no query operators —
-// just "does any field contain this text", covering the full detail record).
+// ── Such-/Filter-Engine (analog Flugbuch) ───────────────────────────────────
+// Unterstützt: Freitext, UND/AND/&&, ODER/OR/||, feld:wert, feld>wert,
+// feld<wert, feld>=wert, feld<=wert, +wort (muss), -wort (darf nicht).
+const FIELD_ALIASES = {
+  nr: "number", nummer: "number", number: "number",
+  datum: "date", date: "date",
+  zeit: "time", time: "time",
+  land: "land",
+  ort: "ort", platz: "ort", resort: "ort",
+  tauchspot: "tauchspot", spot: "tauchspot",
+  "tg-nr": "tgNr", tgnr: "tgNr",
+  dauer: "duration", duration: "duration",
+  tiefe: "depth", depth: "depth",
+  temp: "temp", wassertemp: "temp", temperatur: "temp",
+  anzug: "anzug",
+  blei: "blei",
+  flasche: "flasche",
+  volumen: "volumen", vol: "volumen",
+  nitrox: "nitrox", air: "nitrox", gas: "nitrox",
+  buddy: "buddy",
+  reise: "reise",
+  rating: "rating", bewertung: "rating",
+  bemerkung: "bemerkung", bemerkungen: "bemerkung", notiz: "bemerkung",
+};
+const NUMERIC_QUERY_FIELDS = ["number", "tgNr", "duration", "depth", "temp", "blei", "rating"];
+const DATE_QUERY_FIELDS = ["date"];
+const TIME_QUERY_FIELDS = ["time"];
+
+function evalDiveToken(d, tok) {
+  const m = tok.match(/^([\wäöü\-]+)\s*(>=|<=|!=|≠|>|<|=|:)\s*(.+)$/i);
+  if (m) {
+    const fieldRaw = m[1].toLowerCase();
+    const op = (m[2] === "≠" ? "!=" : m[2]);
+    const raw = m[3].trim();
+    const field = FIELD_ALIASES[fieldRaw] || fieldRaw;
+    let fv = diveFieldValue(d, field);
+
+    if (NUMERIC_QUERY_FIELDS.includes(field)) {
+      const cmp = parseFloat(String(raw).replace(",", "."));
+      fv = parseFloat(fv) || 0;
+      if (isNaN(cmp)) return true;
+      if (op === ">") return fv > cmp;
+      if (op === "<") return fv < cmp;
+      if (op === ">=") return fv >= cmp;
+      if (op === "<=") return fv <= cmp;
+      if (op === "!=") return Math.abs(fv - cmp) >= 0.0001;
+      return Math.abs(fv - cmp) < 0.0001;
+    }
+    if (DATE_QUERY_FIELDS.includes(field)) {
+      const cmp = parseDateToTs(raw);
+      const fvTs = fv;
+      if (!cmp) return true;
+      if (op === ">") return fvTs > cmp;
+      if (op === "<") return fvTs < cmp;
+      if (op === ">=") return fvTs >= cmp;
+      if (op === "<=") return fvTs <= cmp;
+      if (op === "!=") return fvTs !== cmp;
+      return fvTs === cmp;
+    }
+    if (TIME_QUERY_FIELDS.includes(field)) {
+      const toSec = t => { const m2 = String(t).match(/(\d{1,2}):(\d{2})/); return m2 ? (+m2[1]*3600 + +m2[2]*60) : null; };
+      const cmp = toSec(raw), fvSec = toSec(fv);
+      if (cmp == null) return true;
+      if (fvSec == null) return false;
+      if (op === ">") return fvSec > cmp;
+      if (op === "<") return fvSec < cmp;
+      if (op === ">=") return fvSec >= cmp;
+      if (op === "<=") return fvSec <= cmp;
+      if (op === "!=") return fvSec !== cmp;
+      return fvSec === cmp;
+    }
+    // Textfelder: ":" (Standard) = enthält; "=" exakt; "!=" enthält nicht;
+    // >/</>=/<= alphabetischer Vergleich.
+    const fvStr = String(fv), rawStr = raw;
+    if (op === ":") return fvStr.toLowerCase().includes(rawStr.toLowerCase());
+    if (op === "=") return fvStr.toLowerCase() === rawStr.toLowerCase();
+    if (op === "!=") return !fvStr.toLowerCase().includes(rawStr.toLowerCase());
+    const cmpAlpha = fvStr.localeCompare(rawStr, "de", { sensitivity: "base" });
+    if (op === ">") return cmpAlpha > 0;
+    if (op === "<") return cmpAlpha < 0;
+    if (op === ">=") return cmpAlpha >= 0;
+    if (op === "<=") return cmpAlpha <= 0;
+    return fvStr.toLowerCase().includes(rawStr.toLowerCase());
+  }
+  // Einzelnes Wort ohne Operator => Volltextsuche über alle Felder
+  const hay = [
+    d.name, d.date, d.time, d.land, d.ort, d.tauchspot, d.tgNr, d.durationStr,
+    d.maxDepth, d.waterTemp, d.anzug, d.blei, d.flasche, d.volumen, d.nitrox,
+    d.buddy, d.bemerkungen, d.customFields?.reise, d.rating,
+  ].join(" ").toLowerCase();
+  return hay.includes(tok.toLowerCase());
+}
+
 function matchDives(dives, q) {
   if (!q || !q.trim()) return dives;
-  const s = q.trim().toLowerCase();
+  const s = q.trim()
+    .replace(/\s+(UND|AND)\s+/gi, " && ")
+    .replace(/\s+(ODER|OR)\s+/gi, " || ")
+    .replace(/&&/g, " && ").replace(/\|\|/g, " || ");
+  const orGroups = s.split(/\s*\|\|\s*/);
   return dives.filter(d => {
-    const haystack = [
-      d.name, d.date, d.time, d.land, d.ort, d.tauchspot, d.tgNr, d.durationStr,
-      d.maxDepth, d.waterTemp, d.anzug, d.blei, d.flasche, d.volumen, d.nitrox,
-      d.buddy, d.bemerkungen, d.customFields?.reise, d.rating,
-    ].join(" ").toLowerCase();
-    return haystack.includes(s);
+    return orGroups.some(group => {
+      const andTerms = group.split(/\s*&&\s*/).flatMap(t => {
+        return t.match(/(?:[\wäöü\-]+(?:>=|<=|!=|≠|>|<|=|:)\S+|\+\S+|-\S+|"[^"]+"|\S+)/gi) || [];
+      }).map(t => t.replace(/^"|"$/g, ""));
+      if (!andTerms.length) return true;
+      return andTerms.every(term => {
+        if (term.startsWith("+")) return evalDiveToken(d, term.slice(1));
+        if (term.startsWith("-")) return !evalDiveToken(d, term.slice(1));
+        return evalDiveToken(d, term);
+      });
+    });
   });
 }
+
+// ── Erweiterte Suche (mehrzeilig, Feld/Operator/Wert, analog Flugbuch) ─────
+const DIVE_SEARCH_FIELDS = [
+  { id: "number", label: "Nr.", type: "number" },
+  { id: "date", label: "Datum", type: "date" },
+  { id: "time", label: "Zeit", type: "time" },
+  { id: "land", label: "Land", type: "text" },
+  { id: "ort", label: "Ort", type: "text" },
+  { id: "tauchspot", label: "Tauchspot", type: "text" },
+  { id: "tgNr", label: "TG-Nr.", type: "number" },
+  { id: "duration", label: "Dauer (min)", type: "number" },
+  { id: "depth", label: "max. Tiefe (m)", type: "number" },
+  { id: "temp", label: "Wassertemp. (°C)", type: "number" },
+  { id: "anzug", label: "Anzug", type: "text" },
+  { id: "blei", label: "Blei (kg)", type: "number" },
+  { id: "flasche", label: "Flasche", type: "text" },
+  { id: "volumen", label: "Volumen", type: "text" },
+  { id: "nitrox", label: "Nitrox/Air", type: "text" },
+  { id: "buddy", label: "Buddy", type: "text" },
+  { id: "reise", label: "Reise", type: "text" },
+  { id: "rating", label: "Bewertung", type: "number" },
+  { id: "bemerkung", label: "Bemerkung", type: "text" },
+];
+const DIVE_ADV_OPS_NUM = [">=", "<=", "!=", ">", "<", "=", "between"];
+const DIVE_ADV_OPS_TEXT = [":", "=", "!=", ">", "<", ">=", "<="];
+
+function buildAdvancedDiveQuery(rows, combine) {
+  const parts = rows
+    .filter(r => r.value !== "" && r.value != null)
+    .map(r => {
+      const fieldDef = DIVE_SEARCH_FIELDS.find(f => f.id === r.field);
+      const isNumeric = fieldDef?.type === "number" || fieldDef?.type === "date" || fieldDef?.type === "time";
+      const op = r.op || (isNumeric ? "=" : ":");
+      if (op === "between") {
+        if (r.value2 === "" || r.value2 == null) return `${r.field}>=${String(r.value).trim()}`;
+        return `${r.field}>=${String(r.value).trim()} && ${r.field}<=${String(r.value2).trim()}`;
+      }
+      return `${r.field}${op}${String(r.value).trim()}`;
+    });
+  if (!parts.length) return "";
+  return parts.join(combine === "OR" ? " || " : " && ");
+}
+
+function newDiveSearchRow() { return { field: "ort", op: ":", value: "" }; }
 
 // ── Editable summary tiles (3 badges, freely reassignable + editable) ──────
 // Feste Auswahlfelder — analog Flugbuch (Ausrüstung wird meist aus einem
 // kleinen, wiederkehrenden Set gewählt statt frei getippt).
-const NITROX_OPTIONS = ["Ja", "Nein"];
+const NITROX_OPTIONS = ["Air", "Nitrox"];
 const VOLUMEN_OPTIONS = ["15 L", "12 L"];
 const FLASCHE_OPTIONS = ["Alu", "Stahl"];
 const BLEI_OPTIONS = ["3", "4", "5", "6", "7", "8"];
@@ -235,7 +388,7 @@ const TAUCH_TILE_OPTIONS = [
   { key: "tauchspot", label: "Tauchspot", icon: "🐠", get: d => d.tauchspot || "—", rawGet: d => d.tauchspot || "", save: v => ({ tauchspot: v }) },
   { key: "time", label: "Zeit", icon: "🕒", get: d => d.time || "—", rawGet: d => d.time || "", save: v => ({ time: v }) },
 ];
-const DEFAULT_TAUCH_TILE_KEYS = ["duration", "maxDepth", "waterTemp"];
+const DEFAULT_TAUCH_TILE_KEYS = ["duration", "maxDepth", "waterTemp", "time"];
 
 function DiveTile({ tileKey, d, onPick, onSave }) {
   const opt = TAUCH_TILE_OPTIONS.find(o => o.key === tileKey) || TAUCH_TILE_OPTIONS[0];
@@ -364,14 +517,16 @@ function DiveRow({ d, onClick, sortId, selectMode, isSelected, onToggleSelect, r
         </div>
       )}
       <div style={{flex:1,minWidth:0}}>
-        <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:2}}>
-          <span style={{fontWeight:700,fontSize:15}}>{d.name}</span>
-          {badge && <span style={{fontSize:11,fontWeight:700,color:"#fbbf24"}}>{badge}</span>}
-          {d.rating>0 && <span style={{fontSize:10,fontWeight:700,color:"#fde047"}}>{d.rating}⭐️</span>}
-          <span style={{display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
-            {d.nitrox==="Ja" && <span style={{background:"rgba(34,197,94,0.18)",color:"#4ade80",borderRadius:20,padding:"1px 7px",fontSize:9,fontWeight:700}}>NITROX</span>}
-            {d.buddy && <span style={{border:"1px solid rgba(232,244,253,0.15)",borderRadius:20,padding:"1px 7px",fontSize:9,color:"rgba(232,244,253,0.5)"}}>👤 {d.buddy}</span>}
-          </span>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:6,marginBottom:2}}>
+          <div style={{display:"flex",alignItems:"center",gap:6,minWidth:0}}>
+            <span style={{fontWeight:700,fontSize:15,flexShrink:0}}>{d.name}</span>
+            {badge && <span style={{fontSize:11,fontWeight:700,color:"#fbbf24",flexShrink:0}}>{badge}</span>}
+            {d.buddy && <span style={{border:"1px solid rgba(232,244,253,0.15)",borderRadius:20,padding:"1px 7px",fontSize:9,color:"rgba(232,244,253,0.5)",flexShrink:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>👤 {d.buddy}</span>}
+          </div>
+          <div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
+            {d.rating>0 && <span style={{fontSize:10,fontWeight:700,color:"#fde047"}}>{d.rating}⭐️</span>}
+            {d.time && <span style={{fontSize:11,fontWeight:600,color:"#38bdf8"}}>{d.time}</span>}
+          </div>
         </div>
         <div style={{fontSize:11,color:"rgba(232,244,253,0.4)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
           {d.date} · {d.tauchspot||d.ort||"—"}{d.land?" · "+d.land:""}
@@ -390,14 +545,94 @@ function DiveRow({ d, onClick, sortId, selectMode, isSelected, onToggleSelect, r
 }
 
 // ── Search bar (simplified, text-only across all fields) ──────────────────
+// Eingeklappt: einzeilige Suche (bisheriges Verhalten). Aufklappen zeigt
+// einen Zeilen-Baukasten (Feld/Operator/Wert, beliebig viele Zeilen, UND/
+// ODER kombinierbar) — live übersetzt in denselben Query-String, den auch
+// das einfache Textfeld benutzt, sodass beide Wege identische Treffer liefern.
 function SearchBar({ filterText, setFilterText }) {
+  const [advOpen, setAdvOpen] = useState(false);
+  const [rows, setRows] = useState([newDiveSearchRow()]);
+  const [combine, setCombine] = useState("AND");
+
+  const applyRows = (nextRows, nextCombine) => {
+    setRows(nextRows);
+    const useCombine = nextCombine || combine;
+    if (nextCombine) setCombine(nextCombine);
+    setFilterText(buildAdvancedDiveQuery(nextRows, useCombine));
+  };
+  const updateRow = (idx, patch) => applyRows(rows.map((r,i)=> i===idx ? {...r, ...patch} : r));
+  const addRow = () => applyRows([...rows, newDiveSearchRow()]);
+  const removeRow = (idx) => {
+    const next = rows.filter((_,i)=>i!==idx);
+    applyRows(next.length ? next : [newDiveSearchRow()]);
+  };
+
   return (
     <div style={{position:"relative"}}>
-      <input value={filterText} onChange={e=>setFilterText(e.target.value)} placeholder="🔍 Suchen (alle Felder)…"
-        style={{width:"100%",background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,padding:"8px 34px 8px 12px",color:"#e8f4fd",fontSize:13,boxSizing:"border-box"}} />
-      {filterText && (
-        <button onClick={()=>setFilterText("")}
-          style={{position:"absolute",right:8,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",color:"rgba(232,244,253,0.4)",cursor:"pointer",fontSize:14}}>✕</button>
+      <div style={{position:"relative"}}>
+        <input value={filterText} onChange={e=>setFilterText(e.target.value)} onFocus={()=>setAdvOpen(true)} placeholder="🔍 Suchen (alle Felder)…"
+          style={{width:"100%",background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,padding:"8px 34px 8px 12px",color:"#e8f4fd",fontSize:13,boxSizing:"border-box"}} />
+        {filterText && (
+          <button onClick={()=>setFilterText("")}
+            style={{position:"absolute",right:8,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",color:"rgba(232,244,253,0.4)",cursor:"pointer",fontSize:14}}>✕</button>
+        )}
+      </div>
+
+      {advOpen && (
+        <div style={{position:"absolute",top:"calc(100% + 8px)",left:0,width:"min(92vw, 420px)",zIndex:50,background:"#0f1f36",boxShadow:"0 12px 32px rgba(0,0,0,0.5)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:12,padding:10}}>
+          <div style={{display:"flex",flexDirection:"column",gap:6}}>
+            {rows.map((row, idx) => {
+              const fieldDef = DIVE_SEARCH_FIELDS.find(f=>f.id===row.field);
+              return (
+                <div key={idx} style={{display:"flex",gap:6,alignItems:"center"}}>
+                  <span style={{fontSize:10,fontWeight:700,color:"#7dd3fc",minWidth:34,textAlign:"center",flexShrink:0}}>
+                    {idx===0 ? "" : (combine==="OR"?"ODER":"UND")}
+                  </span>
+                  <select value={row.field}
+                    onChange={e=>{
+                      const nf = DIVE_SEARCH_FIELDS.find(f=>f.id===e.target.value);
+                      const isNum = nf?.type==="number"||nf?.type==="date"||nf?.type==="time";
+                      updateRow(idx, { field: e.target.value, op: isNum ? "=" : ":", value2: undefined });
+                    }}
+                    style={{background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:8,padding:"5px 4px",color:"#e8f4fd",fontSize:12,minWidth:0}}>
+                    {DIVE_SEARCH_FIELDS.map(f=><option key={f.id} value={f.id} style={{background:"#0a1628"}}>{f.label}</option>)}
+                  </select>
+                  {(() => {
+                    const isNumeric = fieldDef?.type === "number" || fieldDef?.type === "date" || fieldDef?.type === "time";
+                    const ops = isNumeric ? DIVE_ADV_OPS_NUM : DIVE_ADV_OPS_TEXT;
+                    return (
+                      <select value={row.op || (isNumeric ? "=" : ":")} onChange={e=>updateRow(idx,{op:e.target.value})}
+                        style={{background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:8,padding:"5px 2px",color:"#e8f4fd",fontSize:12,width:isNumeric?68:44,flexShrink:0}}>
+                        {ops.map(o=><option key={o} value={o} style={{background:"#0a1628"}}>{o==="between"?"zw.":o}</option>)}
+                      </select>
+                    );
+                  })()}
+                  <input value={row.value||""} onChange={e=>updateRow(idx,{value:e.target.value})}
+                    placeholder={row.op==="between" ? "von…" : "Wert…"}
+                    style={{flex:1,minWidth:0,background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:8,padding:"5px 8px",color:"#e8f4fd",fontSize:12}} />
+                  {row.op==="between" && (
+                    <input value={row.value2||""} onChange={e=>updateRow(idx,{value2:e.target.value})} placeholder="bis…"
+                      style={{flex:1,minWidth:0,background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:8,padding:"5px 8px",color:"#e8f4fd",fontSize:12}} />
+                  )}
+                  <button onClick={()=>removeRow(idx)} style={{background:"none",border:"none",color:"rgba(232,244,253,0.35)",cursor:"pointer",fontSize:14,padding:"0 2px",flexShrink:0}}>✕</button>
+                </div>
+              );
+            })}
+          </div>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:8}}>
+            <button onClick={addRow} style={{background:"rgba(125,211,252,0.12)",border:"1px solid rgba(125,211,252,0.3)",borderRadius:8,padding:"5px 10px",color:"#7dd3fc",fontSize:11,fontWeight:700,cursor:"pointer"}}>+ Zeile</button>
+            <div style={{display:"flex",gap:8,alignItems:"center"}}>
+              {rows.length>1 && (
+                <div style={{display:"flex",background:"rgba(255,255,255,0.06)",borderRadius:8,padding:2}}>
+                  <button onClick={()=>applyRows(rows,"AND")} style={{background:combine==="AND"?"rgba(125,211,252,0.25)":"transparent",border:"none",borderRadius:6,padding:"4px 10px",color:combine==="AND"?"#7dd3fc":"rgba(232,244,253,0.5)",fontSize:11,fontWeight:700,cursor:"pointer"}}>UND</button>
+                  <button onClick={()=>applyRows(rows,"OR")} style={{background:combine==="OR"?"rgba(125,211,252,0.25)":"transparent",border:"none",borderRadius:6,padding:"4px 10px",color:combine==="OR"?"#7dd3fc":"rgba(232,244,253,0.5)",fontSize:11,fontWeight:700,cursor:"pointer"}}>ODER</button>
+                </div>
+              )}
+              <button onClick={()=>setAdvOpen(false)} title="Schliessen"
+                style={{background:"rgba(34,197,94,0.18)",border:"1px solid rgba(34,197,94,0.4)",borderRadius:8,width:30,height:30,color:"#4ade80",fontSize:14,fontWeight:900,cursor:"pointer",flexShrink:0}}>✓</button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
@@ -428,7 +663,7 @@ function DetailContent({ d, dives, setDives, setSelected, setView, saveDive, con
     (async () => {
       try {
         const r = await window.storage.get("settings:diveTileConfig");
-        if (r) { const arr = JSON.parse(r.value); if (Array.isArray(arr) && arr.length === 3) setTileConfig(arr); }
+        if (r) { const arr = JSON.parse(r.value); if (Array.isArray(arr) && arr.length === 4) setTileConfig(arr); }
       } catch {}
     })();
   }, []);
@@ -500,24 +735,29 @@ function DetailContent({ d, dives, setDives, setSelected, setView, saveDive, con
       </div>
 
       <div style={{padding:"0 16px"}}>
-        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:2}}>
+        <div style={{marginBottom:2}}>
           <span style={{fontSize:11,color:"#38bdf8"}}>{d.date}</span>
-          <div style={{display:"flex",alignItems:"center",gap:8}}>
-            <span style={{display:"flex",gap:1}}>
-              {[1,2,3,4,5].map(s=>(
-                <span key={s} onClick={()=>saveField({rating: (d.rating||0)===s ? 0 : s})}
-                  style={{fontSize:13,cursor:"pointer",color:s<=(d.rating||0)?"#f59e0b":"rgba(232,244,253,0.2)"}}>★</span>
-              ))}
-            </span>
-            {d.time && <span style={{fontSize:11,color:"#38bdf8"}}>{d.time}</span>}
-            {d.nitrox==="Ja" && <span style={{background:"rgba(34,197,94,0.2)",color:"#4ade80",borderRadius:20,padding:"2px 10px",fontSize:10,fontWeight:700}}>NITROX</span>}
-          </div>
         </div>
 
-        {/* Titel: nur Zahl, darunter gelbe Reise/TG-Nummer (z.B. 31/2) */}
-        <div style={{display:"flex",alignItems:"baseline",gap:10,marginBottom:14}}>
+        {/* Titel: nur Zahl, daneben gelbe Reise/TG-Nummer (z.B. 31/2) */}
+        <div style={{display:"flex",alignItems:"baseline",gap:10,marginBottom:8}}>
           <EditableTitle value={d.name} onSave={v=>saveField({name:v})} />
           {badge && <span style={{fontSize:15,fontWeight:700,color:"#fbbf24"}}>{badge}</span>}
+        </div>
+
+        {/* Bewertung + Nitrox/Air — gross, links, direkt unter der TG-Nummer */}
+        <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:14}}>
+          <span style={{display:"flex",gap:3}}>
+            {[1,2,3,4,5].map(s=>(
+              <span key={s} onClick={()=>saveField({rating: (d.rating||0)===s ? 0 : s})}
+                style={{fontSize:24,cursor:"pointer",color:s<=(d.rating||0)?"#f59e0b":"rgba(232,244,253,0.2)"}}>★</span>
+            ))}
+          </span>
+          <select value={d.nitrox||""} onChange={e=>saveField({nitrox:e.target.value})}
+            style={{background:d.nitrox==="Nitrox"?"rgba(34,197,94,0.2)":"rgba(255,255,255,0.08)",border:`1px solid ${d.nitrox==="Nitrox"?"rgba(34,197,94,0.4)":"rgba(255,255,255,0.12)"}`,borderRadius:20,padding:"6px 14px",color:d.nitrox==="Nitrox"?"#4ade80":"#e8f4fd",fontSize:14,fontWeight:700,cursor:"pointer"}}>
+            <option value="" style={{background:"#0a1628"}}>—</option>
+            {NITROX_OPTIONS.map(o => <option key={o} value={o} style={{background:"#0a1628"}}>{o}</option>)}
+          </select>
         </div>
 
         {/* Bemerkungen — direkt unter Titel/Bewertung */}
@@ -535,7 +775,7 @@ function DetailContent({ d, dives, setDives, setSelected, setView, saveDive, con
         </div>
 
         {/* Drei frei editierbare Daten-Badges */}
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:14}}>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:6,marginBottom:14}}>
           {tileConfig.map((key, i) => (
             <DiveTile key={i} tileKey={key} d={d}
               onPick={()=>setTilePickerIdx(i)}
@@ -570,7 +810,6 @@ function DetailContent({ d, dives, setDives, setSelected, setView, saveDive, con
         {/* Übrige Felder */}
         <div style={{background:"rgba(255,255,255,0.04)",borderRadius:14,padding:"4px 15px",marginBottom:14,border:"1px solid rgba(255,255,255,0.06)"}}>
           <InlineField label="Datum" value={d.date} onSave={v=>saveField({date:v, year: parseDateToTs(v)?String(new Date(parseDateToTs(v)).getFullYear()):d.year})} />
-          <InlineField label="Zeit" value={d.time} onSave={v=>saveField({time:v})} />
           <InlineField label="Land" value={d.land} onSave={v=>saveField({land:v})} />
           <InlineField label="Ort" value={d.ort} onSave={v=>saveField({ort:v})} />
           <ReiseSelect value={d.customFields?.reise} onSave={saveReiseField} />
@@ -580,7 +819,6 @@ function DetailContent({ d, dives, setDives, setSelected, setView, saveDive, con
           <SelectField label="Blei" value={d.blei} options={BLEI_OPTIONS} unit="kg" onSave={v=>saveField({blei:v})} />
           <SelectField label="Flasche" value={d.flasche} options={FLASCHE_OPTIONS} onSave={v=>saveField({flasche:v})} />
           <SelectField label="Volumen" value={d.volumen} options={VOLUMEN_OPTIONS} onSave={v=>saveField({volumen:v})} />
-          <SelectField label="Nitrox" value={d.nitrox} options={NITROX_OPTIONS} onSave={v=>saveField({nitrox:v})} />
           <InlineField label="Buddy" value={d.buddy} onSave={v=>saveField({buddy:v})} />
         </div>
       </div>
@@ -661,8 +899,15 @@ function TauchbuchApp() {
     setReisenNames(names);
     const updated = [];
     for (const d of diveList) {
-      if (!d.customFields?.reise && d.ort) {
-        const upd = { ...d, customFields: { ...(d.customFields||{}), reise: d.ort } };
+      const needsReise = !d.customFields?.reise && d.ort;
+      const normalizedNitrox = normalizeNitroxValue(d.nitrox);
+      const needsNitroxFix = normalizedNitrox !== d.nitrox;
+      if (needsReise || needsNitroxFix) {
+        const upd = {
+          ...d,
+          ...(needsNitroxFix ? { nitrox: normalizedNitrox } : {}),
+          customFields: needsReise ? { ...(d.customFields||{}), reise: d.ort } : d.customFields,
+        };
         try { await window.storage.set(`dive:${upd.id}`, JSON.stringify(upd)); } catch {}
         updated.push(upd);
       } else updated.push(d);
