@@ -1,6 +1,6 @@
 const { useState, useEffect, useRef } = React;
 
-const APP_VERSION = "1.3";
+const APP_VERSION = "1.4";
 
 // ── Startseite ───────────────────────────────────────────────────────────
 // Editierbares Titelbild (per Tap austauschbar, als Data-URL in Storage
@@ -15,6 +15,9 @@ const CHAPTERS = [
 // Änderungsverlauf — neuste zuerst. Wird beim Erhöhen der Version jeweils
 // von Hand ergänzt.
 const CHANGELOG = [
+  { version: "1.4", changes: [
+    "Tauchgang-Detail: Tauchspot steht jetzt in Rot neben dem Titel (gleiche Grösse wie Reise/Nr.-Badge)",
+  ]},
   { version: "1.3", changes: [
     "Titel auf der Startseite: „meintauchbuch“ in Kleinbuchstaben, „tauch“ in Orange",
   ]},
