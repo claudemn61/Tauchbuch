@@ -103,6 +103,23 @@ function sortByNumber(dives) {
   return [...dives].sort((a, b) => (parseFloat(b.name) || 0) - (parseFloat(a.name) || 0));
 }
 
+// Fasst aufeinanderfolgende Tauchgang-Nummern zu Bereichen zusammen, z.B.
+// ["123","124","125","126"] -> "123 - 126". Nicht-fortlaufende Nummern
+// bleiben einzeln, mit Komma getrennt.
+function compressNumberList(names) {
+  if (!names.length) return "";
+  const sorted = [...names].sort((a,b)=>(parseFloat(a)||0)-(parseFloat(b)||0));
+  const groups = [];
+  let start = sorted[0], prev = sorted[0], prevNum = parseFloat(sorted[0]);
+  for (let i = 1; i < sorted.length; i++) {
+    const n = sorted[i], num = parseFloat(n);
+    if (num === prevNum + 1) { prev = n; prevNum = num; }
+    else { groups.push(start === prev ? start : `${start} - ${prev}`); start = n; prev = n; prevNum = num; }
+  }
+  groups.push(start === prev ? start : `${start} - ${prev}`);
+  return groups.join(", ");
+}
+
 // Reise-Nummer je Tauchgang: Reisen chronologisch durchnummeriert (älteste=1,
 // neuste=höchste Zahl — konsistent mit der Kartennummerierung auf der
 // Reisen-Seite). Kombiniert mit dem TG-Nr.-Feld ergibt sich z.B. "31/2".
@@ -1347,9 +1364,9 @@ function TauchbuchApp() {
 
         {bulkEditOpen && (() => {
           const chosenCount = selectedIds.size;
-          const chosenNames = dives.filter(d=>selectedIds.has(d.id))
-            .sort((a,b)=>(parseFloat(a.name)||0)-(parseFloat(b.name)||0))
-            .map(d=>d.name);
+          const chosenDives = dives.filter(d=>selectedIds.has(d.id));
+          const chosenNames = chosenDives.map(d=>d.name);
+          const titleText = compressNumberList(chosenNames);
           const applyBulkEdit = async () => {
             const b = bulkEditData;
             const updated = dives.map(d => {
@@ -1378,60 +1395,74 @@ function TauchbuchApp() {
             setBulkEditData({});
             setBulkEditMixed({});
           };
+          const closeEdit = () => { setBulkEditOpen(false); setBulkEditData({}); setBulkEditMixed({}); };
           const set = (key, v) => setBulkEditData(b=>({...b,[key]:v}));
           return (
-            <div onClick={()=>setBulkEditOpen(false)}
-              style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:200,padding:24}}>
-              <div onClick={e=>e.stopPropagation()}
-                style={{background:"#14253a",borderRadius:16,padding:"20px 22px",maxWidth:380,width:"100%",border:"1px solid rgba(255,255,255,0.1)",maxHeight:"85vh",overflowY:"auto"}}>
-                <div style={{fontSize:26,fontWeight:800,marginBottom:4,lineHeight:1.25,wordBreak:"break-word"}}>
-                  {chosenNames.join(", ")}
-                </div>
-                <div style={{fontSize:16,fontWeight:700,marginBottom:4,color:"rgba(232,244,253,0.7)"}}>{chosenCount} Tauchgänge bearbeiten</div>
-                <div style={{fontSize:12,color:"rgba(232,244,253,0.5)",marginBottom:16}}>Felder mit "variabel" haben unterschiedliche Werte in der Auswahl — leer gelassen bleiben sie unverändert. Ausgefüllte Felder werden auf alle {chosenCount} ausgewählten Tauchgänge übertragen.</div>
-
-                {/* Bemerkungen — gleiche Kachel-Optik wie auf der Detailseite */}
-                <div style={{background:"rgba(255,255,255,0.04)",borderRadius:14,padding:"13px 15px",marginBottom:14,border:"1px solid rgba(255,255,255,0.06)"}}>
-                  <div style={{fontSize:10,fontWeight:700,color:"rgba(232,244,253,0.4)",letterSpacing:1.5,textTransform:"uppercase",marginBottom:9}}>Bemerkungen</div>
-                  <textarea value={bulkEditData.bemerkungen||""} onChange={e=>set("bemerkungen",e.target.value)} rows={2}
-                    placeholder={bulkEditMixed.bemerkungen ? "variabel" : "—"}
-                    style={{width:"100%",background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:8,padding:"8px 10px",color:"#e8f4fd",fontSize:13,resize:"vertical",minHeight:48,boxSizing:"border-box"}} />
+            <div style={{position:"fixed",inset:0,zIndex:200,overflowY:"auto",background:"#040e20"}}>
+              <div style={{maxWidth:480,margin:"0 auto",padding:"0 0 32px",minHeight:"100vh",color:"#e8f4fd",fontFamily:"-apple-system,BlinkMacSystemFont,sans-serif"}}>
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"calc(16px + env(safe-area-inset-top, 0px)) 16px 10px"}}>
+                  <button onClick={closeEdit} style={{background:"none",border:"none",color:"#38bdf8",fontSize:22,cursor:"pointer"}}>←</button>
+                  <button onClick={()=>{closeEdit();setConfirmBulkDelete(true);}}
+                    style={{background:"rgba(239,68,68,0.12)",border:"1px solid rgba(239,68,68,0.25)",borderRadius:20,padding:"6px 12px",color:"#f87171",fontSize:13,cursor:"pointer"}}>🗑</button>
                 </div>
 
-                {/* Bewertung */}
-                <div style={{marginBottom:14}}>
-                  <div style={{fontSize:11,color:"rgba(232,244,253,0.4)",marginBottom:6}}>Bewertung</div>
-                  <div style={{display:"flex",gap:6,alignItems:"center"}}>
-                    {[1,2,3,4,5].map(s=>(
-                      <button key={s} onClick={()=>set("rating",(bulkEditData.rating||0)===s?0:s)}
-                        style={{fontSize:22,background:"none",border:"none",cursor:"pointer",color:s<=(bulkEditData.rating||0)?"#f59e0b":"rgba(232,244,253,0.2)"}}>★</button>
-                    ))}
-                    {bulkEditData.rating>0
-                      ? <span style={{fontSize:11,color:"rgba(232,244,253,0.4)",marginLeft:6}}>wird auf alle übertragen</span>
-                      : (bulkEditMixed.rating && <span style={{fontSize:11,color:"rgba(232,244,253,0.35)",marginLeft:6}}>variabel</span>)}
+                <div style={{padding:"0 16px"}}>
+                  <div style={{marginBottom:2}}>
+                    <span style={{fontSize:11,color:"#38bdf8"}}>{bulkEditMixed.date ? "variabel" : (bulkEditData.date || "—")}</span>
                   </div>
-                </div>
 
-                {/* Übrige Felder — 1:1 dieselbe Reihenfolge/Optik wie auf der Detailseite */}
-                <div style={{background:"rgba(255,255,255,0.04)",borderRadius:14,padding:"4px 15px",marginBottom:18,border:"1px solid rgba(255,255,255,0.06)"}}>
-                  <BulkField label="Datum" value={bulkEditData.date} mixed={bulkEditMixed.date} onChange={v=>set("date",v)} />
-                  <BulkField label="Land" value={bulkEditData.land} mixed={bulkEditMixed.land} onChange={v=>set("land",v)} />
-                  <BulkReiseSelect label="Ort, Reise" value={bulkEditData.reise} mixed={bulkEditMixed.reise} names={reisenNames} onChange={v=>set("reise",v)} />
-                  <BulkField label="TG-Nr." value={bulkEditData.tgNr} mixed={bulkEditMixed.tgNr} onChange={v=>set("tgNr",v)} />
-                  <BulkField label="Tauchspot" value={bulkEditData.tauchspot} mixed={bulkEditMixed.tauchspot} onChange={v=>set("tauchspot",v)} />
-                  <BulkField label="Anzug" value={bulkEditData.anzug} mixed={bulkEditMixed.anzug} onChange={v=>set("anzug",v)} />
-                  <BulkSelectField label="Blei" value={bulkEditData.blei} mixed={bulkEditMixed.blei} options={BLEI_OPTIONS} unit="kg" onChange={v=>set("blei",v)} />
-                  <BulkSelectField label="Flasche" value={bulkEditData.flasche} mixed={bulkEditMixed.flasche} options={FLASCHE_OPTIONS} onChange={v=>set("flasche",v)} />
-                  <BulkSelectField label="Volumen" value={bulkEditData.volumen} mixed={bulkEditMixed.volumen} options={VOLUMEN_OPTIONS} onChange={v=>set("volumen",v)} />
-                  <BulkSelectField label="Nitrox" value={bulkEditData.nitrox} mixed={bulkEditMixed.nitrox} options={NITROX_OPTIONS} onChange={v=>set("nitrox",v)} />
-                  <BulkField label="Buddy" value={bulkEditData.buddy} mixed={bulkEditMixed.buddy} onChange={v=>set("buddy",v)} />
-                </div>
+                  {/* Titelzeile: nur die (ggf. zu Bereichen zusammengefassten) Nummern, nicht editierbar */}
+                  <div style={{display:"flex",alignItems:"baseline",gap:10,marginBottom:8,flexWrap:"wrap"}}>
+                    <div style={{fontSize:26,fontWeight:800,lineHeight:1.25,wordBreak:"break-word"}}>{titleText}</div>
+                  </div>
 
-                <div style={{display:"flex",gap:8}}>
-                  <button onClick={()=>{setBulkEditOpen(false);setBulkEditData({});setBulkEditMixed({});}}
-                    style={{flex:1,background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:10,padding:"10px",color:"#e8f4fd",fontSize:14,cursor:"pointer"}}>Abbrechen</button>
-                  <button onClick={applyBulkEdit}
-                    style={{flex:1,background:"linear-gradient(135deg,#0ea5e9,#0284c7)",color:"#fff",border:"none",borderRadius:10,padding:10,fontSize:14,fontWeight:800,cursor:"pointer"}}>Speichern</button>
+                  {/* Bewertung + Nitrox — gleiche Position/Optik wie auf der Detailseite */}
+                  <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:14}}>
+                    <span style={{display:"flex",gap:3}}>
+                      {[1,2,3,4,5].map(s=>(
+                        <span key={s} onClick={()=>set("rating",(bulkEditData.rating||0)===s?0:s)}
+                          style={{fontSize:24,cursor:"pointer",color:s<=(bulkEditData.rating||0)?"#f59e0b":"rgba(232,244,253,0.2)"}}>★</span>
+                      ))}
+                    </span>
+                    {bulkEditMixed.rating && !bulkEditData.rating && <span style={{fontSize:12,color:"rgba(232,244,253,0.35)"}}>variabel</span>}
+                    {!bulkEditMixed.nitrox && bulkEditData.nitrox && (
+                      <span style={{background:bulkEditData.nitrox==="Nitrox"?"rgba(34,197,94,0.2)":"rgba(255,255,255,0.08)",border:`1px solid ${bulkEditData.nitrox==="Nitrox"?"rgba(34,197,94,0.4)":"rgba(255,255,255,0.12)"}`,borderRadius:20,padding:"6px 14px",color:bulkEditData.nitrox==="Nitrox"?"#4ade80":"#e8f4fd",fontSize:14,fontWeight:700}}>
+                        {bulkEditData.nitrox}
+                      </span>
+                    )}
+                  </div>
+
+                  <div style={{fontSize:12,color:"rgba(232,244,253,0.5)",marginBottom:14}}>{chosenCount} Tauchgänge werden gemeinsam bearbeitet. Felder mit "variabel" haben unterschiedliche Werte in der Auswahl — leer gelassen bleiben sie unverändert.</div>
+
+                  {/* Bemerkungen — direkt unter Titel/Bewertung, wie auf der Detailseite */}
+                  <div style={{background:"rgba(255,255,255,0.04)",borderRadius:14,padding:"13px 15px",marginBottom:14,border:"1px solid rgba(255,255,255,0.06)"}}>
+                    <div style={{fontSize:10,fontWeight:700,color:"rgba(232,244,253,0.4)",letterSpacing:1.5,textTransform:"uppercase",marginBottom:9}}>Bemerkungen</div>
+                    <textarea value={bulkEditData.bemerkungen||""} onChange={e=>set("bemerkungen",e.target.value)} rows={3}
+                      placeholder={bulkEditMixed.bemerkungen ? "variabel" : "Tippen zum Hinzufügen…"}
+                      style={{width:"100%",background:"rgba(255,255,255,0.08)",border:"1px solid rgba(56,189,248,0.4)",borderRadius:8,padding:"8px 10px",color:"#e8f4fd",fontSize:13,resize:"vertical",minHeight:60,boxSizing:"border-box"}} />
+                  </div>
+
+                  {/* Übrige Felder — identische Reihenfolge/Optik wie auf der Detailseite */}
+                  <div style={{background:"rgba(255,255,255,0.04)",borderRadius:14,padding:"4px 15px",marginBottom:14,border:"1px solid rgba(255,255,255,0.06)"}}>
+                    <BulkField label="Datum" value={bulkEditData.date} mixed={bulkEditMixed.date} onChange={v=>set("date",v)} />
+                    <BulkField label="Land" value={bulkEditData.land} mixed={bulkEditMixed.land} onChange={v=>set("land",v)} />
+                    <BulkReiseSelect label="Ort, Reise" value={bulkEditData.reise} mixed={bulkEditMixed.reise} names={reisenNames} onChange={v=>set("reise",v)} />
+                    <BulkField label="TG-Nr." value={bulkEditData.tgNr} mixed={bulkEditMixed.tgNr} onChange={v=>set("tgNr",v)} />
+                    <BulkField label="Tauchspot" value={bulkEditData.tauchspot} mixed={bulkEditMixed.tauchspot} onChange={v=>set("tauchspot",v)} />
+                    <BulkField label="Anzug" value={bulkEditData.anzug} mixed={bulkEditMixed.anzug} onChange={v=>set("anzug",v)} />
+                    <BulkSelectField label="Blei" value={bulkEditData.blei} mixed={bulkEditMixed.blei} options={BLEI_OPTIONS} unit="kg" onChange={v=>set("blei",v)} />
+                    <BulkSelectField label="Flasche" value={bulkEditData.flasche} mixed={bulkEditMixed.flasche} options={FLASCHE_OPTIONS} onChange={v=>set("flasche",v)} />
+                    <BulkSelectField label="Volumen" value={bulkEditData.volumen} mixed={bulkEditMixed.volumen} options={VOLUMEN_OPTIONS} onChange={v=>set("volumen",v)} />
+                    <BulkSelectField label="Nitrox" value={bulkEditData.nitrox} mixed={bulkEditMixed.nitrox} options={NITROX_OPTIONS} onChange={v=>set("nitrox",v)} />
+                    <BulkField label="Buddy" value={bulkEditData.buddy} mixed={bulkEditMixed.buddy} onChange={v=>set("buddy",v)} />
+                  </div>
+
+                  <div style={{display:"flex",gap:8}}>
+                    <button onClick={closeEdit}
+                      style={{flex:1,background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:10,padding:"10px",color:"#e8f4fd",fontSize:14,cursor:"pointer"}}>Abbrechen</button>
+                    <button onClick={applyBulkEdit}
+                      style={{flex:1,background:"linear-gradient(135deg,#0ea5e9,#0284c7)",color:"#fff",border:"none",borderRadius:10,padding:10,fontSize:14,fontWeight:800,cursor:"pointer"}}>Speichern</button>
+                  </div>
                 </div>
               </div>
             </div>

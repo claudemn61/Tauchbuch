@@ -18,7 +18,7 @@ const CHAPTERS = [
 // von Hand ergänzt.
 const CHANGELOG = [
   { version: "2.2", changes: [
-    "Mehrfachauswahl → Bearbeiten: neuer Dialog im Design der Detailseite, Felder mit unterschiedlichen Werten zeigen \"variabel\", Reise jetzt als Auswahlliste statt Freitext, Titelzeile zeigt die ausgewählten Tauchgang-Nummern",
+    "Mehrfachauswahl → Bearbeiten: jetzt Vollbild-Seite im 1:1-Design der Tauchgang-Detailseite (Header, Datum, Bewertung/Nitrox, Bemerkungen, Feldliste), Titelzeile zeigt die ausgewählten Nummern (fortlaufende als Bereich, z.B. \"123 - 129\"), Felder mit unterschiedlichen Werten zeigen \"variabel\", Reise als Auswahlliste statt Freitext",
     "Separater \"Reise anpassen\"-Button in der Auswahlleiste entfernt (jetzt Teil von \"Bearbeiten\")",
     "Startseite: Stift-Icon auf dem Titelbild entfernt, Tippen aufs Foto öffnet weiterhin die Bildauswahl",
   ]},
