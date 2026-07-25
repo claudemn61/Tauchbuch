@@ -1,6 +1,6 @@
 const { useState, useEffect, useRef } = React;
 
-const APP_VERSION = "2.1.1";
+const APP_VERSION = "2.2";
 
 // ── Startseite ───────────────────────────────────────────────────────────
 // Editierbares Titelbild (per Tap austauschbar, als Data-URL in Storage
@@ -17,6 +17,11 @@ const CHAPTERS = [
 // Änderungsverlauf — neuste zuerst. Wird beim Erhöhen der Version jeweils
 // von Hand ergänzt.
 const CHANGELOG = [
+  { version: "2.2", changes: [
+    "Mehrfachauswahl → Bearbeiten: neuer Dialog im Design der Detailseite, Felder mit unterschiedlichen Werten zeigen \"variabel\", Reise jetzt als Auswahlliste statt Freitext, Titelzeile zeigt die ausgewählten Tauchgang-Nummern",
+    "Separater \"Reise anpassen\"-Button in der Auswahlleiste entfernt (jetzt Teil von \"Bearbeiten\")",
+    "Startseite: Stift-Icon auf dem Titelbild entfernt, Tippen aufs Foto öffnet weiterhin die Bildauswahl",
+  ]},
   { version: "2.1.1", changes: [
     "Bugfix: Aktualisierungen wurden nicht immer zuverlässig angezeigt — Service Worker holt eigene Dateien jetzt garantiert frisch vom Server statt aus einem zwischengeschalteten Cache",
   ]},
@@ -245,9 +250,6 @@ function HomeApp() {
         <img src={coverSrc} alt="Titelbild" style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}
           onError={e=>{ e.target.style.display="none"; }} />
         <div style={{position:"absolute",inset:0,background:"linear-gradient(to bottom, rgba(4,14,32,0) 55%, rgba(4,14,32,0.85) 100%)"}} />
-        <div style={{position:"absolute",top:"calc(12px + env(safe-area-inset-top, 0px))",right:12,background:"rgba(0,0,0,0.45)",borderRadius:20,width:32,height:32,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14}}>
-          ✎
-        </div>
         <div style={{position:"absolute",bottom:16,left:20,right:20,textAlign:"center"}}>
           <div style={{fontSize:26,fontWeight:900,letterSpacing:-0.5,textShadow:"0 2px 8px rgba(0,0,0,0.5)",whiteSpace:"nowrap"}}>
             <span style={{color:"#fff"}}>mein</span><span style={{color:"#f5a623"}}>tauch</span><span style={{color:"#fff"}}>buch</span>
