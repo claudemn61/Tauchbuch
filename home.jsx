@@ -261,11 +261,11 @@ function HomeApp() {
           const subtitle = subtitleFor(ch.key);
           return (
             <div key={ch.key} onClick={()=>{window.location.href=ch.href;}}
-              style={{background:ch.bg,border:`1px solid ${ch.border}`,borderRadius:14,padding:"10px 10px",display:"flex",alignItems:"center",justifyContent:"center",gap:10,cursor:"pointer",marginBottom:8,minHeight:66}}>
-              <span style={{fontSize:20}}>{ch.icon}</span>
+              style={{background:ch.bg,border:`1px solid ${ch.border}`,borderRadius:14,padding:"10px 10px",display:"flex",alignItems:"center",justifyContent:"center",gap:10,cursor:"pointer",marginBottom:8,height:"calc((100vw - 40px) / 2)",boxSizing:"border-box"}}>
+              <span style={{fontSize:26}}>{ch.icon}</span>
               <div style={{textAlign:"center"}}>
-                <div style={{fontSize:12,fontWeight:700,color:ch.color}}>{ch.label}</div>
-                {subtitle && <div style={{fontSize:9,color:"rgba(232,244,253,0.4)"}}>{subtitle}</div>}
+                <div style={{fontSize:13,fontWeight:700,color:ch.color}}>{ch.label}</div>
+                {subtitle && <div style={{fontSize:10,color:"rgba(232,244,253,0.4)"}}>{subtitle}</div>}
               </div>
             </div>
           );
@@ -276,10 +276,10 @@ function HomeApp() {
           const subtitle = subtitleFor(ch.key);
           return (
             <div key={ch.key} onClick={()=>{window.location.href=ch.href;}}
-              style={{background:ch.bg,border:`1px solid ${ch.border}`,borderRadius:14,padding:"10px 10px",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:3,cursor:"pointer",minHeight:66}}>
-              <span style={{fontSize:20}}>{ch.icon}</span>
-              <span style={{fontSize:12,fontWeight:700,color:ch.color}}>{ch.label}</span>
-              {subtitle && <span style={{fontSize:9,color:"rgba(232,244,253,0.4)"}}>{subtitle}</span>}
+              style={{background:ch.bg,border:`1px solid ${ch.border}`,borderRadius:14,padding:"10px 10px",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:4,cursor:"pointer",aspectRatio:"1"}}>
+              <span style={{fontSize:26}}>{ch.icon}</span>
+              <span style={{fontSize:13,fontWeight:700,color:ch.color}}>{ch.label}</span>
+              {subtitle && <span style={{fontSize:10,color:"rgba(232,244,253,0.4)"}}>{subtitle}</span>}
             </div>
           );
         })}
