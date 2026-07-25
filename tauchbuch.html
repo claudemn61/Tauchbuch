@@ -14,6 +14,7 @@
 <link rel="apple-touch-icon" sizes="167x167" href="apple-touch-icon-167.png" />
 <link rel="icon" href="favicon-32.png" sizes="32x32" />
 <meta name="theme-color" content="#040e20" />
+<link rel="manifest" href="manifest.json" />
 
 <style>
   html, body { margin:0; padding:0; background:#040e20; -webkit-tap-highlight-color: transparent; }
@@ -214,7 +215,7 @@
 
     let appSource;
     try {
-      const resp = await fetch("tauchbuch.jsx?v=" + Date.now(), { cache: "no-store" });
+      const resp = await fetch("tauchbuch.jsx");
       if (!resp.ok) { status.textContent = "FEHLER beim Laden von tauchbuch.jsx: HTTP " + resp.status; status.style.color = "#f87171"; return; }
       appSource = await resp.text();
       status.textContent = "Code geladen ✓ (" + appSource.length + " Zeichen) — kompiliere…";
@@ -278,8 +279,33 @@
   }
 
 
+  function updateOnlineStatus() {
+    const existing = document.getElementById("offline-banner");
+    if (!navigator.onLine) {
+      if (!existing) {
+        const b = document.createElement("div");
+        b.id = "offline-banner";
+        b.textContent = "📴 Offline — zuletzt gespeicherter Stand";
+        b.style.cssText = "position:fixed;bottom:0;left:0;right:0;background:#f59e0b;color:#1a1200;font:600 11px -apple-system,sans-serif;text-align:center;padding:6px;z-index:9999;padding-bottom:calc(6px + env(safe-area-inset-bottom, 0px));";
+        document.body.appendChild(b);
+      }
+    } else if (existing) {
+      existing.remove();
+    }
+  }
+  window.addEventListener("online", updateOnlineStatus);
+  window.addEventListener("offline", updateOnlineStatus);
+
   window.addEventListener("load", function() {
     setTimeout(checkAndRender, 300);
+    updateOnlineStatus();
+    // Service Worker: macht die App ab dem zweiten erfolgreichen
+    // Online-Start auch ohne Internetverbindung nutzbar.
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("sw.js").catch(function(e) {
+        console.error("Service-Worker-Registrierung fehlgeschlagen:", e);
+      });
+    }
   });
 </script>
 

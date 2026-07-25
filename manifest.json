@@ -1,0 +1,16 @@
+{
+  "name": "meintauchbuch",
+  "short_name": "Tauchbuch",
+  "start_url": "index.html",
+  "scope": ".",
+  "display": "standalone",
+  "background_color": "#040e20",
+  "theme_color": "#040e20",
+  "icons": [
+    { "src": "apple-touch-icon-120.png", "sizes": "120x120", "type": "image/png" },
+    { "src": "apple-touch-icon-152.png", "sizes": "152x152", "type": "image/png" },
+    { "src": "apple-touch-icon-167.png", "sizes": "167x167", "type": "image/png" },
+    { "src": "apple-touch-icon.png", "sizes": "180x180", "type": "image/png" },
+    { "src": "favicon-32.png", "sizes": "32x32", "type": "image/png" }
+  ]
+}

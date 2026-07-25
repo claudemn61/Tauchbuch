@@ -1,6 +1,6 @@
 const { useState, useEffect, useRef } = React;
 
-const APP_VERSION = "1.5.1";
+const APP_VERSION = "2.0";
 
 // ── Startseite ───────────────────────────────────────────────────────────
 // Editierbares Titelbild (per Tap austauschbar, als Data-URL in Storage
@@ -15,6 +15,11 @@ const CHAPTERS = [
 // Änderungsverlauf — neuste zuerst. Wird beim Erhöhen der Version jeweils
 // von Hand ergänzt.
 const CHANGELOG = [
+  { version: "2.0", changes: [
+    "App jetzt offlinefähig (ab dem zweiten erfolgreichen Online-Start) — Service Worker cached App und Bibliotheken automatisch",
+    "Kleiner Offline-Hinweis unten, wenn keine Verbindung besteht",
+    "Statistik-Kapitel vollständig eingerichtet: Kennzahlen, Jahres-Verlauf, Tiefen-/Zeit-Rekorde, häufigste Tauchspots/Buddys, Länder-Verteilung, Bewertungsverteilung, Ausrüstungsauswertung",
+  ]},
   { version: "1.5.1", changes: [
     "Startseiten-Titelbild: Tauchbrillen-Icon entfernt, Titel-Text zentriert (Tauchbuch-Header bleibt unverändert)",
   ]},
