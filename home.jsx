@@ -258,11 +258,11 @@ function HomeApp() {
           const subtitle = subtitleFor(ch.key);
           return (
             <div key={ch.key} onClick={()=>{window.location.href=ch.href;}}
-              style={{background:ch.bg,border:`1px solid ${ch.border}`,borderRadius:16,padding:"12px 16px",display:"flex",alignItems:"center",gap:12,cursor:"pointer",marginBottom:8}}>
-              <span style={{fontSize:26}}>{ch.icon}</span>
-              <div>
-                <div style={{fontSize:15,fontWeight:700,color:ch.color}}>{ch.label}</div>
-                {subtitle && <div style={{fontSize:11,color:"rgba(232,244,253,0.4)",marginTop:1}}>{subtitle}</div>}
+              style={{background:ch.bg,border:`1px solid ${ch.border}`,borderRadius:14,padding:"10px 10px",display:"flex",alignItems:"center",justifyContent:"center",gap:10,cursor:"pointer",marginBottom:8,minHeight:66}}>
+              <span style={{fontSize:20}}>{ch.icon}</span>
+              <div style={{textAlign:"center"}}>
+                <div style={{fontSize:12,fontWeight:700,color:ch.color}}>{ch.label}</div>
+                {subtitle && <div style={{fontSize:9,color:"rgba(232,244,253,0.4)"}}>{subtitle}</div>}
               </div>
             </div>
           );
