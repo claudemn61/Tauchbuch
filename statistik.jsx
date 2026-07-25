@@ -1,11 +1,4 @@
-const { useState, useEffect, useRef } = React;
-
-// ── Statistik Page ───────────────────────────────────────────────────────
-// Four aggregated views built from the same flight data the Flugbuch app
-// stores: Schirm (glider), Passagiere, Landeplätze, Startplätze. Shown as
-// four collapsible badges (same pattern as the Service page). On narrow
-// screens each row renders as a stacked card instead of a wide table, since
-// the source tables have too many columns to fit comfortably.
+const { useState, useEffect } = React;
 
 function parseDateToTs(d) {
   if (!d) return 0;
@@ -16,540 +9,284 @@ function parseDateToTs(d) {
   return new Date(+yy, +mm - 1, +dd).getTime();
 }
 
+function fmtDuration(min) {
+  if (!min) return "—";
+  if (min >= 60) return `${Math.floor(min/60)}h ${String(min%60).padStart(2,"0")}m`;
+  return `${min} min`;
+}
+
 function fmtDateShort(ts) {
   if (!ts) return "—";
   const d = new Date(ts);
-  return `${d.getDate()}.${d.getMonth()+1}.${String(d.getFullYear()).slice(2)}`;
+  return `${String(d.getDate()).padStart(2,"0")}.${String(d.getMonth()+1).padStart(2,"0")}.${String(d.getFullYear()).slice(2)}`;
 }
 
-function fmtHours(sec) {
-  const h = Math.floor(sec/3600), m = Math.round((sec%3600)/60);
-  return `${h}h ${String(m).padStart(2,"0")}m`;
-}
+// ── Statistik-Berechnung ─────────────────────────────────────────────────
+function computeStats(dives) {
+  const n = dives.length;
+  if (!n) return null;
 
-function fmtHM(sec) {
-  const h = Math.floor(sec/3600), m = Math.round((sec%3600)/60);
-  return `${h}h${String(m).padStart(2,"0")}m`;
-}
+  const totalMin = dives.reduce((s,d) => s + (d.durationMin||0), 0);
+  const depths = dives.map(d => d.maxDepth).filter(v => v != null);
+  const temps = dives.map(d => d.waterTemp).filter(v => v != null);
+  const ratings = dives.map(d => d.rating).filter(v => v > 0);
 
-// Builds the aggregation for a "grouping" stat: groups flights by a key
-// function, computing count / total duration / max duration / total
-// distance / first+last flight date, sorted by flight count descending.
-function aggregate(flights, keyFn) {
-  const groups = new Map();
-  flights.forEach(f => {
-    const key = keyFn(f);
-    if (!key) return;
-    if (!groups.has(key)) groups.set(key, { key, flights: [] });
-    groups.get(key).flights.push(f);
+  const avgDepth = depths.length ? depths.reduce((s,v)=>s+v,0)/depths.length : null;
+  const maxDepthDive = depths.length ? dives.filter(d=>d.maxDepth!=null).sort((a,b)=>b.maxDepth-a.maxDepth)[0] : null;
+  const avgTemp = temps.length ? temps.reduce((s,v)=>s+v,0)/temps.length : null;
+  const avgRating = ratings.length ? ratings.reduce((s,v)=>s+v,0)/ratings.length : null;
+
+  const nitroxCount = dives.filter(d => d.nitrox === "Nitrox").length;
+  const reisenSet = new Set(dives.map(d=>d.customFields?.reise).filter(Boolean));
+  const laenderSet = new Set(dives.map(d=>d.land).filter(Boolean));
+  const ortSet = new Set(dives.map(d=>d.ort).filter(Boolean));
+
+  // Jahres-Verlauf
+  const byYear = new Map();
+  dives.forEach(d => {
+    if (!d.year) return;
+    const cur = byYear.get(d.year) || { count: 0, min: 0 };
+    cur.count++; cur.min += (d.durationMin||0);
+    byYear.set(d.year, cur);
   });
-  const rows = [...groups.values()].map(g => {
-    const fl = g.flights;
-    const totalSec = fl.reduce((s,f) => s + (f.durationSec||0), 0);
-    const maxSec = fl.reduce((m,f) => Math.max(m, f.durationSec||0), 0);
-    const totalDist = fl.reduce((s,f) => s + (f.totalDist||0), 0);
-    const maxDist = fl.reduce((m,f) => Math.max(m, f.totalDist||0), 0);
-    const maxAlt = fl.reduce((m,f) => Math.max(m, f.maxAlt||0), 0);
-    const dates = fl.map(f => parseDateToTs(f.date)).filter(Boolean);
-    const first = dates.length ? Math.min(...dates) : 0;
-    const last = dates.length ? Math.max(...dates) : 0;
-    const startSites = new Set(fl.map(f => f.site).filter(Boolean)).size;
-    const endSites = new Set(fl.map(f => f.customFields?.landung).filter(Boolean)).size;
-    const r5 = fl.filter(f => f.rating === 5).length;
-    const r4 = fl.filter(f => f.rating === 4).length;
-    return { name: g.key, count: fl.length, totalSec, maxSec, totalDist, maxDist, maxAlt, first, last, startSites, endSites, r5, r4, flights: fl };
-  });
-  return rows;
-}
+  const years = [...byYear.entries()].sort((a,b) => b[0]-a[0]);
+  const maxYearCount = Math.max(1, ...years.map(([,v])=>v.count));
 
-// Generic sort helper: sorts a copy of rows by field, direction "asc"/"desc".
-// Non-numeric fields (name) sort alphabetically; everything else numerically.
-function sortRows(rows, field, dir) {
-  const sorted = [...rows].sort((a,b) => {
-    let av = a[field], bv = b[field];
-    if (typeof av === "string") {
-      const cmp = av.localeCompare(bv, "de");
-      return dir === "asc" ? cmp : -cmp;
-    }
-    return dir === "asc" ? av - bv : bv - av;
-  });
-  return sorted;
-}
+  // Rankings
+  const topDepth = [...dives].filter(d=>d.maxDepth!=null).sort((a,b)=>b.maxDepth-a.maxDepth).slice(0,5);
+  const topDuration = [...dives].filter(d=>d.durationMin).sort((a,b)=>b.durationMin-a.durationMin).slice(0,5);
 
-// Ported from flugbuch.jsx's SeasonDash — same content (year selector, stats
-// grid, personal records), but without its own page header/back-button
-// since this now lives as a section inside Statistik's own page instead of
-// being a separate full-screen view.
-function SeasonSection({ flights }) {
-  const years = [...new Set(flights.map(f=>f.year).filter(Boolean))].sort().reverse();
-  const [yr, setYr] = useState(years[0]||"");
-  const [showMoreYears, setShowMoreYears] = useState(false);
-  const yf = flights.filter(f=>f.year===yr);
-  const parseDurStr = s => {
-    if (!s) return 0;
-    const dm = s.match(/(\d+):(\d{2}):(\d{2})/);
-    if (dm) return +dm[1]*3600 + +dm[2]*60 + +dm[3];
-    const dm2 = s.match(/(\d+):(\d{2})/);
-    if (dm2) return +dm2[1]*60 + +dm2[2];
-    const dm3 = s.match(/(\d+)h\s*(\d+)m/);
-    if (dm3) return +dm3[1]*3600 + +dm3[2]*60;
-    const dm4 = s.match(/(\d+)m/);
-    if (dm4) return +dm4[1]*60;
-    return 0;
+  const countBy = (getKey) => {
+    const m = new Map();
+    dives.forEach(d => { const k = getKey(d); if (!k) return; m.set(k, (m.get(k)||0)+1); });
+    return [...m.entries()].sort((a,b)=>b[1]-a[1]);
   };
-  const parseDur = f => f.durationSec > 0 ? f.durationSec : (f.durationStr ? parseDurStr(f.durationStr) : 0);
-  const getDist = f => f.totalDist > 0 ? f.totalDist : (parseFloat(f.customFields?.distKm || 0) || 0);
-  const getAlt = f => f.maxAlt > 0 ? f.maxAlt : (+(f.customFields?.hMax || 0));
-  const totalSec = yf.reduce((s,f)=>s+parseDur(f),0);
-  const totalDist = yf.reduce((s,f)=>s+getDist(f),0);
-  const getDur = f => parseDur(f);
-  const prDur  = yf.length ? Math.max(...yf.map(getDur))  : 0;
-  const prDist = yf.length ? Math.max(...yf.map(getDist)) : 0;
-  const prAlt  = yf.length ? Math.max(...yf.map(getAlt))  : 0;
-  const prFlightDur  = yf.find(f=>getDur(f)===prDur);
-  const prFlightDist = yf.find(f=>getDist(f)===prDist);
-  const prFlightAlt  = yf.find(f=>getAlt(f)===prAlt);
-  const fmtDur = s => `${Math.floor(s/3600)}h ${String(Math.floor((s%3600)/60)).padStart(2,"0")}m`;
+  const topSpots = countBy(d => d.tauchspot).slice(0,6);
+  const topBuddies = countBy(d => d.buddy).slice(0,6);
+  const byLand = countBy(d => d.land);
+  const maxLandCount = Math.max(1, ...byLand.map(([,c])=>c));
+  const maxSpotCount = Math.max(1, ...topSpots.map(([,c])=>c));
+  const maxBuddyCount = Math.max(1, ...topBuddies.map(([,c])=>c));
 
-  const S = {
-    yearRow:{display:"flex",gap:8,marginBottom:16,flexWrap:"wrap"},
-    yrBtn:(a)=>({background:a?"rgba(224,48,74,0.3)":"rgba(255,255,255,0.05)",border:a?"1px solid rgba(224,48,74,0.5)":"1px solid rgba(255,255,255,0.08)",borderRadius:20,padding:"6px 14px",color:a?"#e8f4fd":"rgba(232,244,253,0.5)",fontSize:13,cursor:"pointer",fontWeight:a?600:400}),
-    grid:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:16},
-    box:{background:"rgba(255,255,255,0.05)",borderRadius:12,padding:"14px 12px",textAlign:"center",border:"1px solid rgba(255,255,255,0.07)"},
-    bigNum:{fontSize:26,fontWeight:800,color:"#e8f4fd",letterSpacing:-1},
-    lbl:{fontSize:10,color:"rgba(232,244,253,0.4)",textTransform:"uppercase",letterSpacing:0.8,marginTop:3},
-    prBox:{background:"rgba(224,48,74,0.08)",border:"1px solid rgba(224,48,74,0.2)",borderRadius:12,padding:"14px 16px",marginBottom:10},
-    prTitle:{fontSize:11,fontWeight:600,color:"#e8f4fd",letterSpacing:1.2,textTransform:"uppercase",marginBottom:8},
-    prRow:{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 0",borderBottom:"1px solid rgba(224,48,74,0.08)"},
-    prLbl:{fontSize:13,color:"rgba(232,244,253,0.5)"},
-    prVal:{fontSize:13,fontWeight:600,color:"#fcd34d"},
-    prSub:{fontSize:11,color:"rgba(232,244,253,0.3)"},
+  // Bewertungsverteilung
+  const ratingDist = [5,4,3,2,1].map(s => ({ stars: s, count: dives.filter(d=>d.rating===s).length }));
+  const maxRatingCount = Math.max(1, ...ratingDist.map(r=>r.count));
+
+  // Ausrüstung
+  const anzugCounts = countBy(d => d.anzug).slice(0,5);
+  const flascheCounts = countBy(d => d.flasche);
+
+  return {
+    n, totalMin, avgDurationMin: Math.round(totalMin/n),
+    avgDepth, maxDepthDive, avgTemp, avgRating,
+    nitroxCount, nitroxPct: Math.round(nitroxCount/n*100),
+    reisenCount: reisenSet.size, laenderCount: laenderSet.size, ortCount: ortSet.size,
+    years, maxYearCount,
+    topDepth, topDuration,
+    topSpots, maxSpotCount, topBuddies, maxBuddyCount,
+    byLand, maxLandCount,
+    ratingDist, maxRatingCount,
+    anzugCounts, flascheCounts,
+    firstDate: Math.min(...dives.map(d=>parseDateToTs(d.date)).filter(Boolean)),
+    lastDate: Math.max(...dives.map(d=>parseDateToTs(d.date)).filter(Boolean)),
   };
+}
 
-  if (!flights.length) return null;
-
+// ── UI-Bausteine ─────────────────────────────────────────────────────────
+function StatTile({ label, value, sub }) {
   return (
-    <div style={{margin:"12px 16px 0",display:"flex",flexDirection:"column",gap:8}}>
-      <div style={S.yearRow}>
-        {years.slice(0,4).map(y=><button key={y} style={S.yrBtn(y===yr)} onClick={()=>setYr(y)}>{y}</button>)}
-        {years.length>4 && (
-          <button onClick={()=>setShowMoreYears(true)}
-            style={S.yrBtn(years.slice(4).includes(yr))}>
-            {years.slice(4).includes(yr) ? yr : "Mehr ▾"}
-          </button>
-        )}
+    <div style={{background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:14,padding:"14px 12px",textAlign:"center"}}>
+      <div style={{fontSize:20,fontWeight:800,color:"#f87171"}}>{value}</div>
+      <div style={{fontSize:10,color:"rgba(232,244,253,0.5)",textTransform:"uppercase",letterSpacing:0.4,marginTop:4}}>{label}</div>
+      {sub && <div style={{fontSize:10,color:"rgba(232,244,253,0.3)",marginTop:2}}>{sub}</div>}
+    </div>
+  );
+}
+
+function SectionCard({ title, children }) {
+  return (
+    <div style={{background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.06)",borderRadius:14,padding:"14px 16px",marginBottom:14}}>
+      <div style={{fontSize:11,fontWeight:700,color:"rgba(232,244,253,0.4)",textTransform:"uppercase",letterSpacing:1,marginBottom:12}}>{title}</div>
+      {children}
+    </div>
+  );
+}
+
+function BarRow({ label, count, max, color, suffix }) {
+  const pct = Math.max(4, Math.round(count/max*100));
+  return (
+    <div style={{marginBottom:9}}>
+      <div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:3}}>
+        <span style={{color:"#e8f4fd",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:"70%"}}>{label}</span>
+        <span style={{color:"rgba(232,244,253,0.5)",flexShrink:0}}>{count}{suffix||""}</span>
       </div>
-      {showMoreYears && (
-        <div onClick={()=>setShowMoreYears(false)}
-          style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.55)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",padding:24}}>
-          <div onClick={e=>e.stopPropagation()}
-            style={{background:"#2a0d16",border:"1px solid rgba(255,255,255,0.12)",borderRadius:16,padding:14,maxHeight:"60vh",overflowY:"auto",width:"100%",maxWidth:280,boxShadow:"0 8px 30px rgba(0,0,0,0.5)"}}>
-            <div style={{fontSize:13,fontWeight:700,color:"rgba(232,244,253,0.5)",marginBottom:8,padding:"0 4px"}}>Jahr wählen</div>
-            {years.slice(4).map(y=>(
-              <div key={y} onClick={()=>{setYr(y);setShowMoreYears(false);}}
-                style={{padding:"10px 12px",borderRadius:10,fontSize:15,cursor:"pointer",color:"#e8f4fd",background:y===yr?"rgba(224,48,74,0.15)":"transparent",marginBottom:2}}>
-                {y}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-      {yf.length===0 ? (
-        <div style={{color:"rgba(232,244,253,0.3)",fontSize:14}}>Keine Flüge in {yr}</div>
-      ) : (<>
-        <div style={S.grid}>
-          <div style={S.box}><div style={S.bigNum}>{yf.length}</div><div style={S.lbl}>Flüge</div></div>
-          <div style={S.box}><div style={S.bigNum}>{fmtDur(totalSec)}</div><div style={S.lbl}>Total Flugzeit</div></div>
-          <div style={S.box}><div style={S.bigNum}>{totalDist.toFixed(0)} km</div><div style={S.lbl}>Total Distanz</div></div>
-          <div style={S.box}><div style={S.bigNum}>{yf.length>0?(totalDist/yf.length).toFixed(1):0} km</div><div style={S.lbl}>Ø / Flug</div></div>
-        </div>
-        <div style={S.prBox}>
-          <div style={S.prTitle}>🏆 Persönliche Rekorde {yr}</div>
-          {[
-            ["Längster Flug",   prFlightDur?.name,  prDur  ? fmtDur(prDur)       : "—"],
-            ["Weitester Flug",  prFlightDist?.name, prDist ? prDist+" km"         : "—"],
-            ["Höchster Flug",   prFlightAlt?.name,  prAlt  ? prAlt+" m ü.M."      : "—"],
-          ].map(([label,name,val])=>(
-            <div key={label} style={S.prRow}>
-              <div>
-                <div style={S.prLbl}>{label}</div>
-                {name&&<div style={S.prSub}>Flug {name}</div>}
-              </div>
-              <span style={S.prVal}>{val}</span>
-            </div>
-          ))}
-        </div>
-      </>)}
+      <div style={{height:6,background:"rgba(255,255,255,0.06)",borderRadius:6,overflow:"hidden"}}>
+        <div style={{width:pct+"%",height:"100%",background:color||"#f87171",borderRadius:6}} />
+      </div>
+    </div>
+  );
+}
+
+function RankRow({ rank, primary, secondary, value }) {
+  return (
+    <div style={{display:"flex",alignItems:"center",gap:10,padding:"7px 0",borderBottom:"1px solid rgba(255,255,255,0.05)"}}>
+      <span style={{width:20,fontSize:12,fontWeight:700,color:"rgba(232,244,253,0.35)",flexShrink:0}}>{rank}</span>
+      <div style={{flex:1,minWidth:0}}>
+        <div style={{fontSize:13,color:"#e8f4fd",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{primary}</div>
+        <div style={{fontSize:11,color:"rgba(232,244,253,0.4)"}}>{secondary}</div>
+      </div>
+      <span style={{fontSize:14,fontWeight:700,color:"#f87171",flexShrink:0}}>{value}</span>
     </div>
   );
 }
 
 function StatistikApp() {
-  const [flights, setFlights] = useState([]);
+  const [dives, setDives] = useState([]);
   const [loaded, setLoaded] = useState(false);
-  const [openTable, setOpenTable] = useState(null); // "schirm" | "passagiere" | "landeplaetze" | "startplaetze"
-  // If this page was left via a flight click (which stashes its state here
-  // before navigating to Flugbuch), restore exactly which category + row
-  // was open once, then forget it so a fresh visit doesn't get stuck.
-  const [restoreDetailName, setRestoreDetailName] = useState(null);
-  useEffect(() => {
-    try {
-      const raw = sessionStorage.getItem("statistik:returnState");
-      if (raw) {
-        const saved = JSON.parse(raw);
-        if (saved?.tableId) {
-          setOpenTable(saved.tableId);
-          setRestoreDetailName(saved.rowName || null);
-        }
-        sessionStorage.removeItem("statistik:returnState");
-      }
-    } catch {}
-  }, []);
 
   useEffect(() => {
     (async () => {
       try {
-        const keys = await window.storage.list("flight:");
+        const keys = await window.storage.list("dive:");
         const raw = await Promise.all((keys?.keys||[]).map(async k => {
           try { const r = await window.storage.get(k); return r ? JSON.parse(r.value) : null; } catch { return null; }
         }));
-        setFlights(raw.filter(Boolean));
+        setDives(raw.filter(Boolean));
       } catch (e) { console.error("Load error:", e); }
       setLoaded(true);
     })();
   }, []);
 
   if (!loaded) return null;
+  const stats = computeStats(dives);
 
-  const schirmRows = aggregate(flights, f => f.glider || null);
-  const passagierRows = aggregate(flights, f => (f.customFields?.passagier || "").trim() || null);
-  const landRows = aggregate(flights, f => f.customFields?.landung || null).map(r => {
-    const withCoord = flights.find(f => f.customFields?.landung === r.name && f.endPt);
-    return { ...r, alt: withCoord?.endAlt || withCoord?.endPt?.gpsAlt || null, lat: withCoord?.endPt?.lat, lon: withCoord?.endPt?.lon };
-  });
-  const startRows = aggregate(flights, f => f.site || null).map(r => {
-    const withCoord = flights.find(f => f.site === r.name && f.startPt);
-    return { ...r, alt: withCoord?.startAlt || withCoord?.startPt?.gpsAlt || null, lat: withCoord?.startPt?.lat, lon: withCoord?.startPt?.lon };
-  });
-
-  const SORT_OPTIONS = {
-    schirm: [
-      { id: "count", label: "Anzahl Flüge" },
-      { id: "totalSec", label: "Gesamte Flugzeit" },
-      { id: "maxSec", label: "Längster Flug" },
-      { id: "totalDist", label: "Gesamte Distanz" },
-      { id: "maxDist", label: "Weitester Flug" },
-      { id: "maxAlt", label: "Grösste Höhe" },
-      { id: "startSites", label: "Startplätze" },
-      { id: "endSites", label: "Landeplätze" },
-      { id: "name", label: "Name" },
-      { id: "first", label: "Erster Flug" },
-      { id: "last", label: "Letzter Flug" },
-    ],
-    passagiere: [
-      { id: "count", label: "Anzahl" },
-      { id: "first", label: "Erster Flug" },
-      { id: "last", label: "Letzter Flug" },
-      { id: "name", label: "Name" },
-    ],
-    landeplaetze: [
-      { id: "count", label: "Anzahl Flüge" },
-      { id: "alt", label: "Höhe m.ü.M." },
-      { id: "first", label: "Erster Flug" },
-      { id: "last", label: "Letzter Flug" },
-      { id: "name", label: "Name" },
-    ],
-    startplaetze: [
-      { id: "count", label: "Anzahl Flüge" },
-      { id: "alt", label: "Höhe m.ü.M." },
-      { id: "first", label: "Erster Flug" },
-      { id: "last", label: "Letzter Flug" },
-      { id: "name", label: "Name" },
-    ],
-  };
-
-  const TABLES = [
-    { id: "schirm", icon: "🪂", label: "Schirm", rows: schirmRows, color: "#3b82f6", glow: "rgba(59,130,246,0.5)" },
-    { id: "startplaetze", icon: "🛫", label: "Startplätze", rows: startRows, color: "#4ade80", glow: "rgba(74,222,128,0.5)" },
-    { id: "landeplaetze", icon: "🛬", label: "Landeplätze", rows: landRows, color: "#f5a623", glow: "rgba(245,166,35,0.5)" },
-    { id: "passagiere", icon: "👤", label: "Passagiere", rows: passagierRows, color: "#a78bfa", glow: "rgba(167,139,250,0.5)" },
-    { id: "saison", icon: "📅", label: "Saison", rows: [], color: "#e0304a", glow: "rgba(224,48,74,0.5)" },
-  ];
   return (
     <div style={{minHeight:"100vh",background:"#210710",color:"#e8f4fd",fontFamily:"-apple-system,BlinkMacSystemFont,sans-serif",paddingBottom:40}}>
-      {/* Header */}
       <div style={{background:"rgba(255,255,255,0.03)",borderBottom:"1px solid rgba(255,255,255,0.06)",padding:"calc(28px + env(safe-area-inset-top, 0px)) 16px 12px",display:"flex",alignItems:"center",position:"sticky",top:0,zIndex:10,backdropFilter:"blur(10px)"}}>
         <button onClick={()=>{window.location.href="index.html";}} title="Zur Startseite"
           style={{background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,width:32,height:32,display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,color:"rgba(232,244,253,0.8)",cursor:"pointer",flexShrink:0}}>
           🏠
         </button>
         <span style={{fontWeight:900,fontSize:18,letterSpacing:-0.5,flex:1,textAlign:"center",marginLeft:-32}}>
-          📊 Statistik
+          📊 Tauch-Statistik
         </span>
       </div>
 
-      {/* 5 badges as full-width horizontal bars, stacked — each with its own
-          colour accent rail plus a radial-gradient glow blob behind the
-          icon, exactly matching Home's tile design (rail + icon glow)
-          rather than a uniform 2x2 grid of same-coloured boxes. */}
-      <div style={{padding:"14px 16px 0",display:"flex",flexDirection:"column",gap:10}}>
-        {TABLES.map(t => (
-          <button key={t.id} onClick={()=>setOpenTable(openTable===t.id?null:t.id)}
-            style={{width:"100%",boxSizing:"border-box",display:"flex",alignItems:"stretch",padding:0,overflow:"hidden",
-              background:openTable===t.id?`${t.color}26`:"rgba(255,255,255,0.05)",
-              border:`1px solid ${openTable===t.id?t.color+"66":"rgba(255,255,255,0.1)"}`,
-              borderRadius:12,color:openTable===t.id?t.color:"rgba(232,244,253,0.85)",fontSize:15,fontWeight:700,cursor:"pointer",textAlign:"left"}}>
-            {/* Accent rail */}
-            <div style={{width:5,background:t.color,flexShrink:0,boxShadow:`0 0 12px ${t.color}`}} />
-            {/* Icon block with glow blob */}
-            <div style={{width:56,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,
-              background:`radial-gradient(circle, ${t.glow} 0%, ${t.glow} 40%, transparent 85%)`}}>
-              {t.icon}
-            </div>
-            <span style={{flex:1,display:"flex",alignItems:"center",padding:"14px 8px"}}>{t.label}</span>
-            <span style={{opacity:0.6,fontSize:13,display:"flex",alignItems:"center",paddingRight:16}}>{openTable===t.id?"▾":"▸"}</span>
-          </button>
-        ))}
-      </div>
-
-      {TABLES.map(t => openTable===t.id && (
-        t.id === "saison"
-          ? <SeasonSection key={t.id} flights={flights} />
-          : <StatTable key={t.id} table={t} sortOptions={SORT_OPTIONS[t.id]}
-              initialDetailName={openTable===t.id ? restoreDetailName : null} />
-      ))}
-    </div>
-  );
-}
-
-function StatTable({ table, sortOptions, initialDetailName }) {
-  const { rows, id } = table;
-  const [sortField, setSortField] = useState(sortOptions[0].id);
-  const [sortDir, setSortDir] = useState("desc");
-  const [showSortMenu, setShowSortMenu] = useState(false);
-  const [openDetail, setOpenDetail] = useState(null); // the row (r) whose flight list is shown
-  // Restores the flight-list overlay for whichever row was open when the
-  // person left for Flugbuch (via initialDetailName, read from
-  // sessionStorage by the parent) — only once, on mount.
-  useEffect(() => {
-    if (initialDetailName) {
-      const match = rows.find(r => r.name === initialDetailName);
-      if (match) setOpenDetail(match);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-  // Keeps every card's chip row scrolled to the same horizontal position:
-  // scrolling any one card's chips (e.g. one Schirm's stats) mirrors that
-  // scrollLeft onto every other card's chip row, while each card's name/
-  // title stays in normal (non-scrolling) flow above it.
-  const chipRowRefs = useRef([]);
-  const syncingScroll = useRef(false);
-  const handleChipScroll = (e) => {
-    if (syncingScroll.current) return;
-    syncingScroll.current = true;
-    const left = e.target.scrollLeft;
-    chipRowRefs.current.forEach(el => { if (el && el !== e.target) el.scrollLeft = left; });
-    syncingScroll.current = false;
-  };
-
-  if (!rows.length) {
-    return (
-      <div style={{margin:"12px 16px 0",background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:12,padding:"20px 16px",textAlign:"center",color:"rgba(232,244,253,0.4)",fontSize:13}}>
-        Keine Daten vorhanden.
-      </div>
-    );
-  }
-  const sorted = sortRows(rows, sortField, sortDir);
-  const totalFlights = rows.reduce((s,r) => s+r.count, 0);
-
-  return (
-    <div style={{margin:"12px 16px 0",display:"flex",flexDirection:"column",gap:8}}>
-      {/* Sort selector */}
-      <div style={{position:"relative"}}>
-        <div style={{display:"flex",gap:8}}>
-          <button onClick={()=>setShowSortMenu(s=>!s)}
-            style={{flex:1,display:"flex",justifyContent:"space-between",alignItems:"center",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,padding:"8px 12px",color:"rgba(232,244,253,0.8)",fontSize:12,cursor:"pointer"}}>
-            <span>⇅ {sortOptions.find(o=>o.id===sortField)?.label}</span>
-            <span>{showSortMenu?"▾":"▸"}</span>
-          </button>
-          <button onClick={()=>setSortDir(d=>d==="asc"?"desc":"asc")}
-            style={{background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,padding:"8px 14px",color:"#f87171",fontSize:14,cursor:"pointer"}}>
-            {sortDir==="asc"?"↑":"↓"}
-          </button>
+      {!stats ? (
+        <div style={{padding:"60px 24px",textAlign:"center"}}>
+          <div style={{fontSize:40,marginBottom:14}}>📊</div>
+          <div style={{fontSize:16,fontWeight:700,marginBottom:8}}>Noch keine Daten</div>
+          <div style={{fontSize:13,color:"rgba(232,244,253,0.5)",lineHeight:1.6,maxWidth:320,margin:"0 auto"}}>
+            Sobald Tauchgänge im Tauchbuch erfasst sind, erscheinen hier Auswertungen.
+          </div>
         </div>
-        {showSortMenu && (
-          <div style={{marginTop:6,background:"#2a0d16",border:"1px solid rgba(255,255,255,0.12)",borderRadius:12,padding:6,boxShadow:"0 8px 24px rgba(0,0,0,0.4)",position:"absolute",top:"100%",left:0,right:0,zIndex:20}}>
-            {sortOptions.map(o=>(
-              <div key={o.id} onClick={()=>{setSortField(o.id);setShowSortMenu(false);}}
-                style={{padding:"9px 12px",borderRadius:8,fontSize:13,cursor:"pointer",color:o.id===sortField?"#f87171":"rgba(232,244,253,0.75)",background:o.id===sortField?"rgba(224,48,74,0.15)":"transparent"}}>
-                {o.label}
-              </div>
+      ) : (
+        <div style={{padding:"16px"}}>
+
+          <div style={{fontSize:12,color:"rgba(232,244,253,0.4)",marginBottom:12,textAlign:"center"}}>
+            {fmtDateShort(stats.firstDate)} – {fmtDateShort(stats.lastDate)}
+          </div>
+
+          {/* Kennzahlen */}
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:14}}>
+            <StatTile label="Tauchgänge" value={stats.n} />
+            <StatTile label="Gesamtzeit" value={fmtDuration(stats.totalMin)} />
+            <StatTile label="Ø Dauer" value={fmtDuration(stats.avgDurationMin)} />
+            <StatTile label="Ø Tiefe" value={stats.avgDepth!=null?stats.avgDepth.toFixed(1)+" m":"—"} />
+            <StatTile label="Max. Tiefe" value={stats.maxDepthDive?stats.maxDepthDive.maxDepth+" m":"—"} sub={stats.maxDepthDive?"TG "+stats.maxDepthDive.name:null} />
+            <StatTile label="Ø Wassertemp." value={stats.avgTemp!=null?stats.avgTemp.toFixed(1)+"°":"—"} />
+            <StatTile label="Reisen" value={stats.reisenCount} />
+            <StatTile label="Länder" value={stats.laenderCount} />
+            <StatTile label="Orte" value={stats.ortCount} />
+            <StatTile label="Nitrox-Anteil" value={stats.nitroxPct+"%"} />
+            <StatTile label="Ø Bewertung" value={stats.avgRating!=null?stats.avgRating.toFixed(1)+"★":"—"} />
+          </div>
+
+          {/* Jahres-Verlauf */}
+          {stats.years.length > 0 && (
+            <SectionCard title="Tauchgänge pro Jahr">
+              {stats.years.map(([yr, v]) => (
+                <BarRow key={yr} label={yr} count={v.count} max={stats.maxYearCount} color="#f87171" suffix=" TG" />
+              ))}
+            </SectionCard>
+          )}
+
+          {/* Tiefste Tauchgänge */}
+          {stats.topDepth.length > 0 && (
+            <SectionCard title="Tiefste Tauchgänge">
+              {stats.topDepth.map((d,i) => (
+                <RankRow key={d.id} rank={i+1} primary={d.tauchspot||d.ort||"—"} secondary={`TG ${d.name} · ${d.date}`} value={d.maxDepth+" m"} />
+              ))}
+            </SectionCard>
+          )}
+
+          {/* Längste Tauchgänge */}
+          {stats.topDuration.length > 0 && (
+            <SectionCard title="Längste Tauchgänge">
+              {stats.topDuration.map((d,i) => (
+                <RankRow key={d.id} rank={i+1} primary={d.tauchspot||d.ort||"—"} secondary={`TG ${d.name} · ${d.date}`} value={fmtDuration(d.durationMin)} />
+              ))}
+            </SectionCard>
+          )}
+
+          {/* Beliebteste Tauchspots */}
+          {stats.topSpots.length > 0 && (
+            <SectionCard title="Häufigste Tauchspots">
+              {stats.topSpots.map(([spot, count]) => (
+                <BarRow key={spot} label={spot} count={count} max={stats.maxSpotCount} color="#fb923c" suffix=" TG" />
+              ))}
+            </SectionCard>
+          )}
+
+          {/* Länder-Verteilung */}
+          {stats.byLand.length > 0 && (
+            <SectionCard title="Länder">
+              {stats.byLand.map(([land, count]) => (
+                <BarRow key={land} label={land} count={count} max={stats.maxLandCount} color="#38bdf8" suffix=" TG" />
+              ))}
+            </SectionCard>
+          )}
+
+          {/* Buddys */}
+          {stats.topBuddies.length > 0 && (
+            <SectionCard title="Häufigste Buddys">
+              {stats.topBuddies.map(([buddy, count]) => (
+                <BarRow key={buddy} label={"👤 "+buddy} count={count} max={stats.maxBuddyCount} color="#4ade80" suffix=" TG" />
+              ))}
+            </SectionCard>
+          )}
+
+          {/* Bewertungsverteilung */}
+          <SectionCard title="Bewertungsverteilung">
+            {stats.ratingDist.map(r => (
+              <BarRow key={r.stars} label={"★".repeat(r.stars)} count={r.count} max={stats.maxRatingCount} color="#f59e0b" suffix=" TG" />
             ))}
-          </div>
-        )}
-      </div>
+          </SectionCard>
 
-      <div style={{fontSize:11,color:"rgba(232,244,253,0.4)",textTransform:"uppercase",letterSpacing:0.5,padding:"0 2px"}}>
-        {rows.length} Einträge · {totalFlights} Flüge total
-      </div>
+          {/* Ausrüstung */}
+          {stats.anzugCounts.length > 0 && (
+            <SectionCard title="Anzüge im Einsatz">
+              {stats.anzugCounts.map(([anzug, count]) => (
+                <BarRow key={anzug} label={anzug} count={count} max={Math.max(...stats.anzugCounts.map(a=>a[1]))} color="#a78bfa" suffix=" TG" />
+              ))}
+            </SectionCard>
+          )}
 
-      {sorted.map((r,idx) => (
-        <div key={idx} style={{background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:12,padding:"12px 14px"}}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-end",marginBottom:8,gap:8}}>
-            <div style={{flex:1,minWidth:0}}>
-              <div onClick={()=>setOpenDetail(r)}
-                style={{fontSize:14,fontWeight:700,cursor:"pointer",textDecoration:"underline",textDecorationColor:"rgba(232,244,253,0.25)",textUnderlineOffset:3}}>
-                {r.name}
+          {stats.flascheCounts.length > 0 && (
+            <SectionCard title="Flaschentyp">
+              <div style={{display:"flex",gap:8}}>
+                {stats.flascheCounts.map(([flasche, count]) => (
+                  <div key={flasche} style={{flex:1,background:"rgba(255,255,255,0.03)",borderRadius:10,padding:"10px 8px",textAlign:"center"}}>
+                    <div style={{fontSize:18,fontWeight:800,color:"#f87171"}}>{count}</div>
+                    <div style={{fontSize:11,color:"rgba(232,244,253,0.5)",marginTop:2}}>{flasche}</div>
+                  </div>
+                ))}
               </div>
-              {(id === "landeplaetze" || id === "startplaetze") && r.lat && r.lon && (
-                <div style={{fontSize:10,color:"rgba(232,244,253,0.35)",marginTop:2,fontFamily:"monospace"}}>
-                  {r.lat.toFixed(5)}, {r.lon.toFixed(5)}
-                </div>
-              )}
-            </div>
-            {(id === "schirm" || id === "startplaetze" || id === "passagiere" || id === "landeplaetze") && (r.r5>0 || r.r4>0) && (
-              <div style={{fontSize:10,fontWeight:700,color:"#fde047",whiteSpace:"nowrap",flexShrink:0,display:"flex",gap:5}}>
-                {r.r5>0 && <span>{r.r5}×5⭐️</span>}
-                {r.r4>0 && <span>{r.r4}×4⭐️</span>}
-              </div>
-            )}
-            <div style={{fontSize:13,fontWeight:700,color:"#f87171",flexShrink:0}}>{r.count} Flüge</div>
-          </div>
-          <div ref={el => { chipRowRefs.current[idx] = el; }} onScroll={handleChipScroll}
-            style={{display:"flex",gap:6,overflowX:"auto",paddingBottom:2,WebkitOverflowScrolling:"touch"}}>
-            {id === "schirm" && (<>
-              <StatChip label="Gesamte Flugzeit" value={fmtHM(r.totalSec)} />
-              <StatChip label="Längster Flug" value={fmtHours(r.maxSec)} />
-              <StatChip label="Gesamte Distanz" value={`${r.totalDist.toFixed(1)} km`} />
-              <StatChip label="Weitester Flug" value={`${r.maxDist.toFixed(1)} km`} />
-              <StatChip label="Zeit/Flug" value={fmtHM(Math.round(r.totalSec/r.count))} />
-              <StatChip label="km/Flug" value={`${(r.totalDist/r.count).toFixed(1)} km`} />
-              <StatChip label="Grösste Höhe" value={`${r.maxAlt} m`} />
-              <StatChip label="Startplätze" value={r.startSites} />
-              <StatChip label="Landeplätze" value={r.endSites} />
-              <StatChip label="Erster Flug" value={fmtDateShort(r.first)} />
-              <StatChip label="Letzter Flug" value={fmtDateShort(r.last)} />
-            </>)}
-            {id === "passagiere" && (<>
-              <StatChip label="Erster Flug" value={fmtDateShort(r.first)} />
-              <StatChip label="Letzter Flug" value={fmtDateShort(r.last)} />
-            </>)}
-            {(id === "landeplaetze" || id === "startplaetze") && (<>
-              {r.alt ? <StatChip label="m.ü.M." value={r.alt} /> : null}
-              <StatChip label="Erster Flug" value={fmtDateShort(r.first)} />
-              <StatChip label="Letzter Flug" value={fmtDateShort(r.last)} />
-            </>)}
-          </div>
+            </SectionCard>
+          )}
+
         </div>
-      ))}
-      {openDetail && <FlightListOverlay row={openDetail} onClose={()=>setOpenDetail(null)} tableId={id} />}
+      )}
     </div>
-  );
-}
-
-// Fullscreen overlay listing every flight behind a tapped Schirm/Passagier/
-// Start-/Landeplatz value, with the same core fields shown in the Flugbuch
-// list and its own independent sort control (mirrors the Flugbuch pattern:
-// a field dropdown + direction toggle).
-const FLIGHT_LIST_SORT_OPTIONS = [
-  { id: "date", label: "Datum" },
-  { id: "number", label: "Nummer" },
-  { id: "duration", label: "Dauer" },
-  { id: "dist", label: "Distanz" },
-];
-
-function flightListSortValue(f, sortId) {
-  switch (sortId) {
-    case "date": return parseDateToTs(f.date);
-    case "number": return parseInt((f.name||"").match(/\d+/)?.[0]||"0",10);
-    case "duration": return f.durationSec||0;
-    case "dist": return f.totalDist||0;
-    default: return 0;
-  }
-}
-
-function FlightListOverlay({ row, onClose, tableId }) {
-  const [sortField, setSortField] = useState("date");
-  const [sortDir, setSortDir] = useState("desc");
-  const [showSortMenu, setShowSortMenu] = useState(false);
-
-  const sorted = [...row.flights].sort((a,b) => {
-    const av = flightListSortValue(a, sortField), bv = flightListSortValue(b, sortField);
-    return sortDir === "asc" ? av - bv : bv - av;
-  });
-
-  return (
-    <div style={{position:"fixed",inset:0,background:"#210710",zIndex:300,overflowY:"auto"}}>
-      <div style={{position:"sticky",top:0,zIndex:10,background:"rgba(33,7,16,0.95)",backdropFilter:"blur(10px)",borderBottom:"1px solid rgba(255,255,255,0.08)",padding:"calc(16px + env(safe-area-inset-top, 0px)) 16px 12px",display:"flex",alignItems:"center",gap:10}}>
-        <button onClick={onClose}
-          style={{background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.15)",borderRadius:10,width:32,height:32,color:"#e8f4fd",fontSize:16,cursor:"pointer",flexShrink:0}}>
-          ✕
-        </button>
-        <div style={{flex:1,minWidth:0}}>
-          <div style={{fontSize:16,fontWeight:800,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{row.name}</div>
-          <div style={{fontSize:11,color:"rgba(232,244,253,0.4)"}}>{row.flights.length} Flüge</div>
-        </div>
-      </div>
-
-      <div style={{padding:"12px 16px",position:"relative"}}>
-        <div style={{display:"flex",gap:8}}>
-          <button onClick={()=>setShowSortMenu(s=>!s)}
-            style={{flex:1,display:"flex",justifyContent:"space-between",alignItems:"center",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,padding:"8px 12px",color:"rgba(232,244,253,0.8)",fontSize:12,cursor:"pointer"}}>
-            <span>⇅ {FLIGHT_LIST_SORT_OPTIONS.find(o=>o.id===sortField)?.label}</span>
-            <span>{showSortMenu?"▾":"▸"}</span>
-          </button>
-          <button onClick={()=>setSortDir(d=>d==="asc"?"desc":"asc")}
-            style={{background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,padding:"8px 14px",color:"#f87171",fontSize:14,cursor:"pointer"}}>
-            {sortDir==="asc"?"↑":"↓"}
-          </button>
-        </div>
-        {showSortMenu && (
-          <div style={{marginTop:6,background:"#2a0d16",border:"1px solid rgba(255,255,255,0.12)",borderRadius:12,padding:6,boxShadow:"0 8px 24px rgba(0,0,0,0.4)",position:"absolute",top:"100%",left:16,right:16,zIndex:20}}>
-            {FLIGHT_LIST_SORT_OPTIONS.map(o=>(
-              <div key={o.id} onClick={()=>{setSortField(o.id);setShowSortMenu(false);}}
-                style={{padding:"9px 12px",borderRadius:8,fontSize:13,cursor:"pointer",color:o.id===sortField?"#f87171":"rgba(232,244,253,0.75)",background:o.id===sortField?"rgba(224,48,74,0.15)":"transparent"}}>
-                {o.label}
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      <div style={{padding:"0 16px 24px"}}>
-        {sorted.map(f => (
-          <div key={f.id}
-            onClick={()=>{
-              try {
-                sessionStorage.setItem("statistik:returnState", JSON.stringify({ tableId, rowName: row.name }));
-              } catch {}
-              window.location.href = `flugbuch.html?openFlightId=${encodeURIComponent(f.id)}&returnTo=${encodeURIComponent("statistik.html")}`;
-            }}
-            style={{padding:"11px 0",borderBottom:"1px solid rgba(255,255,255,0.06)",display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer"}}>
-            <div style={{minWidth:0}}>
-              <div style={{fontSize:14,fontWeight:700}}>{f.name}</div>
-              <div style={{fontSize:11,color:"rgba(232,244,253,0.4)"}}>
-                {f.date} · {f.site||"—"}{f.customFields?.landung ? " → "+f.customFields.landung : ""}
-              </div>
-            </div>
-            <div style={{textAlign:"right",flexShrink:0,marginLeft:8}}>
-              <div style={{fontSize:13,fontWeight:600,color:"#f87171",display:"flex",alignItems:"center",justifyContent:"flex-end",gap:4}}>
-                {f.rating>0 && <span><span style={{color:"#fde047"}}>{f.rating}</span><span style={{fontSize:"0.85em"}}>⭐️</span></span>}
-                <span>{f.durationStr||fmtHM(f.durationSec||0)}</span>
-              </div>
-              <div style={{fontSize:11,color:"rgba(232,244,253,0.3)"}}>{f.totalDist?f.totalDist+" km":""}</div>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function StatChip({ label, value }) {
-  return (
-    <span style={{display:"flex",flexDirection:"column",alignItems:"center",gap:1,background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.06)",borderRadius:10,padding:"5px 10px",whiteSpace:"nowrap",flexShrink:0}}>
-      <span style={{fontSize:9,color:"rgba(232,244,253,0.4)",textTransform:"uppercase",letterSpacing:0.3}}>{label}</span>
-      <span style={{fontSize:13,fontWeight:700,color:"rgba(232,244,253,0.9)"}}>{value}</span>
-    </span>
   );
 }
