@@ -261,7 +261,7 @@ function HomeApp() {
           const subtitle = subtitleFor(ch.key);
           return (
             <div key={ch.key} onClick={()=>{window.location.href=ch.href;}}
-              style={{background:ch.bg,border:`1px solid ${ch.border}`,borderRadius:14,padding:"10px 10px",display:"flex",alignItems:"center",justifyContent:"center",gap:10,cursor:"pointer",marginBottom:8,height:"calc((100vw - 40px) / 2)",boxSizing:"border-box"}}>
+              style={{background:ch.bg,border:`1px solid ${ch.border}`,borderRadius:14,padding:"10px 10px",display:"flex",alignItems:"center",justifyContent:"center",gap:10,cursor:"pointer",marginBottom:8,height:"calc((100vw - 40px) * 0.375)",boxSizing:"border-box"}}>
               <span style={{fontSize:26}}>{ch.icon}</span>
               <div style={{textAlign:"center"}}>
                 <div style={{fontSize:13,fontWeight:700,color:ch.color}}>{ch.label}</div>
@@ -276,7 +276,7 @@ function HomeApp() {
           const subtitle = subtitleFor(ch.key);
           return (
             <div key={ch.key} onClick={()=>{window.location.href=ch.href;}}
-              style={{background:ch.bg,border:`1px solid ${ch.border}`,borderRadius:14,padding:"10px 10px",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:4,cursor:"pointer",aspectRatio:"1"}}>
+              style={{background:ch.bg,border:`1px solid ${ch.border}`,borderRadius:14,padding:"10px 10px",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:4,cursor:"pointer",aspectRatio:"1 / 0.75"}}>
               <span style={{fontSize:26}}>{ch.icon}</span>
               <span style={{fontSize:13,fontWeight:700,color:ch.color}}>{ch.label}</span>
               {subtitle && <span style={{fontSize:10,color:"rgba(232,244,253,0.4)"}}>{subtitle}</span>}
