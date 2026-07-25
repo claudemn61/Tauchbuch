@@ -191,12 +191,20 @@ function fmtMonthYear(date) {
 }
 
 // Single source of truth for the version number shown next to the title.
-const APP_VERSION = "2.9.1";
+const APP_VERSION = "3.1.1";
 
 // Chronological changelog, newest first, matching what's actually been
 // built and shipped in this app over the course of development. Kept here
 // so the in-app "Log Files" folder can show it without needing any backend.
 const VERSION_LOG = [
+  { v: "3.1.1", note: "Weltkarte-Suche: logische Verknüpfung — mehrere Wörter mit Leerzeichen sind automatisch UND-verknüpft, \"oder\" trennt Alternativen (z.B. \"2026 Brasilien oder Wallis\")." },
+  { v: "3.1", note: "Höhenprofil-Zoom: Karte zoomt jetzt synchron mit auf denselben Streckenabschnitt, statt nur einen Punkt zu markieren. Referenzpunkt kräftiges Rot mit weissem Rand. Im Profil selbst zeigt eine dünne gestrichelte Linie die Mitte des Ausschnitts (entspricht dem Kartenpunkt)." },
+  { v: "3.0.5", note: "Karte zeigt jetzt einen gelben Referenzpunkt, wenn das Höhenprofil gezoomt ist — folgt dynamisch der Mitte des sichtbaren Ausschnitts, sowohl in der kleinen Vorschau als auch im Vollbild." },
+  { v: "3.0.4", note: "Höhenprofil: Verschieben-Regler entfernt — bei aktivem Zoom (>1×) wird stattdessen direkt im Profil per Wischen verschoben, Wischen zwischen Flügen bleibt währenddessen weiterhin komplett blockiert." },
+  { v: "3.0.3", note: "Höhenprofil: Wischen zwischen Flügen ist jetzt komplett blockiert, solange das Profil gezoomt ist (>1×) — verhindert Konflikte beim Verschieben im Profil. Zoom-Regler durch einen Button mit Listenauswahl (1-8×) ersetzt." },
+  { v: "3.0.2", note: "Höhenprofil: neuer Verschieben-Regler (bei Zoom >1×) — verschiebt das sichtbare Fenster entlang der ganzen Strecke, statt fest auf die Flugmitte zentriert zu bleiben." },
+  { v: "3.0.1", note: "Höhenprofil-Zoom: Bodenprofil zeigte beim Zoomen ein Zickzack-Muster (alle Bodenpunkte der ganzen Strecke wurden mitgezeichnet statt nur die sichtbaren) — jetzt korrekt gefiltert. Zoom-/Wisch-Geste zuverlässiger, blockiert das Wischen zwischen Flügen jetzt konsequent während der Geste." },
+  { v: "3.0", note: "Neu: Weltkarte (🗺️-Button ersetzt den bisherigen Saison-Button im Flugbuch) — zeigt Start-/Landeplätze aller Flüge (grün/rot), oder nur der in der Listen-Auswahl markierten. Umschalter Start-/Landeplätze, Suche nach Platzname. Saison-Übersicht ist dafür 1:1 in die Statistik-Seite umgezogen (neuer 5. Badge)." },
   { v: "2.9.1", note: "Home: Einstellungen-Zahnrad + Versionsnummer jetzt unten rechts auf dem Foto, auf gleicher Höhe wie der Titel (statt oben). \"flug\" im Titel kräftigeres Orange (#ff9500)." },
   { v: "2.9", note: "Home: Titel \"meinflugbuch\" liegt jetzt direkt auf dem Foto (mit Verlaufs-Schatten für Lesbarkeit), statt in einer eigenen Box darüber." },
   { v: "2.8", note: "Home-Hintergrund auf dasselbe Dunkelblau wie Flugbuch (#040e20) umgestellt, statt dem bisherigen Grau-Blau." },
