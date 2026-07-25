@@ -1,20 +1,27 @@
 const { useState, useEffect, useRef } = React;
 
-const APP_VERSION = "2.0";
+const APP_VERSION = "2.1";
 
 // ── Startseite ───────────────────────────────────────────────────────────
 // Editierbares Titelbild (per Tap austauschbar, als Data-URL in Storage
-// gesichert) + vier Kapitel-Kacheln zu den Unterseiten.
+// gesichert) + Kapitel-Kacheln zu den Unterseiten. Tauchgänge steht als
+// breite Kachel oben, die übrigen folgen darunter zu je zweit.
 const CHAPTERS = [
-  { key: "tauchgaenge", label: "Tauchgänge", icon: "🤿", href: "tauchbuch.html", color: "#38bdf8", bg: "rgba(56,189,248,0.1)", border: "rgba(56,189,248,0.25)" },
+  { key: "tauchgaenge", label: "Tauchgänge", icon: "🤿", href: "tauchbuch.html", color: "#38bdf8", bg: "rgba(56,189,248,0.1)", border: "rgba(56,189,248,0.25)", wide: true },
   { key: "reisen", label: "Reisen", icon: "🧭", href: "reisen.html", color: "#f5a623", bg: "rgba(245,166,35,0.1)", border: "rgba(245,166,35,0.25)" },
   { key: "material", label: "Material", icon: "🎒", href: "material.html", color: "#4ade80", bg: "rgba(74,222,128,0.1)", border: "rgba(74,222,128,0.25)" },
   { key: "statistik", label: "Statistik", icon: "📊", href: "statistik.html", color: "#f87171", bg: "rgba(248,113,113,0.1)", border: "rgba(248,113,113,0.25)" },
+  { key: "brevet", label: "Brevet", icon: "🎓", href: "brevet.html", color: "#a78bfa", bg: "rgba(167,139,250,0.1)", border: "rgba(167,139,250,0.25)" },
 ];
 
 // Änderungsverlauf — neuste zuerst. Wird beim Erhöhen der Version jeweils
 // von Hand ergänzt.
 const CHANGELOG = [
+  { version: "2.1", changes: [
+    "Neues Kapitel „Brevet“: beliebig viele Einträge mit Name und Foto des Ausweises (Vollbild-Ansicht per Tap), Fotos werden automatisch komprimiert",
+    "Startseite: Tauchgänge als breite Kachel oben, restliche Kapitel darunter zu zweit",
+    "Startseite: Titelbild füllt jetzt die gesamte verfügbare Höhe, sodass alles ohne Scrollen auf den Bildschirm passt",
+  ]},
   { version: "2.0", changes: [
     "App jetzt offlinefähig (ab dem zweiten erfolgreichen Online-Start) — Service Worker cached App und Bibliotheken automatisch",
     "Kleiner Offline-Hinweis unten, wenn keine Verbindung besteht",
@@ -174,6 +181,7 @@ function HomeApp() {
   const [loaded, setLoaded] = useState(false);
   const [diveCount, setDiveCount] = useState(0);
   const [reiseCount, setReiseCount] = useState(0);
+  const [brevetCount, setBrevetCount] = useState(0);
   const [showSettings, setShowSettings] = useState(false);
   const fileRef = useRef(null);
 
@@ -193,6 +201,10 @@ function HomeApp() {
         const reiseSet = new Set(raw.filter(Boolean).map(d => d.customFields?.reise).filter(Boolean));
         setReiseCount(reiseSet.size);
       } catch (e) { console.error("Count load error:", e); }
+      try {
+        const r = await window.storage.get("brevet:list");
+        if (r) setBrevetCount((JSON.parse(r.value) || []).length);
+      } catch {}
       setLoaded(true);
     })();
   }, []);
@@ -213,17 +225,20 @@ function HomeApp() {
   const subtitleFor = (key) => {
     if (key === "tauchgaenge") return diveCount ? `${diveCount} Tauchgänge` : null;
     if (key === "reisen") return reiseCount ? `${reiseCount} Reisen` : null;
+    if (key === "brevet") return brevetCount ? `${brevetCount} Brevet${brevetCount!==1?"s":""}` : null;
     return null;
   };
 
   return (
-    <div style={{minHeight:"100vh",background:"#040e20",color:"#e8f4fd",fontFamily:"-apple-system,BlinkMacSystemFont,sans-serif",paddingBottom:40}}>
+    <div className="tb-home-shell" style={{display:"flex",flexDirection:"column",background:"#040e20",color:"#e8f4fd",fontFamily:"-apple-system,BlinkMacSystemFont,sans-serif",overflow:"hidden"}}>
+      <style>{`.tb-home-shell{height:100vh;height:100dvh;}`}</style>
       <input ref={fileRef} type="file" accept="image/*" style={{display:"none"}}
         onChange={e=>{ onPickImage(e.target.files[0]); e.target.value=""; }} />
 
-      {/* Titelbild */}
+      {/* Titelbild — nimmt die gesamte übrige Höhe ein, damit Kacheln und
+          Einstellungen darunter gerade noch ohne Scrollen Platz haben */}
       <div onClick={()=>fileRef.current?.click()}
-        style={{position:"relative",width:"100%",aspectRatio:"16/7",overflow:"hidden",cursor:"pointer",background:"#0a1628"}}>
+        style={{position:"relative",flex:"1 1 auto",minHeight:0,overflow:"hidden",cursor:"pointer",background:"#0a1628"}}>
         <img src={coverSrc} alt="Titelbild" style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}
           onError={e=>{ e.target.style.display="none"; }} />
         <div style={{position:"absolute",inset:0,background:"linear-gradient(to bottom, rgba(4,14,32,0) 55%, rgba(4,14,32,0.85) 100%)"}} />
@@ -237,29 +252,44 @@ function HomeApp() {
         </div>
       </div>
 
-      {/* Kapitel */}
-      <div style={{padding:"20px 16px",display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
-        {CHAPTERS.map(ch => {
+      {/* Kapitel: Tauchgänge als breite Kachel oben, Rest darunter zu zweit */}
+      <div style={{flex:"0 0 auto",padding:"12px 16px 0"}}>
+        {CHAPTERS.filter(ch => ch.wide).map(ch => {
           const subtitle = subtitleFor(ch.key);
           return (
             <div key={ch.key} onClick={()=>{window.location.href=ch.href;}}
-              style={{background:ch.bg,border:`1px solid ${ch.border}`,borderRadius:16,padding:"22px 16px",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:6,cursor:"pointer",minHeight:110}}>
-              <span style={{fontSize:30}}>{ch.icon}</span>
-              <span style={{fontSize:14,fontWeight:700,color:ch.color}}>{ch.label}</span>
-              {subtitle && <span style={{fontSize:11,color:"rgba(232,244,253,0.4)"}}>{subtitle}</span>}
+              style={{background:ch.bg,border:`1px solid ${ch.border}`,borderRadius:16,padding:"12px 16px",display:"flex",alignItems:"center",gap:12,cursor:"pointer",marginBottom:8}}>
+              <span style={{fontSize:26}}>{ch.icon}</span>
+              <div>
+                <div style={{fontSize:15,fontWeight:700,color:ch.color}}>{ch.label}</div>
+                {subtitle && <div style={{fontSize:11,color:"rgba(232,244,253,0.4)",marginTop:1}}>{subtitle}</div>}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <div style={{flex:"0 0 auto",padding:"0 16px",display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+        {CHAPTERS.filter(ch => !ch.wide).map(ch => {
+          const subtitle = subtitleFor(ch.key);
+          return (
+            <div key={ch.key} onClick={()=>{window.location.href=ch.href;}}
+              style={{background:ch.bg,border:`1px solid ${ch.border}`,borderRadius:14,padding:"10px 10px",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:3,cursor:"pointer",minHeight:66}}>
+              <span style={{fontSize:20}}>{ch.icon}</span>
+              <span style={{fontSize:12,fontWeight:700,color:ch.color}}>{ch.label}</span>
+              {subtitle && <span style={{fontSize:9,color:"rgba(232,244,253,0.4)"}}>{subtitle}</span>}
             </div>
           );
         })}
       </div>
 
-      <div style={{display:"flex",justifyContent:"center",padding:"4px 16px 0"}}>
+      <div style={{flex:"0 0 auto",display:"flex",justifyContent:"center",padding:"8px 16px 0"}}>
         <button onClick={()=>setShowSettings(true)}
-          style={{background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:20,padding:"7px 16px",color:"rgba(232,244,253,0.5)",fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",gap:6}}>
+          style={{background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:20,padding:"6px 14px",color:"rgba(232,244,253,0.5)",fontSize:11,cursor:"pointer",display:"flex",alignItems:"center",gap:6}}>
           ⚙️ Einstellungen
         </button>
       </div>
 
-      <div style={{textAlign:"center",padding:"12px 16px 8px",fontSize:10,color:"rgba(232,244,253,0.25)"}}>Tauchbuch v{APP_VERSION}</div>
+      <div style={{flex:"0 0 auto",textAlign:"center",padding:"6px 16px calc(6px + env(safe-area-inset-bottom, 0px))",fontSize:9,color:"rgba(232,244,253,0.25)"}}>Tauchbuch v{APP_VERSION}</div>
 
       {showSettings && <SettingsPanel onClose={()=>setShowSettings(false)} />}
     </div>

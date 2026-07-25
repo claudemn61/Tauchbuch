@@ -13,7 +13,7 @@
 // erhöhen, damit alte, nicht mehr benötigte Cache-Einträge aufgeräumt
 // werden. Für normale Inhalts-Updates ist das NICHT nötig — die sind
 // dank "Network-first" ohnehin sofort aktuell, sobald wieder Netz da ist.
-const CACHE_VERSION = "v1";
+const CACHE_VERSION = "v2";
 const CACHE_NAME = `tauchbuch-cache-${CACHE_VERSION}`;
 
 const PRECACHE_URLS = [
@@ -22,6 +22,7 @@ const PRECACHE_URLS = [
   "reisen.html", "reisen.jsx",
   "statistik.html", "statistik.jsx",
   "material.html", "material.jsx",
+  "brevet.html", "brevet.jsx",
   "manifest.json",
   "cover.jpg",
   "apple-touch-icon.png", "apple-touch-icon-120.png", "apple-touch-icon-152.png", "apple-touch-icon-167.png", "favicon-32.png",
