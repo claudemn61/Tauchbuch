@@ -1,6 +1,6 @@
 const { useState, useEffect, useRef } = React;
 
-const APP_VERSION = "2.1";
+const APP_VERSION = "2.1.1";
 
 // ── Startseite ───────────────────────────────────────────────────────────
 // Editierbares Titelbild (per Tap austauschbar, als Data-URL in Storage
@@ -17,6 +17,9 @@ const CHAPTERS = [
 // Änderungsverlauf — neuste zuerst. Wird beim Erhöhen der Version jeweils
 // von Hand ergänzt.
 const CHANGELOG = [
+  { version: "2.1.1", changes: [
+    "Bugfix: Aktualisierungen wurden nicht immer zuverlässig angezeigt — Service Worker holt eigene Dateien jetzt garantiert frisch vom Server statt aus einem zwischengeschalteten Cache",
+  ]},
   { version: "2.1", changes: [
     "Neues Kapitel „Brevet“: beliebig viele Einträge mit Name und Foto des Ausweises (Vollbild-Ansicht per Tap), Fotos werden automatisch komprimiert",
     "Startseite: Tauchgänge als breite Kachel oben, restliche Kapitel darunter zu zweit",

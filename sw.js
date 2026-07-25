@@ -13,7 +13,7 @@
 // erhöhen, damit alte, nicht mehr benötigte Cache-Einträge aufgeräumt
 // werden. Für normale Inhalts-Updates ist das NICHT nötig — die sind
 // dank "Network-first" ohnehin sofort aktuell, sobald wieder Netz da ist.
-const CACHE_VERSION = "v2";
+const CACHE_VERSION = "v3";
 const CACHE_NAME = `tauchbuch-cache-${CACHE_VERSION}`;
 
 const PRECACHE_URLS = [
@@ -59,8 +59,16 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(req.url);
   if (url.protocol !== "http:" && url.protocol !== "https:") return;
 
+  // Für eigene Dateien (HTML/JSX/JSON) den Browser- UND jeden
+  // zwischengeschalteten CDN-Cache (z.B. von GitHub Pages) umgehen, damit
+  // "network-first" wirklich "frisch vom Server" bedeutet. Für die von CDN
+  // geladenen Bibliotheken (React/Babel, ändern sich nie) ist normales
+  // Caching dagegen sinnvoll und schneller.
+  const isOwnFile = url.origin === self.location.origin;
+  const fetchOptions = isOwnFile ? { cache: "no-store" } : undefined;
+
   event.respondWith(
-    fetch(req).then((response) => {
+    fetch(req, fetchOptions).then((response) => {
       if (response && response.ok) {
         const clone = response.clone();
         caches.open(CACHE_NAME).then((cache) => cache.put(req, clone));
