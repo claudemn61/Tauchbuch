@@ -72,7 +72,7 @@ function ReisenApp() {
   const [loaded, setLoaded] = useState(false);
   const [newName, setNewName] = useState("");
   const [manageOpen, setManageOpen] = useState(false);
-  const [sortMode, setSortMode] = useState("manual"); // "manual" | "count"
+  const [sortMode, setSortMode] = useState("manual"); // "manual" | "date"
   const [confirmDeleteName, setConfirmDeleteName] = useState(null);
 
   useEffect(() => {
@@ -148,13 +148,16 @@ function ReisenApp() {
   const trips = aggregateReisen(dives).sort((a, b) => b.lastDate - a.lastDate);
 
   const countByName = new Map();
+  const firstDateByName = new Map();
   dives.forEach(d => {
     const n = d.customFields?.reise;
     if (!n) return;
     countByName.set(n, (countByName.get(n)||0) + 1);
+    const ts = parseDateToTs(d.date);
+    if (ts && (!firstDateByName.has(n) || ts < firstDateByName.get(n))) firstDateByName.set(n, ts);
   });
-  const displayNames = sortMode === "count"
-    ? [...names].sort((a,b) => (countByName.get(b)||0) - (countByName.get(a)||0))
+  const displayNames = sortMode === "date"
+    ? [...names].sort((a,b) => (firstDateByName.get(b)||0) - (firstDateByName.get(a)||0))
     : names;
 
   return (
@@ -181,9 +184,9 @@ function ReisenApp() {
             style={{flex:1,background:sortMode==="manual"?"rgba(245,166,35,0.18)":"rgba(255,255,255,0.05)",border:`1px solid ${sortMode==="manual"?"rgba(245,166,35,0.4)":"rgba(255,255,255,0.1)"}`,borderRadius:8,padding:"7px 10px",color:sortMode==="manual"?"#f5a623":"rgba(232,244,253,0.6)",fontSize:12,fontWeight:700,cursor:"pointer"}}>
             Manuell
           </button>
-          <button onClick={()=>setSortMode("count")}
-            style={{flex:1,background:sortMode==="count"?"rgba(245,166,35,0.18)":"rgba(255,255,255,0.05)",border:`1px solid ${sortMode==="count"?"rgba(245,166,35,0.4)":"rgba(255,255,255,0.1)"}`,borderRadius:8,padding:"7px 10px",color:sortMode==="count"?"#f5a623":"rgba(232,244,253,0.6)",fontSize:12,fontWeight:700,cursor:"pointer"}}>
-            Nach Anzahl TG
+          <button onClick={()=>setSortMode("date")}
+            style={{flex:1,background:sortMode==="date"?"rgba(245,166,35,0.18)":"rgba(255,255,255,0.05)",border:`1px solid ${sortMode==="date"?"rgba(245,166,35,0.4)":"rgba(255,255,255,0.1)"}`,borderRadius:8,padding:"7px 10px",color:sortMode==="date"?"#f5a623":"rgba(232,244,253,0.6)",fontSize:12,fontWeight:700,cursor:"pointer"}}>
+            Nach Datum TG
           </button>
         </div>
         <div style={{display:"flex",flexDirection:"column",gap:6}}>
