@@ -1,6 +1,6 @@
 const { useState, useEffect, useRef } = React;
 
-const APP_VERSION = "2.2.1";
+const APP_VERSION = "2.2.2";
 
 // ── Startseite ───────────────────────────────────────────────────────────
 // Editierbares Titelbild (per Tap austauschbar, als Data-URL in Storage
@@ -17,6 +17,9 @@ const CHAPTERS = [
 // Änderungsverlauf — neuste zuerst. Wird beim Erhöhen der Version jeweils
 // von Hand ergänzt.
 const CHANGELOG = [
+  { version: "2.2.2", changes: [
+    "Reisen verwalten: neuer Löschen-Button pro Reise (zugeordnete Tauchgänge bleiben erhalten, verlieren nur die Reise-Zuordnung), plus Sortier-Umschalter Manuell / Nach Anzahl TG mit Anzeige der zugeordneten Tauchgänge",
+  ]},
   { version: "2.2.1", changes: [
     "Bugfix: Reise blieb in der Verwaltungsliste/im Dropdown bestehen, auch nachdem alle zugehörigen Tauchgänge gelöscht wurden — wird jetzt beim Löschen automatisch entfernt, falls kein Tauchgang mehr darauf verweist",
   ]},

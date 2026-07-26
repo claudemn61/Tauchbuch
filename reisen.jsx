@@ -38,7 +38,7 @@ function aggregateReisen(dives) {
     const sorted = [...dl].sort((a,b) => parseDateToTs(a.date) - parseDateToTs(b.date));
     const totalMin = sorted.reduce((s,d) => s + (d.durationMin||0), 0);
     const maxDepth = sorted.reduce((m,d) => Math.max(m, d.maxDepth||0), 0);
-    const nums = sorted.map(d => parseInt(d.name||"0",10)).filter(Boolean);
+    const nums = sorted.map(d => parseFloat(d.name)||0).filter(Boolean);
     const first = sorted.length ? parseDateToTs(sorted[0].date) : 0;
     const last = sorted.length ? parseDateToTs(sorted[sorted.length-1].date) : 0;
     return {
@@ -72,6 +72,8 @@ function ReisenApp() {
   const [loaded, setLoaded] = useState(false);
   const [newName, setNewName] = useState("");
   const [manageOpen, setManageOpen] = useState(false);
+  const [sortMode, setSortMode] = useState("manual"); // "manual" | "count"
+  const [confirmDeleteName, setConfirmDeleteName] = useState(null);
 
   useEffect(() => {
     (async () => {
@@ -125,11 +127,35 @@ function ReisenApp() {
       ? { ...d, customFields: { ...d.customFields, reise: newName } } : d));
   };
 
+  const deleteTrip = async (name) => {
+    const affected = dives.filter(d => d.customFields?.reise === name);
+    for (const d of affected) {
+      const updated = { ...d, customFields: { ...d.customFields, reise: "" } };
+      try { await window.storage.set(`dive:${d.id}`, JSON.stringify(updated)); } catch {}
+    }
+    if (affected.length) {
+      setDives(prev => prev.map(d => d.customFields?.reise === name
+        ? { ...d, customFields: { ...d.customFields, reise: "" } } : d));
+    }
+    saveNames(names.filter(n => n !== name));
+    setConfirmDeleteName(null);
+  };
+
   if (!loaded) return null;
 
   // Reisen automatisch nach dem Datum des letzten Tauchgangs sortiert —
   // die neuste Reise erscheint zuerst (ganz links).
   const trips = aggregateReisen(dives).sort((a, b) => b.lastDate - a.lastDate);
+
+  const countByName = new Map();
+  dives.forEach(d => {
+    const n = d.customFields?.reise;
+    if (!n) return;
+    countByName.set(n, (countByName.get(n)||0) + 1);
+  });
+  const displayNames = sortMode === "count"
+    ? [...names].sort((a,b) => (countByName.get(b)||0) - (countByName.get(a)||0))
+    : names;
 
   return (
     <div style={{minHeight:"100vh",background:"#241805",color:"#e8f4fd",fontFamily:"-apple-system,BlinkMacSystemFont,sans-serif",paddingBottom:40}}>
@@ -150,15 +176,30 @@ function ReisenApp() {
           <span style={{color:"rgba(232,244,253,0.4)",fontSize:12}}>{manageOpen?"▾":"▸"}</span>
         </div>
         {manageOpen && (<>
+        <div style={{display:"flex",gap:6,marginBottom:10}}>
+          <button onClick={()=>setSortMode("manual")}
+            style={{flex:1,background:sortMode==="manual"?"rgba(245,166,35,0.18)":"rgba(255,255,255,0.05)",border:`1px solid ${sortMode==="manual"?"rgba(245,166,35,0.4)":"rgba(255,255,255,0.1)"}`,borderRadius:8,padding:"7px 10px",color:sortMode==="manual"?"#f5a623":"rgba(232,244,253,0.6)",fontSize:12,fontWeight:700,cursor:"pointer"}}>
+            Manuell
+          </button>
+          <button onClick={()=>setSortMode("count")}
+            style={{flex:1,background:sortMode==="count"?"rgba(245,166,35,0.18)":"rgba(255,255,255,0.05)",border:`1px solid ${sortMode==="count"?"rgba(245,166,35,0.4)":"rgba(255,255,255,0.1)"}`,borderRadius:8,padding:"7px 10px",color:sortMode==="count"?"#f5a623":"rgba(232,244,253,0.6)",fontSize:12,fontWeight:700,cursor:"pointer"}}>
+            Nach Anzahl TG
+          </button>
+        </div>
         <div style={{display:"flex",flexDirection:"column",gap:6}}>
-          {names.map((n, idx) => (
+          {displayNames.map((n, idx) => (
             <div key={n} style={{display:"flex",alignItems:"center",gap:8,background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:10,padding:"6px 8px"}}>
               <input value={n} onChange={e=>renameManagedTrip(n, e.target.value)}
                 style={{flex:1,background:"transparent",border:"none",color:"#e8f4fd",fontSize:14,padding:"4px 6px",minWidth:0}} />
-              <button onClick={()=>moveName(n, -1)} disabled={idx===0}
-                style={{background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:8,width:26,height:26,color:idx===0?"rgba(232,244,253,0.2)":"#e8f4fd",fontSize:12,cursor:idx===0?"default":"pointer",flexShrink:0}}>▲</button>
-              <button onClick={()=>moveName(n, 1)} disabled={idx===names.length-1}
-                style={{background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:8,width:26,height:26,color:idx===names.length-1?"rgba(232,244,253,0.2)":"#e8f4fd",fontSize:12,cursor:idx===names.length-1?"default":"pointer",flexShrink:0}}>▼</button>
+              <span style={{fontSize:11,color:"rgba(232,244,253,0.35)",flexShrink:0,minWidth:16,textAlign:"right"}}>{countByName.get(n)||0}</span>
+              {sortMode==="manual" && (<>
+                <button onClick={()=>moveName(n, -1)} disabled={idx===0}
+                  style={{background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:8,width:26,height:26,color:idx===0?"rgba(232,244,253,0.2)":"#e8f4fd",fontSize:12,cursor:idx===0?"default":"pointer",flexShrink:0}}>▲</button>
+                <button onClick={()=>moveName(n, 1)} disabled={idx===names.length-1}
+                  style={{background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:8,width:26,height:26,color:idx===names.length-1?"rgba(232,244,253,0.2)":"#e8f4fd",fontSize:12,cursor:idx===names.length-1?"default":"pointer",flexShrink:0}}>▼</button>
+              </>)}
+              <button onClick={()=>setConfirmDeleteName(n)} title="Reise löschen"
+                style={{background:"rgba(239,68,68,0.12)",border:"1px solid rgba(239,68,68,0.3)",borderRadius:8,width:26,height:26,color:"#f87171",fontSize:12,cursor:"pointer",flexShrink:0}}>🗑</button>
             </div>
           ))}
         </div>
@@ -173,10 +214,31 @@ function ReisenApp() {
           </button>
         </div>
         <div style={{fontSize:11,color:"rgba(232,244,253,0.35)",marginTop:8,lineHeight:1.5}}>
-          Jeder Ort aus deinen Tauchgängen wird beim Import automatisch als eigene Reise angelegt. Die Reihenfolge der Reisen-Karten unten richtet sich unabhängig davon automatisch nach dem Datum des letzten Tauchgangs (neuste zuerst). Die Pfeile hier sortieren nur diese Verwaltungsliste (z.B. für Dropdowns im Tauchbuch).
+          Jeder Ort aus deinen Tauchgängen wird beim Import automatisch als eigene Reise angelegt. Die Reihenfolge der Reisen-Karten unten richtet sich unabhängig davon automatisch nach dem Datum des letzten Tauchgangs (neuste zuerst). Die Pfeile hier sortieren nur diese Verwaltungsliste (z.B. für Dropdowns im Tauchbuch) und sind nur im manuellen Modus verfügbar. Beim Löschen einer Reise bleiben zugeordnete Tauchgänge erhalten, verlieren aber ihre Reise-Zuordnung.
         </div>
         </>)}
       </div>
+
+      {confirmDeleteName && (
+        <div onClick={()=>setConfirmDeleteName(null)}
+          style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:200,padding:24}}>
+          <div onClick={e=>e.stopPropagation()}
+            style={{background:"#14253a",borderRadius:16,padding:"20px 22px",maxWidth:320,width:"100%",border:"1px solid rgba(255,255,255,0.1)"}}>
+            <div style={{fontSize:16,fontWeight:700,marginBottom:6}}>"{confirmDeleteName}" löschen?</div>
+            <div style={{fontSize:13,color:"rgba(232,244,253,0.6)",marginBottom:18}}>
+              {countByName.get(confirmDeleteName)
+                ? `${countByName.get(confirmDeleteName)} Tauchgang${countByName.get(confirmDeleteName)!==1?"gänge":""} sind noch dieser Reise zugeordnet. Sie bleiben erhalten, verlieren aber die Reise-Zuordnung.`
+                : "Diese Reise hat keine zugeordneten Tauchgänge."}
+            </div>
+            <div style={{display:"flex",gap:8}}>
+              <button onClick={()=>setConfirmDeleteName(null)}
+                style={{flex:1,background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:10,padding:"10px",color:"#e8f4fd",fontSize:14,cursor:"pointer"}}>Abbrechen</button>
+              <button onClick={()=>deleteTrip(confirmDeleteName)}
+                style={{flex:1,background:"rgba(239,68,68,0.2)",border:"1px solid rgba(239,68,68,0.4)",borderRadius:10,padding:"10px",color:"#f87171",fontSize:14,fontWeight:700,cursor:"pointer"}}>🗑 Löschen</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div style={{padding:"16px 0 0 16px",display:"flex",gap:10,overflowX:"auto",WebkitOverflowScrolling:"touch"}}>
         {trips.length === 0 && (
