@@ -72,7 +72,7 @@ function ReisenApp() {
   const [loaded, setLoaded] = useState(false);
   const [newName, setNewName] = useState("");
   const [manageOpen, setManageOpen] = useState(false);
-  const [sortMode, setSortMode] = useState("manual"); // "manual" | "date"
+  const [sortMode, setSortMode] = useState("manual"); // "manual" | "date" | "abc"
   const [confirmDeleteName, setConfirmDeleteName] = useState(null);
 
   useEffect(() => {
@@ -158,6 +158,8 @@ function ReisenApp() {
   });
   const displayNames = sortMode === "date"
     ? [...names].sort((a,b) => (firstDateByName.get(b)||0) - (firstDateByName.get(a)||0))
+    : sortMode === "abc"
+    ? [...names].sort((a,b) => a.localeCompare(b, "de"))
     : names;
 
   return (
@@ -187,6 +189,10 @@ function ReisenApp() {
           <button onClick={()=>setSortMode("date")}
             style={{flex:1,background:sortMode==="date"?"rgba(245,166,35,0.18)":"rgba(255,255,255,0.05)",border:`1px solid ${sortMode==="date"?"rgba(245,166,35,0.4)":"rgba(255,255,255,0.1)"}`,borderRadius:8,padding:"7px 10px",color:sortMode==="date"?"#f5a623":"rgba(232,244,253,0.6)",fontSize:12,fontWeight:700,cursor:"pointer"}}>
             Nach Datum TG
+          </button>
+          <button onClick={()=>setSortMode("abc")}
+            style={{flex:1,background:sortMode==="abc"?"rgba(245,166,35,0.18)":"rgba(255,255,255,0.05)",border:`1px solid ${sortMode==="abc"?"rgba(245,166,35,0.4)":"rgba(255,255,255,0.1)"}`,borderRadius:8,padding:"7px 10px",color:sortMode==="abc"?"#f5a623":"rgba(232,244,253,0.6)",fontSize:12,fontWeight:700,cursor:"pointer"}}>
+            A–Z
           </button>
         </div>
         <div style={{display:"flex",flexDirection:"column",gap:6}}>
