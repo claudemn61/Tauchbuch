@@ -50,6 +50,7 @@ const TOC = [
     ["h-start-titelbild","2.1 Titelbild ändern"],
     ["h-start-kacheln","2.2 Kapitel-Kacheln"],
     ["h-start-einstellungen","2.3 Einstellungen (Zahnrad)"],
+    ["h-start-hilfe","2.4 Hilfe (❓)"],
   ]},
   { id:"h-tauchbuch", label:"3. Tauchbuch (Tauchgänge)", subs:[
     ["h-tb-liste","3.1 Die Liste: Aufbau einer Zeile"],
@@ -179,6 +180,18 @@ function HilfeApp() {
             Unten auf der Startseite befinden sich die Buttons ⚙️ Einstellungen und ❓ Hilfe.
             Einstellungen öffnet ein Panel mit drei Reitern (Kapitel 10). Ganz unten steht die
             aktuell installierte App-Version.
+          </Sub>
+          <Sub id="h-start-hilfe" title="2.4 Hilfe (❓)">
+            Das ❓-Badge öffnet auf jeder Seite der App genau diese Hilfeseite — mit
+            Inhaltsverzeichnis und Sprungmarken, komplett als durchsuchbarer Text, auch offline
+            nutzbar. Der Zurück-Pfeil oben links führt wieder zurück zu der Seite, von der aus sie
+            geöffnet wurde. Fundorte:
+            <T><Tr><Th>Seite</Th><Th>Position</Th></Tr>
+              <Tr><Td>Startseite</Td><Td>Unten, neben ⚙️ Einstellungen</Td></Tr>
+              <Tr><Td>Tauchbuch — Liste</Td><Td>Oben rechts, neben + Tauchgang (schmäler)</Td></Tr>
+              <Tr><Td>Tauchbuch — Detailseite</Td><Td>Oben rechts, neben 🗑</Td></Tr>
+              <Tr><Td>Reisen, Statistik, Material, Brevet</Td><Td>Oben rechts auf Titel-Höhe</Td></Tr>
+            </T>
           </Sub>
         </Section>
 
