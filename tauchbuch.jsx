@@ -709,7 +709,7 @@ function diveToCsvRow(d) {
 const CSV_COPY_HEADER = ["Nr","Datum","Zeit","Land","Ort","Reise","TG-Nr.","Tauchspot","Dauer","max. Tiefe","Wassertemp.","Anzug","Blei","Flasche","Volumen","Nitrox","Buddy","Bewertung","Bemerkungen"].join("\t");
 
 // ── Detail view ──────────────────────────────────────────────────────────
-function DetailContent({ d, dives, setDives, setSelected, setView, saveDive, confirmDelete, setConfirmDelete, returnTo, reiseNumbers }) {
+function DetailContent({ d, dives, setDives, setSelected, setView, saveDive, confirmDelete, setConfirmDelete, returnTo, reiseNumbers, pruneReisen }) {
   const dIdx = dives.findIndex(x => x.id === d.id);
   const [bemerkungenEditing, setBemerkungenEditing] = useState(false);
   const [bemerkungenVal, setBemerkungenVal] = useState(d.bemerkungen || "");
@@ -894,7 +894,9 @@ function DetailContent({ d, dives, setDives, setSelected, setView, saveDive, con
                 style={{flex:1,background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:10,padding:"10px",color:"#e8f4fd",fontSize:14,cursor:"pointer"}}>Abbrechen</button>
               <button onClick={async()=>{
                   try { await window.storage.delete(`dive:${d.id}`); } catch {}
-                  setDives(prev=>prev.filter(x=>x.id!==d.id));
+                  const remaining = dives.filter(x=>x.id!==d.id);
+                  setDives(remaining);
+                  pruneReisen(remaining, [d]);
                   setConfirmDelete(null);
                   setSelected(null);
                   setView("list");
@@ -975,6 +977,29 @@ function TauchbuchApp() {
       } else updated.push(d);
     }
     return updated;
+  }, []);
+
+  // Entfernt Reise-Namen aus "tauchreisen:names", auf die kein verbliebener
+  // Tauchgang mehr verweist — wird nach dem Löschen von Tauchgängen
+  // aufgerufen, damit eine Reise ohne TG nicht als Karten-/Dropdown-Leiche
+  // bestehen bleibt. Manuell angelegte, noch leere Reisen (ohne TG) werden
+  // dabei nicht angetastet, solange nichts gelöscht wurde.
+  const pruneReisen = useCallback(async (remainingDives, deletedDives) => {
+    const deletedNames = new Set(deletedDives.map(d => d.customFields?.reise).filter(Boolean));
+    if (!deletedNames.size) return;
+    const stillUsed = new Set(remainingDives.map(d => d.customFields?.reise).filter(Boolean));
+    const orphaned = [...deletedNames].filter(n => !stillUsed.has(n));
+    if (!orphaned.length) return;
+    let names = [];
+    try {
+      const r = await window.storage.get("tauchreisen:names");
+      if (r) names = JSON.parse(r.value) || [];
+    } catch {}
+    const next = names.filter(n => !orphaned.includes(n));
+    if (next.length !== names.length) {
+      try { await window.storage.set("tauchreisen:names", JSON.stringify(next)); } catch {}
+      setReisenNames(next);
+    }
   }, []);
 
   useEffect(() => {
@@ -1153,7 +1178,7 @@ function TauchbuchApp() {
     return (
       <DetailContent d={selected} dives={sortByNumber(dives)} setDives={setDives} setSelected={setSelected}
         setView={setView} saveDive={saveDive} confirmDelete={confirmDelete} setConfirmDelete={setConfirmDelete}
-        returnTo={returnTo} reiseNumbers={reiseNumbers} />
+        returnTo={returnTo} reiseNumbers={reiseNumbers} pruneReisen={pruneReisen} />
     );
   }
 
@@ -1348,7 +1373,10 @@ function TauchbuchApp() {
                 <button onClick={async()=>{
                     const ids = [...selectedIds];
                     for (const id of ids) { try { await window.storage.delete(`dive:${id}`); } catch {} }
-                    setDives(prev=>prev.filter(d=>!selectedIds.has(d.id)));
+                    const deleted = dives.filter(d=>selectedIds.has(d.id));
+                    const remaining = dives.filter(d=>!selectedIds.has(d.id));
+                    setDives(remaining);
+                    pruneReisen(remaining, deleted);
                     setCopyMsg(`✓ ${ids.length} Tauchgang${ids.length!==1?"gänge":""} gelöscht.`);
                     setSelectedIds(new Set());
                     setConfirmBulkDelete(false);

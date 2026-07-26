@@ -1,6 +1,6 @@
 const { useState, useEffect, useRef } = React;
 
-const APP_VERSION = "2.2";
+const APP_VERSION = "2.2.1";
 
 // ── Startseite ───────────────────────────────────────────────────────────
 // Editierbares Titelbild (per Tap austauschbar, als Data-URL in Storage
@@ -17,6 +17,9 @@ const CHAPTERS = [
 // Änderungsverlauf — neuste zuerst. Wird beim Erhöhen der Version jeweils
 // von Hand ergänzt.
 const CHANGELOG = [
+  { version: "2.2.1", changes: [
+    "Bugfix: Reise blieb in der Verwaltungsliste/im Dropdown bestehen, auch nachdem alle zugehörigen Tauchgänge gelöscht wurden — wird jetzt beim Löschen automatisch entfernt, falls kein Tauchgang mehr darauf verweist",
+  ]},
   { version: "2.2", changes: [
     "Mehrfachauswahl → Bearbeiten: jetzt Vollbild-Seite im 1:1-Design der Tauchgang-Detailseite (Header, Datum, Bewertung/Nitrox, Bemerkungen, Feldliste), Titelzeile zeigt die ausgewählten Nummern (fortlaufende als Bereich, z.B. \"123 - 129\"), Felder mit unterschiedlichen Werten zeigen \"variabel\", Reise als Auswahlliste statt Freitext",
     "Separater \"Reise anpassen\"-Button in der Auswahlleiste entfernt (jetzt Teil von \"Bearbeiten\")",
