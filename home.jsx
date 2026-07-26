@@ -1,6 +1,6 @@
 const { useState, useEffect, useRef } = React;
 
-const APP_VERSION = "2.2.3";
+const APP_VERSION = "2.3";
 
 // ── Startseite ───────────────────────────────────────────────────────────
 // Editierbares Titelbild (per Tap austauschbar, als Data-URL in Storage
@@ -17,6 +17,10 @@ const CHAPTERS = [
 // Änderungsverlauf — neuste zuerst. Wird beim Erhöhen der Version jeweils
 // von Hand ergänzt.
 const CHANGELOG = [
+  { version: "2.3", changes: [
+    "Neue Hilfeseite mit der kompletten ausführlichen Gebrauchsanweisung direkt in der App (Inhaltsverzeichnis mit Sprungmarken, alle Kapitel als durchsuchbarer Text)",
+    "❓ Hilfe-Button neu auf jeder Seite: Startseite (neben ⚙️ Einstellungen), Tauchbuch-Liste (neben + Tauchgang), Tauchgang-Detail (neben 🗑), sowie oben rechts bei Reisen, Statistik, Material und Brevet",
+  ]},
   { version: "2.2.3", changes: [
     "Reisen verwalten: dritter Sortier-Modus \"A–Z\" (alphabetisch) neben Manuell und Nach Datum TG",
   ]},
@@ -296,7 +300,11 @@ function HomeApp() {
         })}
       </div>
 
-      <div style={{flex:"0 0 auto",display:"flex",justifyContent:"center",padding:"8px 16px 0"}}>
+      <div style={{flex:"0 0 auto",display:"flex",justifyContent:"center",gap:8,padding:"8px 16px 0"}}>
+        <button onClick={()=>{window.location.href="hilfe.html";}}
+          style={{background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:20,padding:"6px 14px",color:"rgba(232,244,253,0.5)",fontSize:11,cursor:"pointer",display:"flex",alignItems:"center",gap:6}}>
+          ❓ Hilfe
+        </button>
         <button onClick={()=>setShowSettings(true)}
           style={{background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:20,padding:"6px 14px",color:"rgba(232,244,253,0.5)",fontSize:11,cursor:"pointer",display:"flex",alignItems:"center",gap:6}}>
           ⚙️ Einstellungen

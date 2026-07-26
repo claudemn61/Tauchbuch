@@ -789,6 +789,8 @@ function DetailContent({ d, dives, setDives, setSelected, setView, saveDive, con
             style={{background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:20,padding:"6px 10px",color:dIdx<=0?"rgba(232,244,253,0.2)":"#e8f4fd",fontSize:13,cursor:dIdx<=0?"default":"pointer"}}>▶</button>
           <button onClick={()=>setConfirmDelete(d.id)}
             style={{background:"rgba(239,68,68,0.12)",border:"1px solid rgba(239,68,68,0.25)",borderRadius:20,padding:"6px 12px",color:"#f87171",fontSize:13,cursor:"pointer"}}>🗑</button>
+          <button onClick={()=>{window.location.href="hilfe.html";}} title="Hilfe"
+            style={{background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:20,padding:"6px 10px",color:"rgba(232,244,253,0.7)",fontSize:13,cursor:"pointer"}}>❓</button>
         </div>
       </div>
 
@@ -1214,8 +1216,10 @@ function TauchbuchApp() {
           <span style={{fontWeight:900,fontSize:18,letterSpacing:-0.5,flex:1,textAlign:"center",marginLeft:-8}}>
             🤿 Tauchbuch {dives.length > 0 && <span style={{fontSize:12,fontWeight:600,color:"rgba(232,244,253,0.4)"}}>({dives.length})</span>}
           </span>
-          <div style={{display:"flex",gap:8,flexShrink:0}}>
+          <div style={{display:"flex",gap:6,flexShrink:0,alignItems:"center"}}>
             <button onClick={addNewDive} style={{background:"rgba(34,197,94,0.15)",color:"#4ade80",border:"1px solid rgba(34,197,94,0.25)",borderRadius:20,padding:"7px 12px",fontSize:12,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>+ Tauchgang</button>
+            <button onClick={()=>{window.location.href="hilfe.html";}} title="Hilfe"
+              style={{background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:20,padding:"7px 9px",fontSize:12,fontWeight:700,color:"rgba(232,244,253,0.7)",cursor:"pointer"}}>❓</button>
           </div>
         </div>
 
