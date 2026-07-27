@@ -164,6 +164,13 @@ function reiseTgBadge(d, reiseNumbers) {
 }
 
 // ── Field engine (used by search, sort and the editable tiles) ─────────────
+// "0:00" kommt oft aus CSV-Importen als Lücken-Füller, nicht als echte
+// Uhrzeit — wird deshalb überall wie ein leeres Feld behandelt und als
+// "—" angezeigt statt als irreführende Mitternachtszeit.
+function fmtTime(t) {
+  return (t && t !== "0:00") ? t : "—";
+}
+
 function diveFieldValue(d, id) {
   const cf = d.customFields || {};
   switch (id) {
@@ -214,6 +221,7 @@ const DIVE_SORT_OPTIONS = [
 function formatSortValue(d, sortId) {
   switch (sortId) {
     case "date": return d.date || "—";
+    case "time": return fmtTime(d.time);
     case "duration": return fmtDuration(d.durationMin);
     case "depth": return d.maxDepth != null ? `${d.maxDepth} m` : "—";
     case "temp": return d.waterTemp != null ? `${d.waterTemp}°` : "—";
@@ -419,7 +427,7 @@ const TAUCH_TILE_OPTIONS = [
   { key: "land", label: "Land", icon: "🌍", get: d => d.land || "—", rawGet: d => d.land || "", save: v => ({ land: v }) },
   { key: "ort", label: "Ort", icon: "📍", get: d => d.ort || "—", rawGet: d => d.ort || "", save: v => ({ ort: v }) },
   { key: "tauchspot", label: "Tauchspot", icon: "🐠", get: d => d.tauchspot || "—", rawGet: d => d.tauchspot || "", save: v => ({ tauchspot: v }) },
-  { key: "time", label: "Zeit", icon: "🕒", get: d => d.time || "—", rawGet: d => d.time || "", save: v => ({ time: v }) },
+  { key: "time", label: "Zeit", icon: "🕒", get: d => fmtTime(d.time), rawGet: d => d.time || "", save: v => ({ time: v }) },
 ];
 const DEFAULT_TAUCH_TILE_KEYS = ["duration", "maxDepth", "waterTemp", "time"];
 
@@ -596,7 +604,7 @@ function DiveRow({ d, onClick, sortId, selectMode, isSelected, onToggleSelect })
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:6,marginBottom:2}}>
           <div style={{display:"flex",alignItems:"center",gap:6,minWidth:0}}>
             <span style={{fontWeight:700,fontSize:15,flexShrink:0}}>{d.name}</span>
-            {d.time && <span style={{fontSize:11,fontWeight:600,color:"#38bdf8",flexShrink:0}}>{d.time}</span>}
+            <span style={{fontSize:11,fontWeight:600,color:(d.time&&d.time!=="0:00")?"#38bdf8":"rgba(232,244,253,0.25)",flexShrink:0}}>{fmtTime(d.time)}</span>
             {d.buddy && <span style={{fontSize:11,fontWeight:600,color:"#f87171",flexShrink:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>👤 {d.buddy}</span>}
           </div>
           <div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
