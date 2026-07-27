@@ -33,14 +33,14 @@ function MaterialField({ label, icon, value, onSave, hasRevision, revisionValue,
             {value || "Tippen zum Hinzufügen…"}
           </span>
         )}
-        {hasRevision && (
+        {hasRevision && !revisionValue && (
           <button onClick={()=>setExpanded(e=>!e)}
             style={{background:"none",border:"none",color:"rgba(232,244,253,0.35)",cursor:"pointer",fontSize:12,flexShrink:0,padding:"2px 4px"}}>
             {expanded?"▾":"▸"}
           </button>
         )}
       </div>
-      {hasRevision && expanded && (
+      {hasRevision && (expanded || revisionValue) && (
         <div style={{display:"flex",alignItems:"center",gap:12,marginTop:8,paddingLeft:38}}>
           <span style={{fontSize:11,color:"rgba(232,244,253,0.4)",minWidth:74,flexShrink:0}}>Revision</span>
           {revEditing ? (

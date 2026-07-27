@@ -1,6 +1,6 @@
 const { useState, useEffect, useRef } = React;
 
-const APP_VERSION = "2.3.1";
+const APP_VERSION = "2.3.2";
 
 // ── Startseite ───────────────────────────────────────────────────────────
 // Editierbares Titelbild (per Tap austauschbar, als Data-URL in Storage
@@ -17,6 +17,9 @@ const CHAPTERS = [
 // Änderungsverlauf — neuste zuerst. Wird beim Erhöhen der Version jeweils
 // von Hand ergänzt.
 const CHANGELOG = [
+  { version: "2.3.2", changes: [
+    "Material: Revisionsdatum bleibt konstant aufgeklappt sichtbar, sobald eines eingetragen ist (kein Ein-/Ausklappen mehr nötig); der Pfeil zum Aufklappen erscheint nur noch, solange noch kein Datum eingetragen ist",
+  ]},
   { version: "2.3.1", changes: [
     "Tauchbuch/Liste, Reisen-Gruppenkopf: \"Tauchgänge\" zu \"TG\" abgekürzt, dafür Datumsspanne der Reise ergänzt (z.B. \"1.-9.12.26\", weiss, gleiche Grösse wie die Gesamtzeit)",
   ]},
