@@ -1,6 +1,6 @@
 const { useState, useEffect, useRef } = React;
 
-const APP_VERSION = "2.3";
+const APP_VERSION = "2.3.1";
 
 // ── Startseite ───────────────────────────────────────────────────────────
 // Editierbares Titelbild (per Tap austauschbar, als Data-URL in Storage
@@ -17,6 +17,9 @@ const CHAPTERS = [
 // Änderungsverlauf — neuste zuerst. Wird beim Erhöhen der Version jeweils
 // von Hand ergänzt.
 const CHANGELOG = [
+  { version: "2.3.1", changes: [
+    "Tauchbuch/Liste, Reisen-Gruppenkopf: \"Tauchgänge\" zu \"TG\" abgekürzt, dafür Datumsspanne der Reise ergänzt (z.B. \"1.-9.12.26\", weiss, gleiche Grösse wie die Gesamtzeit)",
+  ]},
   { version: "2.3", changes: [
     "Neue Hilfeseite mit der kompletten ausführlichen Gebrauchsanweisung direkt in der App (Inhaltsverzeichnis mit Sprungmarken, alle Kapitel als durchsuchbarer Text)",
     "❓ Hilfe-Button neu auf jeder Seite: Startseite (neben ⚙️ Einstellungen), Tauchbuch-Liste (neben + Tauchgang), Tauchgang-Detail (neben 🗑), sowie oben rechts bei Reisen, Statistik, Material und Brevet",

@@ -53,6 +53,23 @@ function fmtDuration(min) {
   return `${min} min`;
 }
 
+// Formatiert die Datumsspanne einer Reise-Gruppe möglichst kompakt,
+// z.B. "1.-9.12.26" (gleicher Monat/Jahr), "28.11.-3.12.26" (gleiches
+// Jahr, anderer Monat) oder "28.12.25-3.1.26" (Jahreswechsel).
+function fmtReiseDateRange(dives) {
+  const timestamps = dives.map(d => parseDateToTs(d.date)).filter(Boolean);
+  if (!timestamps.length) return "";
+  const minTs = Math.min(...timestamps), maxTs = Math.max(...timestamps);
+  const a = new Date(minTs), b = new Date(maxTs);
+  const yy = n => String(n).slice(-2);
+  if (minTs === maxTs) return `${a.getDate()}.${a.getMonth()+1}.${yy(a.getFullYear())}`;
+  if (a.getFullYear() === b.getFullYear()) {
+    if (a.getMonth() === b.getMonth()) return `${a.getDate()}.-${b.getDate()}.${b.getMonth()+1}.${yy(b.getFullYear())}`;
+    return `${a.getDate()}.${a.getMonth()+1}.-${b.getDate()}.${b.getMonth()+1}.${yy(b.getFullYear())}`;
+  }
+  return `${a.getDate()}.${a.getMonth()+1}.${yy(a.getFullYear())}-${b.getDate()}.${b.getMonth()+1}.${yy(b.getFullYear())}`;
+}
+
 function parseDiveCsv(text) {
   const lines = text.replace(/\r/g, "").split("\n").filter(l => l.trim().length);
   const dives = [];
@@ -1594,6 +1611,7 @@ function TauchbuchApp() {
             const rDives = sortDives(filtered.filter(d => d.customFields?.reise === reiseName), sortId, sortDir);
             const collapsed = collapsedReisen.has(reiseName);
             const totalMin = rDives.reduce((s,d)=>s+(d.durationMin||0),0);
+            const dateRange = fmtReiseDateRange(rDives);
             return (
               <div key={reiseName}>
                 <div onClick={()=>{
@@ -1620,7 +1638,10 @@ function TauchbuchApp() {
                         </div>
                       );
                     })()}
-                    <span style={{fontWeight:700,color:"#fbbf24",fontSize:14,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{reiseName} · {rDives.length} Tauchgänge</span>
+                    <span style={{fontWeight:700,color:"#fbbf24",fontSize:14,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                      {reiseName} · {rDives.length} TG
+                      {dateRange && <span style={{color:"#fff",fontWeight:400,fontSize:12}}> · {dateRange}</span>}
+                    </span>
                   </div>
                   <span style={{fontSize:12,color:"rgba(232,244,253,0.35)",flexShrink:0,marginLeft:8}}>{fmtDuration(totalMin)} {collapsed?"▸":"▾"}</span>
                 </div>
