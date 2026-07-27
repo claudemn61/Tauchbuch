@@ -217,53 +217,87 @@ const TITLE_FONTS = [
   { label: "Elegant", value: "Didot, Georgia, serif" },
 ];
 const TITLE_SWATCHES = ["#ffffff", "#f5a623", "#38bdf8", "#4ade80", "#f87171", "#a78bfa"];
+const DEFAULT_TITLE_CFG = {
+  segments: [
+    { text: "mein", color: "#ffffff" },
+    { text: "tauch", color: "#f5a623" },
+    { text: "buch", color: "#ffffff" },
+  ],
+  fontFamily: "-apple-system,BlinkMacSystemFont,sans-serif",
+  fontSize: 26,
+};
+let segIdCounter = 0;
+const newSegId = () => `seg${Date.now()}_${segIdCounter++}`;
 
+// Jeder Textteil (nicht zwingend jeder einzelne Buchstabe, aber beliebig
+// fein aufteilbar bis hinunter zu einzelnen Zeichen) bekommt eine eigene
+// Farbe. Schriftart/-grösse gelten einheitlich für den ganzen Titel.
 function TitleEditor({ current, onSave, onReset, onClose }) {
-  const [text, setText] = useState(current.text);
+  const [segments, setSegments] = useState(
+    current.segments.map(s => ({ ...s, _id: newSegId() }))
+  );
   const [fontFamily, setFontFamily] = useState(current.fontFamily);
   const [fontSize, setFontSize] = useState(current.fontSize);
-  const [color, setColor] = useState(current.color);
+
+  const updateSeg = (id, patch) => setSegments(segs => segs.map(s => s._id===id ? {...s, ...patch} : s));
+  const addSeg = () => setSegments(segs => [...segs, { _id: newSegId(), text: "neu", color: "#ffffff" }]);
+  const removeSeg = (id) => setSegments(segs => segs.length>1 ? segs.filter(s=>s._id!==id) : segs);
 
   return (
     <div onClick={onClose} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",zIndex:300,display:"flex",alignItems:"center",justifyContent:"center",padding:24}}>
       <div onClick={e=>e.stopPropagation()}
-        style={{background:"#0a1628",borderRadius:16,padding:"18px 20px",maxWidth:360,width:"100%",border:"1px solid rgba(255,255,255,0.1)"}}>
+        style={{background:"#0a1628",borderRadius:16,padding:"18px 20px",maxWidth:380,width:"100%",border:"1px solid rgba(255,255,255,0.1)",maxHeight:"85vh",overflowY:"auto"}}>
         <div style={{fontSize:15,fontWeight:800,marginBottom:14}}>Titel bearbeiten</div>
 
         <div style={{marginBottom:12}}>
-          <div style={{fontSize:11,color:"rgba(232,244,253,0.5)",marginBottom:4}}>Text</div>
-          <input value={text} onChange={e=>setText(e.target.value)}
-            style={{width:"100%",boxSizing:"border-box",background:"rgba(255,255,255,0.08)",border:"1px solid rgba(56,189,248,0.4)",borderRadius:8,padding:"7px 10px",color:"#e8f4fd",fontSize:14}} />
+          <div style={{fontSize:11,color:"rgba(232,244,253,0.5)",marginBottom:6}}>Textteile (je mit eigener Farbe)</div>
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            {segments.map(seg => (
+              <div key={seg._id} style={{display:"flex",alignItems:"center",gap:8}}>
+                <input value={seg.text} onChange={e=>updateSeg(seg._id,{text:e.target.value})}
+                  style={{flex:1,minWidth:0,boxSizing:"border-box",background:"rgba(255,255,255,0.08)",border:"1px solid rgba(56,189,248,0.4)",borderRadius:8,padding:"6px 9px",color:"#e8f4fd",fontSize:13}} />
+                <input type="color" value={seg.color} onChange={e=>updateSeg(seg._id,{color:e.target.value})}
+                  style={{width:28,height:26,border:"none",background:"none",cursor:"pointer",padding:0,flexShrink:0}} />
+                <button onClick={()=>removeSeg(seg._id)} disabled={segments.length<=1}
+                  style={{background:"none",border:"none",color:segments.length<=1?"rgba(232,244,253,0.15)":"#f87171",fontSize:15,cursor:segments.length<=1?"default":"pointer",flexShrink:0,padding:"2px 4px"}}>✕</button>
+              </div>
+            ))}
+          </div>
+          <div style={{display:"flex",gap:6,marginTop:8,flexWrap:"wrap"}}>
+            {segments.map(seg => (
+              <div key={seg._id} onClick={()=>{}} style={{display:"flex",gap:4}}>
+                {TITLE_SWATCHES.map(c => (
+                  <div key={c} onClick={()=>updateSeg(seg._id,{color:c})}
+                    title={`"${seg.text}" einfärben`}
+                    style={{width:16,height:16,borderRadius:"50%",background:c,cursor:"pointer",border:seg.color===c?"2px solid #7dd3fc":"1px solid rgba(255,255,255,0.25)"}} />
+                ))}
+              </div>
+            ))}
+          </div>
+          <button onClick={addSeg}
+            style={{marginTop:8,background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:8,padding:"5px 10px",color:"rgba(232,244,253,0.7)",fontSize:12,cursor:"pointer"}}>
+            + Textteil
+          </button>
         </div>
 
         <div style={{marginBottom:12}}>
-          <div style={{fontSize:11,color:"rgba(232,244,253,0.5)",marginBottom:4}}>Schriftart</div>
+          <div style={{fontSize:11,color:"rgba(232,244,253,0.5)",marginBottom:4}}>Schriftart (für den ganzen Titel)</div>
           <select value={fontFamily} onChange={e=>setFontFamily(e.target.value)}
             style={{width:"100%",boxSizing:"border-box",background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:8,padding:"7px 10px",color:"#e8f4fd",fontSize:14}}>
             {TITLE_FONTS.map(f => <option key={f.value} value={f.value} style={{background:"#0a1628"}}>{f.label}</option>)}
           </select>
         </div>
 
-        <div style={{marginBottom:12}}>
+        <div style={{marginBottom:16}}>
           <div style={{fontSize:11,color:"rgba(232,244,253,0.5)",marginBottom:4}}>Schriftgrösse: {fontSize}px</div>
           <input type="range" min="16" max="40" value={fontSize} onChange={e=>setFontSize(+e.target.value)}
             style={{width:"100%"}} />
         </div>
 
-        <div style={{marginBottom:16}}>
-          <div style={{fontSize:11,color:"rgba(232,244,253,0.5)",marginBottom:6}}>Farbe</div>
-          <div style={{display:"flex",gap:8,alignItems:"center"}}>
-            {TITLE_SWATCHES.map(c => (
-              <div key={c} onClick={()=>setColor(c)}
-                style={{width:24,height:24,borderRadius:"50%",background:c,cursor:"pointer",border:color===c?"2px solid #7dd3fc":"2px solid rgba(255,255,255,0.2)"}} />
-            ))}
-            <input type="color" value={color} onChange={e=>setColor(e.target.value)}
-              style={{width:28,height:24,border:"none",background:"none",cursor:"pointer",padding:0}} />
-          </div>
-        </div>
-
-        <div style={{textAlign:"center",marginBottom:16,padding:"14px 0",background:"rgba(255,255,255,0.03)",borderRadius:10}}>
-          <span style={{fontFamily,fontSize,color,fontWeight:900,letterSpacing:-0.5}}>{text || "meintauchbuch"}</span>
+        <div style={{textAlign:"center",marginBottom:16,padding:"14px 0",background:"rgba(255,255,255,0.03)",borderRadius:10,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>
+          <span style={{fontFamily,fontSize,fontWeight:900,letterSpacing:-0.5}}>
+            {segments.map(seg => <span key={seg._id} style={{color:seg.color}}>{seg.text}</span>)}
+          </span>
         </div>
 
         <div style={{display:"flex",gap:8}}>
@@ -271,7 +305,7 @@ function TitleEditor({ current, onSave, onReset, onClose }) {
             style={{flex:1,background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:10,padding:"9px",color:"rgba(232,244,253,0.7)",fontSize:13,cursor:"pointer"}}>
             Zurücksetzen
           </button>
-          <button onClick={()=>onSave({ text: text||"meintauchbuch", fontFamily, fontSize, color })}
+          <button onClick={()=>onSave({ segments: segments.map(({_id,...s})=>s), fontFamily, fontSize })}
             style={{flex:1,background:"linear-gradient(135deg,#0ea5e9,#0284c7)",color:"#fff",border:"none",borderRadius:10,padding:9,fontSize:13,fontWeight:800,cursor:"pointer"}}>
             Speichern
           </button>
@@ -300,7 +334,17 @@ function HomeApp() {
       } catch {}
       try {
         const rt = await window.storage.get("home:titleConfig");
-        if (rt && rt.value) setTitleCfg(JSON.parse(rt.value));
+        if (rt && rt.value) {
+          const parsed = JSON.parse(rt.value);
+          // Migration: alte Version hatte ein einzelnes {text,color} statt
+          // mehrerer Textteile — wird beim Laden einmalig in ein Segment
+          // umgewandelt, damit bestehende individuelle Titel erhalten bleiben.
+          if (parsed && !parsed.segments && parsed.text) {
+            setTitleCfg({ segments: [{ text: parsed.text, color: parsed.color || "#ffffff" }], fontFamily: parsed.fontFamily, fontSize: parsed.fontSize });
+          } else if (parsed && parsed.segments) {
+            setTitleCfg(parsed);
+          }
+        }
       } catch {}
       try {
         const keys = await window.storage.list("dive:");
@@ -367,19 +411,15 @@ function HomeApp() {
         <div style={{position:"absolute",bottom:16,left:20,right:20,textAlign:"center"}}>
           <div onClick={e=>{e.stopPropagation();setEditingTitle(true);}}
             style={{display:"inline-block",fontWeight:900,letterSpacing:-0.5,textShadow:"0 2px 8px rgba(0,0,0,0.5)",whiteSpace:"nowrap",cursor:"pointer",
-              fontSize:titleCfg?titleCfg.fontSize:26, fontFamily:titleCfg?titleCfg.fontFamily:undefined}}>
-            {titleCfg ? (
-              <span style={{color:titleCfg.color}}>{titleCfg.text}</span>
-            ) : (
-              <><span style={{color:"#fff"}}>mein</span><span style={{color:"#f5a623"}}>tauch</span><span style={{color:"#fff"}}>buch</span></>
-            )}
+              fontSize:titleCfg?titleCfg.fontSize:DEFAULT_TITLE_CFG.fontSize, fontFamily:titleCfg?titleCfg.fontFamily:undefined}}>
+            {(titleCfg||DEFAULT_TITLE_CFG).segments.map((seg,i) => <span key={i} style={{color:seg.color}}>{seg.text}</span>)}
           </div>
         </div>
       </div>
 
       {editingTitle && (
         <TitleEditor
-          current={titleCfg || { text: "meintauchbuch", fontFamily: "-apple-system,BlinkMacSystemFont,sans-serif", fontSize: 26, color: "#ffffff" }}
+          current={titleCfg || DEFAULT_TITLE_CFG}
           onSave={saveTitleCfg}
           onReset={resetTitleCfg}
           onClose={()=>setEditingTitle(false)}
