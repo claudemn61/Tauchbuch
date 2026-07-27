@@ -1,6 +1,6 @@
 const { useState, useEffect, useRef } = React;
 
-const APP_VERSION = "2.4";
+const APP_VERSION = "2.4.1";
 
 // ── Startseite ───────────────────────────────────────────────────────────
 // Editierbares Titelbild (per Tap austauschbar, als Data-URL in Storage
@@ -17,6 +17,9 @@ const CHAPTERS = [
 // Änderungsverlauf — neuste zuerst. Wird beim Erhöhen der Version jeweils
 // von Hand ergänzt.
 const CHANGELOG = [
+  { version: "2.4.1", changes: [
+    "Startseite: Copyright-Hinweis \"© Claude Mair-Noack\" unter der Versionsnummer ergänzt",
+  ]},
   { version: "2.4", changes: [
     "Startseite: Titeltext jetzt editierbar (Text, Schriftart, Schriftgrösse, Farbe per Tipp auf den Titel; Zurücksetzen stellt die Standard-Optik wieder her)",
     "Tauchgänge-Kapitel: Seitentitel von \"Tauchbuch\" zu \"Logbuch\" umbenannt",
@@ -467,7 +470,8 @@ function HomeApp() {
         </button>
       </div>
 
-      <div style={{flex:"0 0 auto",textAlign:"center",padding:"6px 16px calc(6px + env(safe-area-inset-bottom, 0px))",fontSize:9,color:"rgba(232,244,253,0.25)"}}>Tauchbuch v{APP_VERSION}</div>
+      <div style={{flex:"0 0 auto",textAlign:"center",padding:"6px 16px 2px",fontSize:9,color:"rgba(232,244,253,0.25)"}}>Tauchbuch v{APP_VERSION}</div>
+      <div style={{flex:"0 0 auto",textAlign:"center",padding:"0 16px calc(6px + env(safe-area-inset-bottom, 0px))",fontSize:9,color:"rgba(232,244,253,0.2)"}}>© Claude Mair-Noack</div>
 
       {showSettings && <SettingsPanel onClose={()=>setShowSettings(false)} />}
     </div>
