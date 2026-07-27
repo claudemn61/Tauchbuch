@@ -1,6 +1,6 @@
 const { useState, useEffect, useRef } = React;
 
-const APP_VERSION = "2.3.2";
+const APP_VERSION = "2.4";
 
 // ── Startseite ───────────────────────────────────────────────────────────
 // Editierbares Titelbild (per Tap austauschbar, als Data-URL in Storage
@@ -17,6 +17,11 @@ const CHAPTERS = [
 // Änderungsverlauf — neuste zuerst. Wird beim Erhöhen der Version jeweils
 // von Hand ergänzt.
 const CHANGELOG = [
+  { version: "2.4", changes: [
+    "Startseite: Titeltext jetzt editierbar (Text, Schriftart, Schriftgrösse, Farbe per Tipp auf den Titel; Zurücksetzen stellt die Standard-Optik wieder her)",
+    "Tauchgänge-Kapitel: Seitentitel von \"Tauchbuch\" zu \"Logbuch\" umbenannt",
+    "Beide Gebrauchsanweisungen (ausführlich/kurz) sowie die In-App-Hilfe entsprechend angepasst",
+  ]},
   { version: "2.3.2", changes: [
     "Material: Revisionsdatum bleibt konstant aufgeklappt sichtbar, sobald eines eingetragen ist (kein Ein-/Ausklappen mehr nötig); der Pfeil zum Aufklappen erscheint nur noch, solange noch kein Datum eingetragen ist",
   ]},
@@ -203,6 +208,79 @@ function SettingsPanel({ onClose }) {
   );
 }
 
+const TITLE_FONTS = [
+  { label: "Standard", value: "-apple-system,BlinkMacSystemFont,sans-serif" },
+  { label: "Serifenschrift", value: "Georgia, 'Times New Roman', serif" },
+  { label: "Rund (Verdana)", value: "Verdana, Geneva, sans-serif" },
+  { label: "Schreibmaschine", value: "'Courier New', monospace" },
+  { label: "Handschrift", value: "'Comic Sans MS', 'Comic Sans', cursive" },
+  { label: "Elegant", value: "Didot, Georgia, serif" },
+];
+const TITLE_SWATCHES = ["#ffffff", "#f5a623", "#38bdf8", "#4ade80", "#f87171", "#a78bfa"];
+
+function TitleEditor({ current, onSave, onReset, onClose }) {
+  const [text, setText] = useState(current.text);
+  const [fontFamily, setFontFamily] = useState(current.fontFamily);
+  const [fontSize, setFontSize] = useState(current.fontSize);
+  const [color, setColor] = useState(current.color);
+
+  return (
+    <div onClick={onClose} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",zIndex:300,display:"flex",alignItems:"center",justifyContent:"center",padding:24}}>
+      <div onClick={e=>e.stopPropagation()}
+        style={{background:"#0a1628",borderRadius:16,padding:"18px 20px",maxWidth:360,width:"100%",border:"1px solid rgba(255,255,255,0.1)"}}>
+        <div style={{fontSize:15,fontWeight:800,marginBottom:14}}>Titel bearbeiten</div>
+
+        <div style={{marginBottom:12}}>
+          <div style={{fontSize:11,color:"rgba(232,244,253,0.5)",marginBottom:4}}>Text</div>
+          <input value={text} onChange={e=>setText(e.target.value)}
+            style={{width:"100%",boxSizing:"border-box",background:"rgba(255,255,255,0.08)",border:"1px solid rgba(56,189,248,0.4)",borderRadius:8,padding:"7px 10px",color:"#e8f4fd",fontSize:14}} />
+        </div>
+
+        <div style={{marginBottom:12}}>
+          <div style={{fontSize:11,color:"rgba(232,244,253,0.5)",marginBottom:4}}>Schriftart</div>
+          <select value={fontFamily} onChange={e=>setFontFamily(e.target.value)}
+            style={{width:"100%",boxSizing:"border-box",background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:8,padding:"7px 10px",color:"#e8f4fd",fontSize:14}}>
+            {TITLE_FONTS.map(f => <option key={f.value} value={f.value} style={{background:"#0a1628"}}>{f.label}</option>)}
+          </select>
+        </div>
+
+        <div style={{marginBottom:12}}>
+          <div style={{fontSize:11,color:"rgba(232,244,253,0.5)",marginBottom:4}}>Schriftgrösse: {fontSize}px</div>
+          <input type="range" min="16" max="40" value={fontSize} onChange={e=>setFontSize(+e.target.value)}
+            style={{width:"100%"}} />
+        </div>
+
+        <div style={{marginBottom:16}}>
+          <div style={{fontSize:11,color:"rgba(232,244,253,0.5)",marginBottom:6}}>Farbe</div>
+          <div style={{display:"flex",gap:8,alignItems:"center"}}>
+            {TITLE_SWATCHES.map(c => (
+              <div key={c} onClick={()=>setColor(c)}
+                style={{width:24,height:24,borderRadius:"50%",background:c,cursor:"pointer",border:color===c?"2px solid #7dd3fc":"2px solid rgba(255,255,255,0.2)"}} />
+            ))}
+            <input type="color" value={color} onChange={e=>setColor(e.target.value)}
+              style={{width:28,height:24,border:"none",background:"none",cursor:"pointer",padding:0}} />
+          </div>
+        </div>
+
+        <div style={{textAlign:"center",marginBottom:16,padding:"14px 0",background:"rgba(255,255,255,0.03)",borderRadius:10}}>
+          <span style={{fontFamily,fontSize,color,fontWeight:900,letterSpacing:-0.5}}>{text || "meintauchbuch"}</span>
+        </div>
+
+        <div style={{display:"flex",gap:8}}>
+          <button onClick={onReset}
+            style={{flex:1,background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:10,padding:"9px",color:"rgba(232,244,253,0.7)",fontSize:13,cursor:"pointer"}}>
+            Zurücksetzen
+          </button>
+          <button onClick={()=>onSave({ text: text||"meintauchbuch", fontFamily, fontSize, color })}
+            style={{flex:1,background:"linear-gradient(135deg,#0ea5e9,#0284c7)",color:"#fff",border:"none",borderRadius:10,padding:9,fontSize:13,fontWeight:800,cursor:"pointer"}}>
+            Speichern
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function HomeApp() {
   const [coverSrc, setCoverSrc] = useState("cover.jpg");
   const [loaded, setLoaded] = useState(false);
@@ -210,6 +288,8 @@ function HomeApp() {
   const [reiseCount, setReiseCount] = useState(0);
   const [brevetCount, setBrevetCount] = useState(0);
   const [showSettings, setShowSettings] = useState(false);
+  const [titleCfg, setTitleCfg] = useState(null);
+  const [editingTitle, setEditingTitle] = useState(false);
   const fileRef = useRef(null);
 
   useEffect(() => {
@@ -217,6 +297,10 @@ function HomeApp() {
       try {
         const r = await window.storage.get("home:coverImage");
         if (r && r.value) setCoverSrc(r.value);
+      } catch {}
+      try {
+        const rt = await window.storage.get("home:titleConfig");
+        if (rt && rt.value) setTitleCfg(JSON.parse(rt.value));
       } catch {}
       try {
         const keys = await window.storage.list("dive:");
@@ -247,6 +331,17 @@ function HomeApp() {
     reader.readAsDataURL(file);
   };
 
+  const saveTitleCfg = async (cfg) => {
+    setTitleCfg(cfg);
+    setEditingTitle(false);
+    try { await window.storage.set("home:titleConfig", JSON.stringify(cfg)); } catch (e) { console.error("Titel-Speicherfehler:", e); }
+  };
+  const resetTitleCfg = async () => {
+    setTitleCfg(null);
+    setEditingTitle(false);
+    try { await window.storage.delete("home:titleConfig"); } catch {}
+  };
+
   if (!loaded) return null;
 
   const subtitleFor = (key) => {
@@ -270,11 +365,26 @@ function HomeApp() {
           onError={e=>{ e.target.style.display="none"; }} />
         <div style={{position:"absolute",inset:0,background:"linear-gradient(to bottom, rgba(4,14,32,0) 55%, rgba(4,14,32,0.85) 100%)"}} />
         <div style={{position:"absolute",bottom:16,left:20,right:20,textAlign:"center"}}>
-          <div style={{fontSize:26,fontWeight:900,letterSpacing:-0.5,textShadow:"0 2px 8px rgba(0,0,0,0.5)",whiteSpace:"nowrap"}}>
-            <span style={{color:"#fff"}}>mein</span><span style={{color:"#f5a623"}}>tauch</span><span style={{color:"#fff"}}>buch</span>
+          <div onClick={e=>{e.stopPropagation();setEditingTitle(true);}}
+            style={{display:"inline-block",fontWeight:900,letterSpacing:-0.5,textShadow:"0 2px 8px rgba(0,0,0,0.5)",whiteSpace:"nowrap",cursor:"pointer",
+              fontSize:titleCfg?titleCfg.fontSize:26, fontFamily:titleCfg?titleCfg.fontFamily:undefined}}>
+            {titleCfg ? (
+              <span style={{color:titleCfg.color}}>{titleCfg.text}</span>
+            ) : (
+              <><span style={{color:"#fff"}}>mein</span><span style={{color:"#f5a623"}}>tauch</span><span style={{color:"#fff"}}>buch</span></>
+            )}
           </div>
         </div>
       </div>
+
+      {editingTitle && (
+        <TitleEditor
+          current={titleCfg || { text: "meintauchbuch", fontFamily: "-apple-system,BlinkMacSystemFont,sans-serif", fontSize: 26, color: "#ffffff" }}
+          onSave={saveTitleCfg}
+          onReset={resetTitleCfg}
+          onClose={()=>setEditingTitle(false)}
+        />
+      )}
 
       {/* Kapitel: Tauchgänge als breite Kachel oben, Rest darunter zu zweit */}
       <div style={{flex:"0 0 auto",padding:"12px 16px 0"}}>

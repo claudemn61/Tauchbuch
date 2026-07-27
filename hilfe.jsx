@@ -48,11 +48,12 @@ const TOC = [
   ]},
   { id:"h-start", label:"2. Startseite", subs:[
     ["h-start-titelbild","2.1 Titelbild ändern"],
-    ["h-start-kacheln","2.2 Kapitel-Kacheln"],
-    ["h-start-einstellungen","2.3 Einstellungen (Zahnrad)"],
-    ["h-start-hilfe","2.4 Hilfe (❓)"],
+    ["h-start-titel","2.2 Titel bearbeiten"],
+    ["h-start-kacheln","2.3 Kapitel-Kacheln"],
+    ["h-start-einstellungen","2.4 Einstellungen (Zahnrad)"],
+    ["h-start-hilfe","2.5 Hilfe (❓)"],
   ]},
-  { id:"h-tauchbuch", label:"3. Tauchbuch (Tauchgänge)", subs:[
+  { id:"h-tauchbuch", label:"3. Logbuch (Tauchgänge)", subs:[
     ["h-tb-liste","3.1 Die Liste: Aufbau einer Zeile"],
     ["h-tb-gruppierung","3.2 Gruppierung: Jahr oder Reise"],
     ["h-tb-sortierung","3.3 Sortierung"],
@@ -171,32 +172,39 @@ function HilfeApp() {
             Ein Tipp auf das Titelbild öffnet die Bildauswahl des Geräts; das gewählte Foto wird
             direkt übernommen und gespeichert.
           </Sub>
-          <Sub id="h-start-kacheln" title="2.2 Kapitel-Kacheln">
+          <Sub id="h-start-titel" title="2.2 Titel bearbeiten">
+            Ein Tipp auf den Titeltext selbst (nicht auf das Foto daneben) öffnet einen Editor für
+            Text, Schriftart, Schriftgrösse und Farbe des Titels. Über einen Regler lässt sich die
+            Grösse stufenlos einstellen, die Farbe entweder über sechs vorgegebene Farbpunkte oder
+            frei über den eigenen Farbwähler bestimmen. <b>Zurücksetzen</b> stellt wieder den
+            ursprünglichen Titel „meintauchbuch“ in der Standard-Optik her.
+          </Sub>
+          <Sub id="h-start-kacheln" title="2.3 Kapitel-Kacheln">
             Ein Tipp auf eine Kachel öffnet das jeweilige Kapitel. „Tauchgänge“ ist breit und steht
             oben, die übrigen vier folgen darunter zu je zweit. Unter jeder Kachel steht — sobald
             Daten vorhanden sind — die jeweilige Anzahl.
           </Sub>
-          <Sub id="h-start-einstellungen" title="2.3 Einstellungen (Zahnrad)">
+          <Sub id="h-start-einstellungen" title="2.4 Einstellungen (Zahnrad)">
             Unten auf der Startseite befinden sich die Buttons ⚙️ Einstellungen und ❓ Hilfe.
             Einstellungen öffnet ein Panel mit drei Reitern (Kapitel 10). Ganz unten steht die
             aktuell installierte App-Version.
           </Sub>
-          <Sub id="h-start-hilfe" title="2.4 Hilfe (❓)">
+          <Sub id="h-start-hilfe" title="2.5 Hilfe (❓)">
             Das ❓-Badge öffnet auf jeder Seite der App genau diese Hilfeseite — mit
             Inhaltsverzeichnis und Sprungmarken, komplett als durchsuchbarer Text, auch offline
             nutzbar. Der Zurück-Pfeil oben links führt wieder zurück zu der Seite, von der aus sie
             geöffnet wurde. Fundorte:
             <T><Tr><Th>Seite</Th><Th>Position</Th></Tr>
               <Tr><Td>Startseite</Td><Td>Unten, neben ⚙️ Einstellungen</Td></Tr>
-              <Tr><Td>Tauchbuch — Liste</Td><Td>Oben rechts, neben + Tauchgang (schmäler)</Td></Tr>
-              <Tr><Td>Tauchbuch — Detailseite</Td><Td>Oben rechts, neben 🗑</Td></Tr>
+              <Tr><Td>Logbuch — Liste</Td><Td>Oben rechts, neben + Tauchgang (schmäler)</Td></Tr>
+              <Tr><Td>Logbuch — Detailseite</Td><Td>Oben rechts, neben 🗑</Td></Tr>
               <Tr><Td>Reisen, Statistik, Material, Brevet</Td><Td>Oben rechts auf Titel-Höhe</Td></Tr>
             </T>
           </Sub>
         </Section>
 
-        {/* 3. Tauchbuch */}
-        <Section id="h-tauchbuch" title="3. Tauchbuch (Tauchgänge)">
+        {/* 3. Logbuch */}
+        <Section id="h-tauchbuch" title="3. Logbuch (Tauchgänge)">
           <p style={{fontSize:12.5,color:"rgba(232,244,253,0.85)"}}>Die Kopfzeile zeigt links 🏠
           zurück zur Startseite, mittig den Titel mit der Gesamtzahl aller Tauchgänge, rechts
           <Badge>+ Tauchgang</Badge> und <Badge>❓</Badge>. Darunter folgt eine Reihe Symbol-Buttons:</p>
