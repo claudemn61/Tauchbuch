@@ -347,6 +347,10 @@ function BrevetCard({ entry, onUpdate, onDelete, onOpenFullscreen }) {
         )}
         {entry.photo && !busy && (
           <div style={{position:"absolute",bottom:8,right:8,display:"flex",gap:6}}>
+            <button onClick={e=>{e.stopPropagation(); setCropSrc(entry.photo);}} title="Automatisch zuschneiden"
+              style={{background:"rgba(0,0,0,0.55)",border:"none",borderRadius:16,padding:"5px 9px",color:"#fff",fontSize:12,cursor:"pointer"}}>
+              ✂️
+            </button>
             <button onClick={e=>{e.stopPropagation(); cameraRef.current?.click();}} title="Neu aufnehmen"
               style={{background:"rgba(0,0,0,0.55)",border:"none",borderRadius:16,padding:"5px 9px",color:"#fff",fontSize:12,cursor:"pointer"}}>
               📷
