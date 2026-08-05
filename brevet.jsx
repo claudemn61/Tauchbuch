@@ -75,9 +75,78 @@ function warpQuadToCanvas(img, quad, outW, outH, gridN) {
 }
 
 // ── Zuschnitt-Dialog mit 4 verschiebbaren Eckpunkten ────────────────────
-// Startposition der Ecken ist automatisch leicht eingerückt (6% Rand) —
-// passt oft schon gut; wenn nicht, lassen sich alle 4 Ecken frei auf die
-// tatsächlichen Kanten des Ausweises/Dokuments ziehen.
+// ── Automatische Kantenerkennung ─────────────────────────────────────────
+// Findet die tatsächlichen Ausschnitt-Grenzen im Foto über eine
+// Gradienten-Projektion: das Bild wird verkleinert, in Graustufen
+// gewandelt, ein Kanten-Gradient (Sobel) berechnet und dann zeilen-/
+// spaltenweise aufsummiert. Wo die aufsummierte Kanten-"Energie" von aussen
+// nach innen eine Schwelle überschreitet, beginnt der eigentliche Inhalt
+// (das Dokument/die Karte) — unabhängig von Hintergrund, Beleuchtung oder
+// Position im Bild. Kein externes Bilderkennungs-Framework nötig.
+function detectContentBounds(img) {
+  try {
+    const maxW = 400;
+    const scale = Math.min(1, maxW / img.naturalWidth);
+    const w = Math.max(2, Math.round(img.naturalWidth * scale));
+    const h = Math.max(2, Math.round(img.naturalHeight * scale));
+    const canvas = document.createElement("canvas");
+    canvas.width = w; canvas.height = h;
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(img, 0, 0, w, h);
+    const { data } = ctx.getImageData(0, 0, w, h);
+
+    const gray = new Float32Array(w*h);
+    for (let i=0;i<w*h;i++) {
+      gray[i] = 0.299*data[i*4] + 0.587*data[i*4+1] + 0.114*data[i*4+2];
+    }
+
+    const grad = new Float32Array(w*h);
+    for (let y=1;y<h-1;y++) {
+      for (let x=1;x<w-1;x++) {
+        const gx = gray[(y-1)*w+(x+1)] + 2*gray[y*w+(x+1)] + gray[(y+1)*w+(x+1)]
+                 - gray[(y-1)*w+(x-1)] - 2*gray[y*w+(x-1)] - gray[(y+1)*w+(x-1)];
+        const gy = gray[(y+1)*w+(x-1)] + 2*gray[(y+1)*w+x] + gray[(y+1)*w+(x+1)]
+                 - gray[(y-1)*w+(x-1)] - 2*gray[(y-1)*w+x] - gray[(y-1)*w+(x+1)];
+        grad[y*w+x] = Math.sqrt(gx*gx + gy*gy);
+      }
+    }
+
+    const rowSum = new Float32Array(h), colSum = new Float32Array(w);
+    for (let y=0;y<h;y++) for (let x=0;x<w;x++) { const g=grad[y*w+x]; rowSum[y]+=g; colSum[x]+=g; }
+
+    const findEdge = (arr, fromStart) => {
+      const total = arr.reduce((a,b)=>a+b,0);
+      if (total <= 0) return null;
+      const thresh = total * 0.02;
+      let acc = 0;
+      if (fromStart) { for (let i=0;i<arr.length;i++){ acc+=arr[i]; if (acc>=thresh) return i; } }
+      else { for (let i=arr.length-1;i>=0;i--){ acc+=arr[i]; if (acc>=thresh) return i; } }
+      return null;
+    };
+
+    const top = findEdge(rowSum, true), bottom = findEdge(rowSum, false);
+    const left = findEdge(colSum, true), right = findEdge(colSum, false);
+
+    // Sicherheitsnetz: Ergebnis unplausibel (zu klein, invertiert) →
+    // grosszügiger Standard-Rahmen statt eines verzerrten Vorschlags.
+    if (top==null || bottom==null || left==null || right==null || bottom<=top || right<=left ||
+        (bottom-top) < h*0.25 || (right-left) < w*0.25) {
+      return { x0:0.06, y0:0.06, x1:0.94, y1:0.94 };
+    }
+    const padX = (right-left)*0.02, padY = (bottom-top)*0.02;
+    return {
+      x0: Math.max(0, left-padX)/w, y0: Math.max(0, top-padY)/h,
+      x1: Math.min(w, right+padX)/w, y1: Math.min(h, bottom+padY)/h,
+    };
+  } catch {
+    return { x0:0.06, y0:0.06, x1:0.94, y1:0.94 };
+  }
+}
+
+// Startposition der Ecken wird automatisch per Kantenerkennung bestimmt
+// (siehe detectContentBounds) — passt sich dem tatsächlichen Foto an,
+// unabhängig davon, wie/wo genau fotografiert wurde. Reicht die
+// Erkennung nicht, lassen sich alle 4 Ecken frei nachjustieren.
 function PerspectiveCropModal({ src, onDone, onCancel }) {
   const imgRef = useRef(null);
   const boxRef = useRef(null);
@@ -92,6 +161,11 @@ function PerspectiveCropModal({ src, onDone, onCancel }) {
 
   const onImgLoad = () => {
     setNatural({ w: imgRef.current.naturalWidth, h: imgRef.current.naturalHeight });
+    const b = detectContentBounds(imgRef.current);
+    setCorners({
+      tl: { x: b.x0, y: b.y0 }, tr: { x: b.x1, y: b.y0 },
+      br: { x: b.x1, y: b.y1 }, bl: { x: b.x0, y: b.y1 },
+    });
     setReady(true);
   };
 
@@ -155,7 +229,7 @@ function PerspectiveCropModal({ src, onDone, onCancel }) {
   return (
     <div style={{position:"fixed",inset:0,background:"#000",zIndex:500,display:"flex",flexDirection:"column"}}>
       <div style={{padding:"calc(14px + env(safe-area-inset-top, 0px)) 16px 10px",color:"#fff",fontSize:13,textAlign:"center",background:"rgba(0,0,0,0.6)"}}>
-        Ecken auf die Kanten des Dokuments ziehen
+        Automatisch erkannter Ausschnitt — bei Bedarf Ecken nachjustieren
       </div>
       <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",padding:16,overflow:"hidden"}}>
         <div ref={boxRef} style={{position:"relative",maxWidth:"100%",maxHeight:"100%",touchAction:"none"}}>

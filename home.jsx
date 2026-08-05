@@ -1,6 +1,6 @@
 const { useState, useEffect, useRef } = React;
 
-const APP_VERSION = "2.5";
+const APP_VERSION = "2.6";
 
 // ── Startseite ───────────────────────────────────────────────────────────
 // Editierbares Titelbild (per Tap austauschbar, als Data-URL in Storage
@@ -17,6 +17,9 @@ const CHAPTERS = [
 // Änderungsverlauf — neuste zuerst. Wird beim Erhöhen der Version jeweils
 // von Hand ergänzt.
 const CHANGELOG = [
+  { version: "2.6", changes: [
+    "Brevet: Zuschnitt-Ecken werden jetzt automatisch per Kantenerkennung (Gradienten-Analyse) an den tatsächlichen Bildinhalt angepasst statt an einen festen Rand — funktioniert unabhängig davon, wie/wo genau fotografiert wurde; manuelles Nachjustieren bleibt weiterhin möglich",
+  ]},
   { version: "2.5", changes: [
     "Brevet: Foto direkt per Kamera aufnehmen (📷) oder aus der Bibliothek wählen (🖼), danach Zuschnitt-Dialog mit 4 frei verschiebbaren Eckpunkten inkl. automatischer Startposition und echter perspektivischer Entzerrung",
   ]},
