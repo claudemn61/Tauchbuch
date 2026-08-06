@@ -682,7 +682,7 @@ function DiveRow({ d, onClick, sortId, selectMode, isSelected, onToggleSelect })
           </div>
         </div>
         <div style={{fontSize:11,color:"rgba(232,244,253,0.4)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-          {d.date} · {d.tauchspot||d.ort||"—"}{d.land?" · "+d.land:""}
+          {d.date} · <span style={parseCoords(d.koordinaten) ? {color:"#86efac"} : undefined}>{d.tauchspot||d.ort||"—"}</span>{d.land?" · "+d.land:""}
         </div>
       </div>
       <div style={{textAlign:"right",flexShrink:0,marginLeft:8}}>
