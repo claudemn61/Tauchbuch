@@ -1651,11 +1651,13 @@ function TauchbuchApp() {
             </div>
           )}
           {listMapOpen && (() => {
-            const pts = filtered
+            const source = selectedIds.size ? filtered.filter(d=>selectedIds.has(d.id)) : filtered;
+            const pts = source
               .map(d => { const c = parseCoords(d.koordinaten); return c ? { lat:c.lat, lon:c.lon, num:d.name, label:`${d.name}: ${d.tauchspot||d.ort||""}` } : null; })
               .filter(Boolean);
             return (
               <div style={{marginTop:10}}>
+                {selectedIds.size>0 && <div style={{fontSize:10,color:"rgba(232,244,253,0.4)",marginBottom:6}}>Nur {selectedIds.size} markierte Tauchgänge</div>}
                 {pts.length ? (
                   <MiniMap points={pts} height={260} />
                 ) : (
