@@ -1,5 +1,15 @@
 const { useState, useEffect, useRef } = React;
 
+function useIsWide() {
+  const [isWide, setIsWide] = useState(typeof window !== "undefined" ? window.innerWidth >= 768 : false);
+  useEffect(() => {
+    const onResize = () => setIsWide(window.innerWidth >= 768);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+  return isWide;
+}
+
 // Verkleinert/komprimiert ein bereits fertiges Canvas (z.B. nach dem
 // Zuschnitt) auf dieselbe Weise wie resizeImage() für Dateien.
 function canvasToCompressed(canvas, maxDim, quality) {
@@ -511,6 +521,7 @@ function BrevetCard({ entry, onUpdate, onDelete, onOpenFullscreen }) {
 }
 
 function BrevetApp() {
+  const isWide = useIsWide();
   const [entries, setEntries] = useState([]);
   const [loaded, setLoaded] = useState(false);
   const [fullscreenPhoto, setFullscreenPhoto] = useState(null);
@@ -553,18 +564,20 @@ function BrevetApp() {
           style={{background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,width:32,height:32,display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,color:"rgba(232,244,253,0.8)",cursor:"pointer",flexShrink:0}}>❓</button>
       </div>
 
-      <div style={{padding:"16px"}}>
+      <div style={{padding:16,maxWidth:isWide?1000:undefined,margin:isWide?"0 auto":undefined}}>
         {entries.length === 0 && (
           <div style={{textAlign:"center",padding:"30px 16px",color:"rgba(232,244,253,0.4)",fontSize:13}}>
             Noch kein Brevet erfasst. Tippe unten, um eines hinzuzufügen.
           </div>
         )}
-        {entries.map(entry => (
-          <BrevetCard key={entry.id} entry={entry} onUpdate={updateEntry} onDelete={deleteEntry} onOpenFullscreen={setFullscreenPhoto} />
-        ))}
+        <div style={isWide ? {display:"grid",gridTemplateColumns:"repeat(auto-fill, minmax(260px, 1fr))",gap:16} : undefined}>
+          {entries.map(entry => (
+            <BrevetCard key={entry.id} entry={entry} onUpdate={updateEntry} onDelete={deleteEntry} onOpenFullscreen={setFullscreenPhoto} />
+          ))}
+        </div>
 
         <button onClick={addEntry}
-          style={{width:"100%",background:"rgba(167,139,250,0.12)",border:"1px dashed rgba(167,139,250,0.4)",borderRadius:14,padding:"14px",color:"#c4b5fd",fontSize:14,fontWeight:700,cursor:"pointer"}}>
+          style={{width:"100%",background:"rgba(167,139,250,0.12)",border:"1px dashed rgba(167,139,250,0.4)",borderRadius:14,padding:"14px",color:"#c4b5fd",fontSize:14,fontWeight:700,cursor:"pointer",marginTop:isWide?16:0}}>
           + Weiteres Brevet hinzufügen
         </button>
       </div>

@@ -1,5 +1,15 @@
 const { useState, useEffect } = React;
 
+function useIsWide() {
+  const [isWide, setIsWide] = useState(typeof window !== "undefined" ? window.innerWidth >= 768 : false);
+  useEffect(() => {
+    const onResize = () => setIsWide(window.innerWidth >= 768);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+  return isWide;
+}
+
 function parseDateToTs(d) {
   if (!d) return 0;
   const m = String(d).match(/(\d{1,2})\.(\d{1,2})\.(\d{2,4})/);
@@ -141,6 +151,7 @@ function RankRow({ rank, primary, secondary, value }) {
 }
 
 function StatistikApp() {
+  const isWide = useIsWide();
   const [dives, setDives] = useState([]);
   const [loaded, setLoaded] = useState(false);
 
@@ -183,14 +194,15 @@ function StatistikApp() {
           </div>
         </div>
       ) : (
-        <div style={{padding:"16px"}}>
+        <div style={{padding:16,maxWidth:isWide?900:undefined,margin:isWide?"0 auto":undefined}}>
 
           <div style={{fontSize:12,color:"rgba(232,244,253,0.4)",marginBottom:12,textAlign:"center"}}>
             {fmtDateShort(stats.firstDate)} – {fmtDateShort(stats.lastDate)}
           </div>
 
-          {/* Kennzahlen */}
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:14}}>
+          {/* Kennzahlen — auf breiten Bildschirmen mehr Spalten, damit die
+              Kacheln nebeneinander statt gestapelt Platz finden */}
+          <div style={{display:"grid",gridTemplateColumns:isWide?"repeat(5,1fr)":"1fr 1fr 1fr",gap:8,marginBottom:14}}>
             <StatTile label="Tauchgänge" value={stats.n} />
             <StatTile label="Gesamtzeit" value={fmtDuration(stats.totalMin)} />
             <StatTile label="Ø Dauer" value={fmtDuration(stats.avgDurationMin)} />

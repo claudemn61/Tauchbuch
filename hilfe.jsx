@@ -45,6 +45,7 @@ const TOC = [
     ["h-ueberblick-aufbau","1.2 Aufbau der App"],
     ["h-ueberblick-install","1.3 Installation & Offline-Nutzung"],
     ["h-ueberblick-daten","1.4 Wo werden die Daten gespeichert?"],
+    ["h-ueberblick-ipad","1.5 iPad/Desktop"],
   ]},
   { id:"h-start", label:"2. Startseite", subs:[
     ["h-start-titelbild","2.1 Titelbild ändern"],
@@ -165,6 +166,14 @@ function HilfeApp() {
             zwischen mehreren Geräten — dafür dient die Backup-Funktion (Kapitel 3.9).
             <Callout kind="warn">Werden Browser-Cache/Website-Daten des Geräts geleert, gehen die
             gespeicherten Tauchgänge ohne vorheriges Backup verloren.</Callout>
+          </Sub>
+          <Sub id="h-ueberblick-ipad" title="1.5 iPad/Desktop">
+            Ab ca. 768px Bildschirmbreite (iPad, Mac-Browserfenster) wechseln mehrere Seiten
+            automatisch auf ein breiteres Layout: Home zeigt Foto und Kacheln nebeneinander,
+            Tauchgänge eine Liste-plus-Detail-Ansicht (wie in Mail-Apps) sobald ein Tauchgang
+            ausgewählt ist, Statistik alle Kennzahlen in einer breiteren Reihe, Material alle
+            Felder gleichzeitig als Karten-Raster statt einer langen Liste, Brevet mehrspaltig.
+            Auf dem iPhone bleibt alles wie gewohnt.
           </Sub>
         </Section>
 

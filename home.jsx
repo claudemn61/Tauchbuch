@@ -1,6 +1,18 @@
 const { useState, useEffect, useRef } = React;
 
-const APP_VERSION = "2.7";
+// Ab ca. 768px Breite (iPad, Mac-Browserfenster) wechseln mehrere Seiten
+// auf ein breiteres Layout. Gleicher Breakpoint/Hook auf allen Seiten.
+function useIsWide() {
+  const [isWide, setIsWide] = useState(typeof window !== "undefined" ? window.innerWidth >= 768 : false);
+  useEffect(() => {
+    const onResize = () => setIsWide(window.innerWidth >= 768);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+  return isWide;
+}
+
+const APP_VERSION = "2.7.1";
 
 // ── Startseite ───────────────────────────────────────────────────────────
 // Editierbares Titelbild (per Tap austauschbar, als Data-URL in Storage
@@ -17,6 +29,10 @@ const CHAPTERS = [
 // Änderungsverlauf — neuste zuerst. Wird beim Erhöhen der Version jeweils
 // von Hand ergänzt.
 const CHANGELOG = [
+  { version: "2.7.1", changes: [
+    "iPad/Mac-Darstellung: Ab ca. 768px Bildschirmbreite wechseln mehrere Seiten automatisch auf ein breiteres Layout — Home zeigt Foto und Kacheln nebeneinander, Tauchgänge eine Liste-plus-Detail-Ansicht (wie in Mail-Apps) sobald ein Tauchgang ausgewählt ist, Statistik zeigt alle Kennzahlen in einer breiteren Reihe, Material alle Felder gleichzeitig als Karten-Raster, Brevet mehrspaltig. Auf dem iPhone bleibt alles wie gewohnt",
+    "In-App-Hilfe entsprechend ergänzt (neues Kapitel 1.5 „iPad/Desktop“)",
+  ]},
   { version: "2.7", changes: [
     "Neues Feld \"Koordinaten\" auf der Tauchgang-Detailseite (nach Tauchspot). Globus-Button auf der Bewertungszeile öffnet eine Karte des Spots direkt unter den Bemerkungen",
     "Tauchbuch-Liste: gleicher Globus-Button zwischen Suche und Sortierung, zeigt eine Karte mit allen aktuell angezeigten (gefilterten) Tauchgängen, die Koordinaten hinterlegt haben",
@@ -336,6 +352,7 @@ function TitleEditor({ current, onSave, onReset, onClose }) {
 }
 
 function HomeApp() {
+  const isWide = useIsWide();
   const [coverSrc, setCoverSrc] = useState("cover.jpg");
   const [loaded, setLoaded] = useState(false);
   const [diveCount, setDiveCount] = useState(0);
@@ -416,23 +433,28 @@ function HomeApp() {
   };
 
   return (
-    <div className="tb-home-shell" style={{display:"flex",flexDirection:"column",background:"#040e20",color:"#e8f4fd",fontFamily:"-apple-system,BlinkMacSystemFont,sans-serif",overflow:"hidden"}}>
+    <div className="tb-home-shell" style={{display:"flex",flexDirection:isWide?"row":"column",background:"#040e20",color:"#e8f4fd",fontFamily:"-apple-system,BlinkMacSystemFont,sans-serif",overflow:"hidden"}}>
       <style>{`.tb-home-shell{height:100vh;height:100dvh;}`}</style>
       <input ref={fileRef} type="file" accept="image/*" style={{display:"none"}}
         onChange={e=>{ onPickImage(e.target.files[0]); e.target.value=""; }} />
 
-      {/* Titelbild — nimmt die gesamte übrige Höhe ein, damit Kacheln und
-          Einstellungen darunter gerade noch ohne Scrollen Platz haben */}
+      {/* Titelbild — im Hochformat nimmt es die gesamte übrige Höhe ein;
+          ab iPad/Mac-Breite (isWide) steht es stattdessen links als
+          eigene, feste Spalte (~42%), rechts daneben scrollt der Rest. */}
       <div onClick={()=>fileRef.current?.click()}
-        style={{position:"relative",flex:"1 1 auto",minHeight:0,overflow:"hidden",cursor:"pointer",background:"#0a1628"}}>
-        <img src={coverSrc} alt="Titelbild" style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}
-          onError={e=>{ e.target.style.display="none"; }} />
-        <div style={{position:"absolute",inset:0,background:"linear-gradient(to bottom, rgba(4,14,32,0) 55%, rgba(4,14,32,0.85) 100%)"}} />
-        <div style={{position:"absolute",bottom:16,left:20,right:20,textAlign:"center"}}>
-          <div onClick={e=>{e.stopPropagation();setEditingTitle(true);}}
-            style={{display:"inline-block",fontWeight:900,letterSpacing:-0.5,textShadow:"0 2px 8px rgba(0,0,0,0.5)",whiteSpace:"nowrap",cursor:"pointer",
-              fontSize:titleCfg?titleCfg.fontSize:DEFAULT_TITLE_CFG.fontSize, fontFamily:titleCfg?titleCfg.fontFamily:undefined}}>
-            {(titleCfg||DEFAULT_TITLE_CFG).segments.map((seg,i) => <span key={i} style={{color:seg.color}}>{seg.text}</span>)}
+        style={isWide
+          ? {position:"relative",flex:"0 0 42%",display:"flex",alignItems:"center",justifyContent:"center",padding:"24px 20px 24px 28px",cursor:"pointer",overflow:"hidden"}
+          : {position:"relative",flex:"1 1 auto",minHeight:0,overflow:"hidden",cursor:"pointer",background:"#0a1628"}}>
+        <div style={isWide ? {position:"relative",width:"100%",height:"100%",borderRadius:20,overflow:"hidden",boxShadow:"0 12px 40px rgba(0,0,0,0.5)",background:"#0a1628"} : {position:"relative",width:"100%",height:"100%"}}>
+          <img src={coverSrc} alt="Titelbild" style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}
+            onError={e=>{ e.target.style.display="none"; }} />
+          <div style={{position:"absolute",inset:0,background:"linear-gradient(to bottom, rgba(4,14,32,0) 55%, rgba(4,14,32,0.85) 100%)"}} />
+          <div style={{position:"absolute",bottom:16,left:20,right:20,textAlign:"center"}}>
+            <div onClick={e=>{e.stopPropagation();setEditingTitle(true);}}
+              style={{display:"inline-block",fontWeight:900,letterSpacing:-0.5,textShadow:"0 2px 8px rgba(0,0,0,0.5)",whiteSpace:"nowrap",cursor:"pointer",
+                fontSize:titleCfg?titleCfg.fontSize:DEFAULT_TITLE_CFG.fontSize, fontFamily:titleCfg?titleCfg.fontFamily:undefined}}>
+              {(titleCfg||DEFAULT_TITLE_CFG).segments.map((seg,i) => <span key={i} style={{color:seg.color}}>{seg.text}</span>)}
+            </div>
           </div>
         </div>
       </div>
@@ -446,13 +468,19 @@ function HomeApp() {
         />
       )}
 
+      {/* Rechte/untere Spalte: Kapitel-Kacheln + Fusszeile. Im Hochformat
+          normaler Dokumentfluss; ab isWide eigene scrollbare Spalte neben
+          dem Titelbild, damit auch bei vielen Kacheln nichts abgeschnitten
+          wird. */}
+      <div style={isWide ? {flex:"1 1 0",minWidth:0,overflowY:"auto",display:"flex",flexDirection:"column"} : {display:"contents"}}>
+
       {/* Kapitel: Tauchgänge als breite Kachel oben, Rest darunter zu zweit */}
-      <div style={{flex:"0 0 auto",padding:"12px 16px 0"}}>
+      <div style={{flex:"0 0 auto",padding:isWide?"24px 28px 0":"12px 16px 0"}}>
         {CHAPTERS.filter(ch => ch.wide).map(ch => {
           const subtitle = subtitleFor(ch.key);
           return (
             <div key={ch.key} onClick={()=>{window.location.href=ch.href;}}
-              style={{background:ch.bg,border:`1px solid ${ch.border}`,borderRadius:14,padding:"10px 10px",display:"flex",alignItems:"center",justifyContent:"center",gap:10,cursor:"pointer",marginBottom:8,height:"calc((100vw - 40px) * 0.375)",boxSizing:"border-box"}}>
+              style={{background:ch.bg,border:`1px solid ${ch.border}`,borderRadius:14,padding:"10px 10px",display:"flex",alignItems:"center",justifyContent:"center",gap:10,cursor:"pointer",marginBottom:8,height:isWide?96:"calc((100vw - 40px) * 0.375)",boxSizing:"border-box"}}>
               <span style={{fontSize:26}}>{ch.icon}</span>
               <div style={{textAlign:"center"}}>
                 <div style={{fontSize:13,fontWeight:700,color:ch.color}}>{ch.label}</div>
@@ -462,12 +490,12 @@ function HomeApp() {
           );
         })}
       </div>
-      <div style={{flex:"0 0 auto",padding:"0 16px",display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+      <div style={{flex:"0 0 auto",padding:isWide?"0 28px":"0 16px",display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
         {CHAPTERS.filter(ch => !ch.wide).map(ch => {
           const subtitle = subtitleFor(ch.key);
           return (
             <div key={ch.key} onClick={()=>{window.location.href=ch.href;}}
-              style={{background:ch.bg,border:`1px solid ${ch.border}`,borderRadius:14,padding:"10px 10px",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:4,cursor:"pointer",aspectRatio:"1 / 0.75"}}>
+              style={{background:ch.bg,border:`1px solid ${ch.border}`,borderRadius:14,padding:"10px 10px",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:4,cursor:"pointer",aspectRatio:isWide?"1 / 0.55":"1 / 0.75"}}>
               <span style={{fontSize:26}}>{ch.icon}</span>
               <span style={{fontSize:13,fontWeight:700,color:ch.color}}>{ch.label}</span>
               {subtitle && <span style={{fontSize:10,color:"rgba(232,244,253,0.4)"}}>{subtitle}</span>}
@@ -489,6 +517,8 @@ function HomeApp() {
 
       <div style={{flex:"0 0 auto",textAlign:"center",padding:"6px 16px 2px",fontSize:9,color:"rgba(232,244,253,0.25)"}}>claudemn61.github.io/Tauchbuch v{APP_VERSION}</div>
       <div style={{flex:"0 0 auto",textAlign:"center",padding:"0 16px calc(6px + env(safe-area-inset-bottom, 0px))",fontSize:9,color:"rgba(232,244,253,0.2)"}}>© Claude Mair-Noack</div>
+
+      </div>
 
       {showSettings && <SettingsPanel onClose={()=>setShowSettings(false)} />}
     </div>

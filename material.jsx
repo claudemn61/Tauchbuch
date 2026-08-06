@@ -1,5 +1,15 @@
 const { useState, useEffect } = React;
 
+function useIsWide() {
+  const [isWide, setIsWide] = useState(typeof window !== "undefined" ? window.innerWidth >= 768 : false);
+  useEffect(() => {
+    const onResize = () => setIsWide(window.innerWidth >= 768);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+  return isWide;
+}
+
 
 const MATERIAL_FIELDS = [
   { key: "regulator", label: "Regulator", icon: "🫁", hasRevision: true },
@@ -10,7 +20,7 @@ const MATERIAL_FIELDS = [
   { key: "uhrComputer", label: "Uhr/Computer", icon: "⌚", hasRevision: true },
 ];
 
-function MaterialField({ label, icon, value, onSave, hasRevision, revisionValue, onSaveRevision }) {
+function MaterialField({ label, icon, value, onSave, hasRevision, revisionValue, onSaveRevision, boxed }) {
   const [editing, setEditing] = useState(false);
   const [val, setVal] = useState(value || "");
   const [expanded, setExpanded] = useState(false);
@@ -19,7 +29,9 @@ function MaterialField({ label, icon, value, onSave, hasRevision, revisionValue,
   const commit = () => { setEditing(false); if (val !== (value||"")) onSave(val); };
   const commitRev = () => { setRevEditing(false); if (revVal !== (revisionValue||"")) onSaveRevision(revVal); };
   return (
-    <div style={{padding:"12px 0",borderBottom:"1px solid rgba(255,255,255,0.06)"}}>
+    <div style={boxed
+      ? {padding:"14px 16px",background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:14}
+      : {padding:"12px 0",borderBottom:"1px solid rgba(255,255,255,0.06)"}}>
       <div style={{display:"flex",alignItems:"center",gap:12}}>
         <span style={{fontSize:18,width:26,textAlign:"center",flexShrink:0}}>{icon}</span>
         <span style={{fontSize:13,color:"rgba(232,244,253,0.5)",minWidth:100,flexShrink:0}}>{label}</span>
@@ -61,6 +73,7 @@ function MaterialField({ label, icon, value, onSave, hasRevision, revisionValue,
 }
 
 function MaterialApp() {
+  const isWide = useIsWide();
   const [data, setData] = useState({});
   const [loaded, setLoaded] = useState(false);
 
@@ -96,16 +109,29 @@ function MaterialApp() {
           style={{background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,width:32,height:32,display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,color:"rgba(232,244,253,0.8)",cursor:"pointer",flexShrink:0}}>❓</button>
       </div>
 
-      <div style={{padding:"20px 16px"}}>
-        <div style={{background:"rgba(255,255,255,0.04)",borderRadius:14,padding:"4px 16px",border:"1px solid rgba(255,255,255,0.06)"}}>
-          {MATERIAL_FIELDS.map(f => (
-            <MaterialField key={f.key} label={f.label} icon={f.icon} value={data[f.key]}
-              onSave={v=>saveField(f.key, v)}
-              hasRevision={f.hasRevision}
-              revisionValue={data[f.key+"Revision"]}
-              onSaveRevision={v=>saveField(f.key+"Revision", v)} />
-          ))}
-        </div>
+      <div style={{padding:"20px 16px",maxWidth:isWide?900:undefined,margin:isWide?"0 auto":undefined}}>
+        {isWide ? (
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+            {MATERIAL_FIELDS.map(f => (
+              <MaterialField key={f.key} label={f.label} icon={f.icon} value={data[f.key]}
+                onSave={v=>saveField(f.key, v)}
+                hasRevision={f.hasRevision}
+                revisionValue={data[f.key+"Revision"]}
+                onSaveRevision={v=>saveField(f.key+"Revision", v)}
+                boxed />
+            ))}
+          </div>
+        ) : (
+          <div style={{background:"rgba(255,255,255,0.04)",borderRadius:14,padding:"4px 16px",border:"1px solid rgba(255,255,255,0.06)"}}>
+            {MATERIAL_FIELDS.map(f => (
+              <MaterialField key={f.key} label={f.label} icon={f.icon} value={data[f.key]}
+                onSave={v=>saveField(f.key, v)}
+                hasRevision={f.hasRevision}
+                revisionValue={data[f.key+"Revision"]}
+                onSaveRevision={v=>saveField(f.key+"Revision", v)} />
+            ))}
+          </div>
+        )}
       </div>
 
     </div>

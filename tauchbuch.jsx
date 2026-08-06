@@ -1,5 +1,17 @@
 const { useState, useEffect, useRef, useCallback, useMemo } = React;
 
+// Ab ca. 768px Breite (iPad, Mac-Browserfenster) wechseln mehrere Seiten
+// auf ein breiteres Layout. Gleicher Breakpoint/Hook auf allen Seiten.
+function useIsWide() {
+  const [isWide, setIsWide] = useState(typeof window !== "undefined" ? window.innerWidth >= 768 : false);
+  useEffect(() => {
+    const onResize = () => setIsWide(window.innerWidth >= 768);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+  return isWide;
+}
+
 
 // ── CSV Parsing (Divers Log / Logbuch Export) ───────────────────────────────
 // Column layout of the export (0-indexed):
@@ -815,7 +827,48 @@ function diveToCsvRow(d) {
 const CSV_COPY_HEADER = ["Nr","Datum","Zeit","Land","Ort","Reise","TG-Nr.","Tauchspot","Koordinaten","Dauer","max. Tiefe","Wassertemp.","Anzug","Blei","Flasche","Volumen","Nitrox","Buddy","Bewertung","Bemerkungen"].join("\t");
 
 // ── Detail view ──────────────────────────────────────────────────────────
-function DetailContent({ d, dives, setDives, setSelected, setView, saveDive, confirmDelete, setConfirmDelete, returnTo, reiseNumbers, pruneReisen }) {
+// ── Seitenleiste für die Split-Ansicht (iPad/Mac) ───────────────────────
+// Kompakte, eigenständige Liste (eigene Suche/Sortierung) links neben der
+// Detailansicht — analog zu Mail-Apps. Erscheint nur, wenn bereits ein
+// Tauchgang ausgewählt ist (siehe Root-Render-Logik in TauchbuchApp).
+function SidebarList({ dives, selectedId, onSelect }) {
+  const [filterText, setFilterText] = useState("");
+  const [sortId, setSortId] = useState("number");
+  const [sortDir, setSortDir] = useState("desc");
+  const filtered = matchDives(dives, filterText);
+  const sorted = sortDives(filtered, sortId, sortDir);
+  return (
+    <div style={{width:"clamp(340px, 22vw, 440px)",minWidth:340,height:"100vh",overflowY:"auto",borderRight:"1px solid rgba(255,255,255,0.08)",background:"#040e20",flexShrink:0}}>
+      <div style={{padding:"calc(14px + env(safe-area-inset-top, 0px)) 14px 8px",position:"sticky",top:0,background:"#040e20",zIndex:5,borderBottom:"1px solid rgba(255,255,255,0.06)"}}>
+        <div style={{marginBottom:6}}>
+          <SearchBar filterText={filterText} setFilterText={setFilterText} />
+        </div>
+        <button onClick={()=>setSortDir(d=>d==="asc"?"desc":"asc")}
+          style={{background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:8,padding:"5px 10px",color:"#7dd3fc",fontSize:11,cursor:"pointer"}}>
+          Nr. {sortDir==="asc"?"↑":"↓"}
+        </button>
+      </div>
+      {sorted.map(d => (
+        <SidebarDiveRow key={d.id} d={d} selectedId={selectedId} onSelect={onSelect} />
+      ))}
+    </div>
+  );
+}
+function SidebarDiveRow({ d, selectedId, onSelect }) {
+  return (
+    <div onClick={()=>onSelect(d)}
+      style={{padding:"10px 14px",cursor:"pointer",borderBottom:"1px solid rgba(255,255,255,0.04)",background:d.id===selectedId?"rgba(14,165,233,0.12)":"transparent",borderLeft:d.id===selectedId?"3px solid #7dd3fc":"3px solid transparent"}}>
+      <div style={{display:"flex",alignItems:"center",gap:6}}>
+        <span style={{fontWeight:700,fontSize:13,color:"#e8f4fd"}}>{d.name}</span>
+        <span style={{fontSize:11,color:"rgba(232,244,253,0.4)"}}>{d.date}</span>
+        {d.rating>0 && <span style={{fontSize:11}}><span style={{color:"#fde047"}}>{d.rating}</span><span style={{fontSize:"0.85em"}}>⭐️</span></span>}
+      </div>
+      <div style={{fontSize:11,color:"rgba(232,244,253,0.5)",marginTop:2}}>{d.tauchspot||d.ort||"—"}</div>
+    </div>
+  );
+}
+
+function DetailContent({ d, dives, setDives, setSelected, setView, saveDive, confirmDelete, setConfirmDelete, returnTo, reiseNumbers, pruneReisen, isWide, hideBackButton }) {
   const dIdx = dives.findIndex(x => x.id === d.id);
   const [bemerkungenEditing, setBemerkungenEditing] = useState(false);
   const [bemerkungenVal, setBemerkungenVal] = useState(d.bemerkungen || "");
@@ -887,9 +940,9 @@ function DetailContent({ d, dives, setDives, setSelected, setView, saveDive, con
 
   return (
     <div onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}
-      style={{maxWidth:480,margin:"0 auto",padding:"0 0 32px",background:"#040e20",minHeight:"100vh",color:"#e8f4fd",fontFamily:"-apple-system,BlinkMacSystemFont,sans-serif"}}>
+      style={{maxWidth:isWide?1100:480,margin:"0 auto",padding:"0 0 32px",background:"#040e20",minHeight:"100vh",color:"#e8f4fd",fontFamily:"-apple-system,BlinkMacSystemFont,sans-serif"}}>
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"calc(16px + env(safe-area-inset-top, 0px)) 16px 10px"}}>
-        <button onClick={goBack} style={{background:"none",border:"none",color:"#38bdf8",fontSize:22,cursor:"pointer"}}>←</button>
+        {hideBackButton ? <span /> : <button onClick={goBack} style={{background:"none",border:"none",color:"#38bdf8",fontSize:22,cursor:"pointer"}}>←</button>}
         <div style={{display:"flex",gap:6}}>
           <button onClick={()=>goToDive(1)} disabled={dIdx>=dives.length-1}
             style={{background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:20,padding:"6px 10px",color:dIdx>=dives.length-1?"rgba(232,244,253,0.2)":"#e8f4fd",fontSize:13,cursor:dIdx>=dives.length-1?"default":"pointer"}}>◀</button>
@@ -1037,6 +1090,7 @@ function DetailContent({ d, dives, setDives, setSelected, setView, saveDive, con
 
 // ── Main App ─────────────────────────────────────────────────────────────
 function TauchbuchApp() {
+  const isWide = useIsWide();
   const [dives, setDives] = useState([]);
   const [loaded, setLoaded] = useState(false);
   const [selected, setSelected] = useState(null);
@@ -1300,11 +1354,24 @@ function TauchbuchApp() {
 
   if (!loaded) return null;
 
+  if (view === "detail" && selected && isWide) {
+    return (
+      <div style={{display:"flex",height:"100vh",overflow:"hidden",background:"#040e20"}}>
+        <SidebarList dives={sortByNumber(dives)} selectedId={selected.id} onSelect={setSelected} />
+        <div style={{flex:1,minWidth:0,height:"100vh",overflowY:"auto"}}>
+          <DetailContent d={selected} dives={sortByNumber(dives)} setDives={setDives} setSelected={setSelected}
+            setView={setView} saveDive={saveDive} confirmDelete={confirmDelete} setConfirmDelete={setConfirmDelete}
+            returnTo={returnTo} reiseNumbers={reiseNumbers} pruneReisen={pruneReisen}
+            hideBackButton={true} isWide={true} />
+        </div>
+      </div>
+    );
+  }
   if (view === "detail" && selected) {
     return (
       <DetailContent d={selected} dives={sortByNumber(dives)} setDives={setDives} setSelected={setSelected}
         setView={setView} saveDive={saveDive} confirmDelete={confirmDelete} setConfirmDelete={setConfirmDelete}
-        returnTo={returnTo} reiseNumbers={reiseNumbers} pruneReisen={pruneReisen} />
+        returnTo={returnTo} reiseNumbers={reiseNumbers} pruneReisen={pruneReisen} isWide={isWide} />
     );
   }
 
@@ -1325,7 +1392,7 @@ function TauchbuchApp() {
   const toggleSelect = (id) => setSelectedIds(prev => { const n = new Set(prev); n.has(id)?n.delete(id):n.add(id); return n; });
 
   return (
-    <div style={{maxWidth:480,margin:"0 auto",minHeight:"100vh",background:"#040e20",color:"#e8f4fd",fontFamily:"-apple-system,BlinkMacSystemFont,sans-serif"}}>
+    <div style={{maxWidth:isWide?1400:480,margin:"0 auto",minHeight:"100vh",background:"#040e20",color:"#e8f4fd",fontFamily:"-apple-system,BlinkMacSystemFont,sans-serif"}}>
       <input ref={fileRef} type="file" accept=".csv" style={{display:"none"}} onChange={e=>e.target.files[0]&&importCsvFile(e.target.files[0])} />
       <input ref={backupFileRef} type="file" accept=".json" style={{display:"none"}}
         onChange={e=>{ if(e.target.files[0]) importBackup(e.target.files[0]); e.target.value=""; }} />
@@ -1556,7 +1623,7 @@ function TauchbuchApp() {
           const set = (key, v) => setBulkEditData(b=>({...b,[key]:v}));
           return (
             <div style={{position:"fixed",inset:0,zIndex:200,overflowY:"auto",background:"#040e20"}}>
-              <div style={{maxWidth:480,margin:"0 auto",padding:"0 0 32px",minHeight:"100vh",color:"#e8f4fd",fontFamily:"-apple-system,BlinkMacSystemFont,sans-serif"}}>
+              <div style={{maxWidth:isWide?1100:480,margin:"0 auto",padding:"0 0 32px",minHeight:"100vh",color:"#e8f4fd",fontFamily:"-apple-system,BlinkMacSystemFont,sans-serif"}}>
                 <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"calc(16px + env(safe-area-inset-top, 0px)) 16px 10px"}}>
                   <button onClick={closeEdit} style={{background:"none",border:"none",color:"#38bdf8",fontSize:22,cursor:"pointer"}}>←</button>
                   <button onClick={()=>{closeEdit();setConfirmBulkDelete(true);}}
