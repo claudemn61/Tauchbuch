@@ -106,6 +106,7 @@ function parseDiveCsv(text) {
       nitrox: normalizeNitroxValue(clean(cols[19])),
       buddy: clean(cols[20]),
       bemerkungen: clean(cols[21]),
+      koordinaten: clean(cols[22]),
       rating: 0,
       customFields: { reise: "" },
     };
@@ -171,6 +172,52 @@ function fmtTime(t) {
   return (t && t !== "0:00") ? t : "—";
 }
 
+// Erkennt Dezimalgrad-Koordinaten aus einem Freitextfeld, z.B.
+// "27.2578, 33.8116" oder "27.2578,33.8116". Liefert null bei allem
+// anderen (auch bei ungültigen Wertebereichen), damit der Globus-Button
+// zuverlässig weiss, ob eine Karte gezeigt werden kann.
+function parseCoords(str) {
+  if (!str) return null;
+  const m = String(str).match(/(-?\d+(?:\.\d+)?)\s*[,;]\s*(-?\d+(?:\.\d+)?)/);
+  if (!m) return null;
+  const lat = parseFloat(m[1]), lon = parseFloat(m[2]);
+  if (isNaN(lat) || isNaN(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) return null;
+  return { lat, lon };
+}
+
+// Leichtgewichtige Karte (Leaflet + OpenStreetMap-Kacheln) für einen oder
+// mehrere Punkte. Bei einem Punkt wird regional gezoomt (Umgebung des
+// Spots), bei mehreren automatisch auf alle Punkte eingepasst. `points`
+// wird über einen stabilen String-Key verglichen, damit die Karte nicht
+// bei jedem Render neu aufgebaut wird.
+function MiniMap({ points, height }) {
+  const elRef = useRef(null);
+  const key = JSON.stringify(points);
+  useEffect(() => {
+    if (!elRef.current || !window.L || !points.length) return;
+    const map = window.L.map(elRef.current, { attributionControl: false });
+    window.L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 18, attribution: "© OpenStreetMap-Mitwirkende",
+    }).addTo(map);
+    points.forEach(p => window.L.marker([p.lat, p.lon]).addTo(map).bindPopup(p.label || ""));
+    if (points.length === 1) map.setView([points[0].lat, points[0].lon], 11);
+    else map.fitBounds(window.L.latLngBounds(points.map(p => [p.lat, p.lon])), { padding: [30, 30] });
+    return () => map.remove();
+  }, [key]);
+  return <div ref={elRef} style={{width:"100%",height:height||220,borderRadius:12,overflow:"hidden",background:"#0a1628"}} />;
+}
+// Kleiner runder Globus-Button, wie er sowohl auf der Detailseite als auch
+// in der Listen-Werkzeugleiste verwendet wird.
+function MapToggleButton({ active, onClick, size }) {
+  const s = size || 32;
+  return (
+    <button onClick={onClick} title="Karte anzeigen"
+      style={{background:active?"rgba(56,189,248,0.2)":"rgba(255,255,255,0.06)",border:"1px solid "+(active?"rgba(56,189,248,0.4)":"rgba(255,255,255,0.12)"),borderRadius:20,width:s,height:s,display:"flex",alignItems:"center",justifyContent:"center",fontSize:s>28?15:13,cursor:"pointer",flexShrink:0,color:"#e8f4fd"}}>
+      🌐
+    </button>
+  );
+}
+
 function diveFieldValue(d, id) {
   const cf = d.customFields || {};
   switch (id) {
@@ -180,6 +227,7 @@ function diveFieldValue(d, id) {
     case "land": return d.land || "";
     case "ort": return d.ort || "";
     case "tauchspot": return d.tauchspot || "";
+    case "koordinaten": return d.koordinaten || "";
     case "tgNr": return parseInt(d.tgNr || "0", 10) || 0;
     case "duration": return d.durationMin || 0;
     case "depth": return d.maxDepth != null ? d.maxDepth : -1;
@@ -255,6 +303,7 @@ const FIELD_ALIASES = {
   land: "land",
   ort: "ort", platz: "ort", resort: "ort",
   tauchspot: "tauchspot", spot: "tauchspot",
+  koordinaten: "koordinaten", koordinate: "koordinaten", gps: "koordinaten", coords: "koordinaten",
   "tg-nr": "tgNr", tgnr: "tgNr",
   dauer: "duration", duration: "duration",
   tiefe: "depth", depth: "depth",
@@ -331,7 +380,7 @@ function evalDiveToken(d, tok) {
   }
   // Einzelnes Wort ohne Operator => Volltextsuche über alle Felder
   const hay = [
-    d.name, d.date, d.time, d.land, d.ort, d.tauchspot, d.tgNr, d.durationStr,
+    d.name, d.date, d.time, d.land, d.ort, d.tauchspot, d.koordinaten, d.tgNr, d.durationStr,
     d.maxDepth, d.waterTemp, d.anzug, d.blei, d.flasche, d.volumen, d.nitrox,
     d.buddy, d.bemerkungen, d.customFields?.reise, d.rating,
   ].join(" ").toLowerCase();
@@ -368,6 +417,7 @@ const DIVE_SEARCH_FIELDS = [
   { id: "land", label: "Land", type: "text" },
   { id: "ort", label: "Ort", type: "text" },
   { id: "tauchspot", label: "Tauchspot", type: "text" },
+  { id: "koordinaten", label: "Koordinaten", type: "text" },
   { id: "tgNr", label: "TG-Nr.", type: "number" },
   { id: "duration", label: "Dauer (min)", type: "number" },
   { id: "depth", label: "max. Tiefe (m)", type: "number" },
@@ -726,12 +776,12 @@ function diveToCsvRow(d) {
   const cf = d.customFields || {};
   return [
     d.name||"", d.date||"", d.time||"", d.land||"", d.ort||"", cf.reise||"",
-    d.tgNr||"", d.tauchspot||"", d.durationStr||"", d.maxDepth!=null?String(d.maxDepth):"",
+    d.tgNr||"", d.tauchspot||"", d.koordinaten||"", d.durationStr||"", d.maxDepth!=null?String(d.maxDepth):"",
     d.waterTemp!=null?String(d.waterTemp):"", d.anzug||"", d.blei||"", d.flasche||"",
     d.volumen||"", d.nitrox||"", d.buddy||"", d.rating?String(d.rating):"", d.bemerkungen||"",
   ].join("\t");
 }
-const CSV_COPY_HEADER = ["Nr","Datum","Zeit","Land","Ort","Reise","TG-Nr.","Tauchspot","Dauer","max. Tiefe","Wassertemp.","Anzug","Blei","Flasche","Volumen","Nitrox","Buddy","Bewertung","Bemerkungen"].join("\t");
+const CSV_COPY_HEADER = ["Nr","Datum","Zeit","Land","Ort","Reise","TG-Nr.","Tauchspot","Koordinaten","Dauer","max. Tiefe","Wassertemp.","Anzug","Blei","Flasche","Volumen","Nitrox","Buddy","Bewertung","Bemerkungen"].join("\t");
 
 // ── Detail view ──────────────────────────────────────────────────────────
 function DetailContent({ d, dives, setDives, setSelected, setView, saveDive, confirmDelete, setConfirmDelete, returnTo, reiseNumbers, pruneReisen }) {
@@ -740,6 +790,8 @@ function DetailContent({ d, dives, setDives, setSelected, setView, saveDive, con
   const [bemerkungenVal, setBemerkungenVal] = useState(d.bemerkungen || "");
   const [tileConfig, setTileConfig] = useState(DEFAULT_TAUCH_TILE_KEYS);
   const [tilePickerIdx, setTilePickerIdx] = useState(null);
+  const [mapOpen, setMapOpen] = useState(false);
+  const coords = parseCoords(d.koordinaten);
   const touchStartRef = useRef(null);
 
   useEffect(() => {
@@ -831,7 +883,7 @@ function DetailContent({ d, dives, setDives, setSelected, setView, saveDive, con
           {d.tauchspot && <span style={{fontSize:15,fontWeight:700,color:"#f87171"}}>{d.tauchspot}</span>}
         </div>
 
-        {/* Bewertung + Nitrox/Air — gross, links, direkt unter der TG-Nummer */}
+        {/* Bewertung + Nitrox/Air — gross, links, direkt unter der TG-Nummer; Karten-Button ganz rechts */}
         <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:14}}>
           <span style={{display:"flex",gap:3}}>
             {[1,2,3,4,5].map(s=>(
@@ -844,6 +896,8 @@ function DetailContent({ d, dives, setDives, setSelected, setView, saveDive, con
               {d.nitrox}
             </span>
           )}
+          <span style={{flex:1}} />
+          <MapToggleButton active={mapOpen} onClick={()=>setMapOpen(o=>!o)} />
         </div>
 
         {/* Bemerkungen — direkt unter Titel/Bewertung */}
@@ -859,6 +913,18 @@ function DetailContent({ d, dives, setDives, setSelected, setView, saveDive, con
             </div>
           )}
         </div>
+
+        {mapOpen && (
+          <div style={{marginBottom:14}}>
+            {coords ? (
+              <MiniMap points={[{lat:coords.lat, lon:coords.lon, label:d.tauchspot||d.name}]} />
+            ) : (
+              <div style={{background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:12,padding:"16px",fontSize:12,color:"rgba(232,244,253,0.5)",textAlign:"center"}}>
+                Keine Koordinaten hinterlegt. Unter „Koordinaten" z.B. „27.2578, 33.8116" eintragen.
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Drei frei editierbare Daten-Badges */}
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:6,marginBottom:14}}>
@@ -900,6 +966,7 @@ function DetailContent({ d, dives, setDives, setSelected, setView, saveDive, con
           <ReiseSelect label="Ort, Reise" value={d.customFields?.reise || d.ort} onSave={saveOrtReiseField} />
           <InlineField label="TG-Nr." value={d.tgNr} onSave={v=>saveField({tgNr:v})} />
           <InlineField label="Tauchspot" value={d.tauchspot} onSave={v=>saveField({tauchspot:v})} />
+          <InlineField label="Koordinaten" value={d.koordinaten} onSave={v=>saveField({koordinaten:v})} />
           <InlineField label="Anzug" value={d.anzug} onSave={v=>saveField({anzug:v})} />
           <SelectField label="Blei" value={d.blei} options={BLEI_OPTIONS} unit="kg" onSave={v=>saveField({blei:v})} />
           <SelectField label="Flasche" value={d.flasche} options={FLASCHE_OPTIONS} onSave={v=>saveField({flasche:v})} />
@@ -948,6 +1015,7 @@ function TauchbuchApp() {
   const [sortId, setSortId] = useState("number");
   const [sortDir, setSortDir] = useState("desc");
   const [showSortMenu, setShowSortMenu] = useState(false);
+  const [listMapOpen, setListMapOpen] = useState(false);
   const [collapsedYears, setCollapsedYears] = useState(new Set());
   const [groupBy, setGroupBy] = useState("year"); // "year" | "reise"
   const [collapsedReisen, setCollapsedReisen] = useState(new Set());
@@ -1360,7 +1428,7 @@ function TauchbuchApp() {
                 const chosen = dives.filter(d=>selectedIds.has(d.id));
                 const getters = {
                   date: d=>d.date, land: d=>d.land, reise: d=>d.customFields?.reise||d.ort,
-                  tgNr: d=>d.tgNr, tauchspot: d=>d.tauchspot, anzug: d=>d.anzug,
+                  tgNr: d=>d.tgNr, tauchspot: d=>d.tauchspot, koordinaten: d=>d.koordinaten, anzug: d=>d.anzug,
                   blei: d=>d.blei, flasche: d=>d.flasche, volumen: d=>d.volumen,
                   nitrox: d=>d.nitrox, buddy: d=>d.buddy, rating: d=>d.rating||0,
                   bemerkungen: d=>d.bemerkungen,
@@ -1433,6 +1501,7 @@ function TauchbuchApp() {
               if (b.land) patch.land = b.land;
               if (b.tgNr) patch.tgNr = b.tgNr;
               if (b.tauchspot) patch.tauchspot = b.tauchspot;
+              if (b.koordinaten) patch.koordinaten = b.koordinaten;
               if (b.anzug) patch.anzug = b.anzug;
               if (b.blei) patch.blei = b.blei;
               if (b.flasche) patch.flasche = b.flasche;
@@ -1506,6 +1575,7 @@ function TauchbuchApp() {
                     <BulkReiseSelect label="Ort, Reise" value={bulkEditData.reise} mixed={bulkEditMixed.reise} names={reisenNames} onChange={v=>set("reise",v)} />
                     <BulkField label="TG-Nr." value={bulkEditData.tgNr} mixed={bulkEditMixed.tgNr} onChange={v=>set("tgNr",v)} />
                     <BulkField label="Tauchspot" value={bulkEditData.tauchspot} mixed={bulkEditMixed.tauchspot} onChange={v=>set("tauchspot",v)} />
+                    <BulkField label="Koordinaten" value={bulkEditData.koordinaten} mixed={bulkEditMixed.koordinaten} onChange={v=>set("koordinaten",v)} />
                     <BulkField label="Anzug" value={bulkEditData.anzug} mixed={bulkEditMixed.anzug} onChange={v=>set("anzug",v)} />
                     <BulkSelectField label="Blei" value={bulkEditData.blei} mixed={bulkEditMixed.blei} options={BLEI_OPTIONS} unit="kg" onChange={v=>set("blei",v)} />
                     <BulkSelectField label="Flasche" value={bulkEditData.flasche} mixed={bulkEditMixed.flasche} options={FLASCHE_OPTIONS} onChange={v=>set("flasche",v)} />
@@ -1532,6 +1602,7 @@ function TauchbuchApp() {
             <div style={{flex:"1 1 0",minWidth:0,position:"relative"}}>
               <SearchBar filterText={filterText} setFilterText={setFilterText} />
             </div>
+            <MapToggleButton active={listMapOpen} onClick={()=>setListMapOpen(o=>!o)} size={34} />
             <button onClick={()=>setShowSortMenu(s=>!s)}
               style={{flex:"1 1 0",minWidth:0,boxSizing:"border-box",display:"flex",justifyContent:"space-between",alignItems:"center",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,padding:"8px 8px",color:"#fff",fontSize:12,cursor:"pointer"}}>
               <span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>⇅ {DIVE_SORT_OPTIONS.find(o=>o.id===sortId)?.label||"—"}</span>
@@ -1548,6 +1619,22 @@ function TauchbuchApp() {
               ))}
             </div>
           )}
+          {listMapOpen && (() => {
+            const pts = filtered
+              .map(d => { const c = parseCoords(d.koordinaten); return c ? { lat:c.lat, lon:c.lon, label:`${d.name}: ${d.tauchspot||d.ort||""}` } : null; })
+              .filter(Boolean);
+            return (
+              <div style={{marginTop:10}}>
+                {pts.length ? (
+                  <MiniMap points={pts} height={260} />
+                ) : (
+                  <div style={{background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:12,padding:"16px",fontSize:12,color:"rgba(232,244,253,0.5)",textAlign:"center"}}>
+                    Keine der aktuell angezeigten Tauchgänge hat Koordinaten hinterlegt.
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         </div>
       </div>
 

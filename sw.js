@@ -13,7 +13,7 @@
 // erhöhen, damit alte, nicht mehr benötigte Cache-Einträge aufgeräumt
 // werden. Für normale Inhalts-Updates ist das NICHT nötig — die sind
 // dank "Network-first" ohnehin sofort aktuell, sobald wieder Netz da ist.
-const CACHE_VERSION = "v4";
+const CACHE_VERSION = "v5";
 const CACHE_NAME = `tauchbuch-cache-${CACHE_VERSION}`;
 
 const PRECACHE_URLS = [
@@ -30,6 +30,8 @@ const PRECACHE_URLS = [
   "https://cdn.jsdelivr.net/npm/react@18/umd/react.production.min.js",
   "https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.production.min.js",
   "https://cdn.jsdelivr.net/npm/@babel/standalone@7/babel.min.js",
+  "https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css",
+  "https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js",
 ];
 
 self.addEventListener("install", (event) => {

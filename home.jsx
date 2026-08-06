@@ -1,6 +1,6 @@
 const { useState, useEffect, useRef } = React;
 
-const APP_VERSION = "2.6.1";
+const APP_VERSION = "2.7";
 
 // ── Startseite ───────────────────────────────────────────────────────────
 // Editierbares Titelbild (per Tap austauschbar, als Data-URL in Storage
@@ -17,6 +17,11 @@ const CHAPTERS = [
 // Änderungsverlauf — neuste zuerst. Wird beim Erhöhen der Version jeweils
 // von Hand ergänzt.
 const CHANGELOG = [
+  { version: "2.7", changes: [
+    "Neues Feld \"Koordinaten\" auf der Tauchgang-Detailseite (nach Tauchspot). Globus-Button auf der Bewertungszeile öffnet eine Karte des Spots direkt unter den Bemerkungen",
+    "Tauchbuch-Liste: gleicher Globus-Button zwischen Suche und Sortierung, zeigt eine Karte mit allen aktuell angezeigten (gefilterten) Tauchgängen, die Koordinaten hinterlegt haben",
+    "Koordinaten sind durchsuchbar (einfache und erweiterte Suche), CSV-import-/kopierbar und in der Mehrfachauswahl-Bearbeitung verfügbar",
+  ]},
   { version: "2.6.1", changes: [
     "Brevet: automatische Kantenerkennung deutlich verbessert — statt grober Zeilen-/Spalten-Schätzung wird jetzt der tatsächlich umschlossene Bereich per Flutfüllung von den Bildrändern gefunden (Otsu-Schwelle, mit Fallback-Kette bei schwierigen Fotos)",
   ]},
