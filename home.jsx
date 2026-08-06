@@ -12,7 +12,7 @@ function useIsWide() {
   return isWide;
 }
 
-const APP_VERSION = "2.7.1";
+const APP_VERSION = "2.7.2";
 
 // ── Startseite ───────────────────────────────────────────────────────────
 // Editierbares Titelbild (per Tap austauschbar, als Data-URL in Storage
@@ -29,6 +29,11 @@ const CHAPTERS = [
 // Änderungsverlauf — neuste zuerst. Wird beim Erhöhen der Version jeweils
 // von Hand ergänzt.
 const CHANGELOG = [
+  { version: "2.7.2", changes: [
+    "Bugfix: Backup erfasste bisher nur Tauchgänge und Reisen-Namen — jetzt zusätzlich Material, alle Brevet-Einträge samt Fotos sowie Startseiten-Titelbild und -Titel",
+    "Tauchbuch-Liste: Symbolleisten-Reihenfolge an Flugbuch angeglichen (Import/Backup/Auswahl/Karte/Gruppierung/Richtung/Auf-Zu), Karten-Button aus der Suchzeile in die Symbolleiste verschoben",
+    "Symbolleiste flacher statt quadratisch, Icons deutlich grösser",
+  ]},
   { version: "2.7.1", changes: [
     "iPad/Mac-Darstellung: Ab ca. 768px Bildschirmbreite wechseln mehrere Seiten automatisch auf ein breiteres Layout — Home zeigt Foto und Kacheln nebeneinander, Tauchgänge eine Liste-plus-Detail-Ansicht (wie in Mail-Apps) sobald ein Tauchgang ausgewählt ist, Statistik zeigt alle Kennzahlen in einer breiteren Reihe, Material alle Felder gleichzeitig als Karten-Raster, Brevet mehrspaltig. Auf dem iPhone bleibt alles wie gewohnt",
     "In-App-Hilfe entsprechend ergänzt (neues Kapitel 1.5 „iPad/Desktop“)",

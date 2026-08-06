@@ -1299,7 +1299,7 @@ function TauchbuchApp() {
     try {
       const keys = await window.storage.list("");
       for (const k of (keys?.keys || [])) {
-        if (k.startsWith("tauchreisen:") || k.startsWith("settings:")) {
+        if (k.startsWith("tauchreisen:") || k.startsWith("settings:") || k.startsWith("material:") || k.startsWith("brevet:") || k.startsWith("home:")) {
           const r = await window.storage.get(k);
           if (r) { try { extra[k] = JSON.parse(r.value); } catch { extra[k] = r.value; } }
         }
@@ -1344,7 +1344,7 @@ function TauchbuchApp() {
       }
       const withReisen = await ensureReisen(data.dives);
       setDives(sortByNumber(withReisen));
-      setBackupMsg(`✓ ${data.dives.length} Tauchgänge${restoredExtras?" + Reisen-Daten":""} wiederhergestellt.`);
+      setBackupMsg(`✓ ${data.dives.length} Tauchgänge${restoredExtras?" + Reisen/Material/Brevet/Einstellungen":""} wiederhergestellt.`);
     } catch (e) {
       setBackupMsg("Fehler beim Import: " + e.message);
     }
@@ -1414,26 +1414,31 @@ function TauchbuchApp() {
           </div>
         </div>
 
-        {/* Icon-Buttons: Import / Backup / Auswahl / Gruppierung / Richtung / Auf-Zu */}
+        {/* Icon-Buttons: Import / Backup / Auswahl / Karte / Gruppierung / Richtung / Auf-Zu
+            — Reihenfolge analog zum Flugbuch (dort: Import/Backup/Auswahl/Karte/Richtung/Gruppierung) */}
         <div style={{padding:"10px 16px 0",display:"flex",gap:6}}>
           <button onClick={()=>{ setShowImportMenu(m=>!m); setShowBackupMenu(false); }} title="CSV Import"
-            style={{flex:"1 1 0",minWidth:0,aspectRatio:"1",boxSizing:"border-box",display:"flex",alignItems:"center",justifyContent:"center",background:showImportMenu?"rgba(56,189,248,0.15)":"rgba(255,255,255,0.05)",border:`1px solid ${showImportMenu?"rgba(56,189,248,0.35)":"rgba(255,255,255,0.1)"}`,borderRadius:10,color:"#fff",fontSize:17,cursor:"pointer"}}>
+            style={{flex:"1 1 0",minWidth:0,height:44,boxSizing:"border-box",display:"flex",alignItems:"center",justifyContent:"center",background:showImportMenu?"rgba(56,189,248,0.15)":"rgba(255,255,255,0.05)",border:`1px solid ${showImportMenu?"rgba(56,189,248,0.35)":"rgba(255,255,255,0.1)"}`,borderRadius:10,color:"#fff",fontSize:20,cursor:"pointer"}}>
             📥
           </button>
           <button onClick={()=>{ setShowBackupMenu(m=>!m); setShowImportMenu(false); }} title="Backup"
-            style={{flex:"1 1 0",minWidth:0,aspectRatio:"1",boxSizing:"border-box",display:"flex",alignItems:"center",justifyContent:"center",background:showBackupMenu?"rgba(56,189,248,0.15)":"rgba(255,255,255,0.05)",border:`1px solid ${showBackupMenu?"rgba(56,189,248,0.35)":"rgba(255,255,255,0.1)"}`,borderRadius:10,color:"#fff",fontSize:17,cursor:"pointer"}}>
+            style={{flex:"1 1 0",minWidth:0,height:44,boxSizing:"border-box",display:"flex",alignItems:"center",justifyContent:"center",background:showBackupMenu?"rgba(56,189,248,0.15)":"rgba(255,255,255,0.05)",border:`1px solid ${showBackupMenu?"rgba(56,189,248,0.35)":"rgba(255,255,255,0.1)"}`,borderRadius:10,color:"#fff",fontSize:20,cursor:"pointer"}}>
             💾
           </button>
           <button onClick={()=>{ setSelectMode(m=>!m); setSelectedIds(new Set()); setCopyMsg(""); }} title="Auswahl"
-            style={{flex:"1 1 0",minWidth:0,aspectRatio:"1",boxSizing:"border-box",display:"flex",alignItems:"center",justifyContent:"center",background:selectMode?"rgba(14,165,233,0.18)":"rgba(255,255,255,0.05)",border:`1px solid ${selectMode?"rgba(14,165,233,0.4)":"rgba(255,255,255,0.1)"}`,borderRadius:10,color:"#fff",fontSize:21,cursor:"pointer"}}>
+            style={{flex:"1 1 0",minWidth:0,height:44,boxSizing:"border-box",display:"flex",alignItems:"center",justifyContent:"center",background:selectMode?"rgba(14,165,233,0.18)":"rgba(255,255,255,0.05)",border:`1px solid ${selectMode?"rgba(14,165,233,0.4)":"rgba(255,255,255,0.1)"}`,borderRadius:10,color:"#fff",fontSize:24,cursor:"pointer"}}>
             {selectMode?"✕":"☑"}
           </button>
+          <button onClick={()=>setListMapOpen(o=>!o)} title="Karte anzeigen"
+            style={{flex:"1 1 0",minWidth:0,height:44,boxSizing:"border-box",display:"flex",alignItems:"center",justifyContent:"center",background:listMapOpen?"rgba(56,189,248,0.15)":"rgba(255,255,255,0.05)",border:`1px solid ${listMapOpen?"rgba(56,189,248,0.35)":"rgba(255,255,255,0.1)"}`,borderRadius:10,color:"#fff",fontSize:20,cursor:"pointer"}}>
+            🌐
+          </button>
           <button onClick={()=>setGroupBy(g=>g==="year"?"reise":"year")} title={groupBy==="year"?"Gruppiert nach Jahr (zu Reise wechseln)":"Gruppiert nach Reise (zu Jahr wechseln)"}
-            style={{flex:"1 1 0",minWidth:0,aspectRatio:"1",boxSizing:"border-box",display:"flex",alignItems:"center",justifyContent:"center",background:groupBy==="reise"?"rgba(245,166,35,0.18)":"rgba(255,255,255,0.05)",border:`1px solid ${groupBy==="reise"?"rgba(245,166,35,0.4)":"rgba(255,255,255,0.1)"}`,borderRadius:10,color:groupBy==="reise"?"#f5a623":"#fff",fontSize:17,cursor:"pointer"}}>
+            style={{flex:"1 1 0",minWidth:0,height:44,boxSizing:"border-box",display:"flex",alignItems:"center",justifyContent:"center",background:groupBy==="reise"?"rgba(245,166,35,0.18)":"rgba(255,255,255,0.05)",border:`1px solid ${groupBy==="reise"?"rgba(245,166,35,0.4)":"rgba(255,255,255,0.1)"}`,borderRadius:10,color:groupBy==="reise"?"#f5a623":"#fff",fontSize:20,cursor:"pointer"}}>
             {groupBy==="year" ? "📅" : "🧭"}
           </button>
           <button onClick={()=>setSortDir(d=>d==="asc"?"desc":"asc")} title={sortDir==="asc"?"Aufsteigend":"Absteigend"}
-            style={{flex:"1 1 0",minWidth:0,aspectRatio:"1",boxSizing:"border-box",display:"flex",alignItems:"center",justifyContent:"center",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,color:"#fff",fontSize:17,cursor:"pointer"}}>
+            style={{flex:"1 1 0",minWidth:0,height:44,boxSizing:"border-box",display:"flex",alignItems:"center",justifyContent:"center",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,color:"#fff",fontSize:20,cursor:"pointer"}}>
             {sortDir==="asc"?"↑":"↓"}
           </button>
           <button onClick={()=>{
@@ -1441,7 +1446,7 @@ function TauchbuchApp() {
               else setCollapsedReisen(s=>s.size===0?new Set(reiseOrder):new Set());
             }}
             title={(groupBy==="year"?collapsedYears:collapsedReisen).size===0?"Alle reduzieren":"Alle erweitern"}
-            style={{flex:"1 1 0",minWidth:0,aspectRatio:"1",boxSizing:"border-box",display:"flex",alignItems:"center",justifyContent:"center",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,color:"#fff",fontSize:14,fontWeight:700,letterSpacing:1,cursor:"pointer"}}>
+            style={{flex:"1 1 0",minWidth:0,height:44,boxSizing:"border-box",display:"flex",alignItems:"center",justifyContent:"center",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,color:"#fff",fontSize:16,fontWeight:700,letterSpacing:1,cursor:"pointer"}}>
             {(groupBy==="year"?collapsedYears:collapsedReisen).size===0?"⊟⊟":"⊞⊞"}
           </button>
         </div>
@@ -1700,7 +1705,6 @@ function TauchbuchApp() {
             <div style={{flex:"1 1 0",minWidth:0,position:"relative"}}>
               <SearchBar filterText={filterText} setFilterText={setFilterText} />
             </div>
-            <MapToggleButton active={listMapOpen} onClick={()=>setListMapOpen(o=>!o)} size={34} />
             <button onClick={()=>setShowSortMenu(s=>!s)}
               style={{flex:"1 1 0",minWidth:0,boxSizing:"border-box",display:"flex",justifyContent:"space-between",alignItems:"center",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,padding:"8px 8px",color:"#fff",fontSize:12,cursor:"pointer"}}>
               <span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>⇅ {DIVE_SORT_OPTIONS.find(o=>o.id===sortId)?.label||"—"}</span>

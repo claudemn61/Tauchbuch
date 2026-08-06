@@ -223,6 +223,7 @@ function HilfeApp() {
             <Tr><Td>📥</Td><Td>CSV-Import öffnen/schliessen</Td></Tr>
             <Tr><Td>💾</Td><Td>Backup-Menü öffnen/schliessen</Td></Tr>
             <Tr><Td>☑ / ✕</Td><Td>Mehrfachauswahl-Modus ein-/ausschalten</Td></Tr>
+            <Tr><Td>🌐</Td><Td>Karte aller angezeigten Spots öffnen (Kapitel 3.7)</Td></Tr>
             <Tr><Td>📅 / 🧭</Td><Td>Gruppierung: nach Jahr (📅) oder nach Reise (🧭)</Td></Tr>
             <Tr><Td>↑ / ↓</Td><Td>Sortierrichtung: aufsteigend/absteigend</Td></Tr>
             <Tr><Td>⊟⊟ / ⊞⊞</Td><Td>Alle Gruppen reduzieren bzw. erweitern</Td></Tr>
@@ -279,7 +280,7 @@ function HilfeApp() {
             alle Tauchgänge in Ägypten ab 30 m, die keine Nachttauchgänge sind.</Callout>
           </Sub>
           <Sub id="h-tb-karte" title="3.7 Karte aller angezeigten Spots">
-            Der 🌐-Button zwischen Suchfeld und Sortierung öffnet eine Karte mit allen aktuell
+            Der 🌐-Button in der Symbolleiste (4. Symbol, neben ☑ Auswahl) öffnet eine Karte mit allen aktuell
             angezeigten Tauchgängen (also nach Suche/Filter), die im Feld „Koordinaten“ einen
             gültigen Wert hinterlegt haben — die Karte passt sich automatisch so ein, dass alle
             Punkte sichtbar sind. Jeder Marker zeigt dauerhaft seine Tauchgang-Nummer über dem Pin;
@@ -302,7 +303,9 @@ function HilfeApp() {
           <Sub id="h-tb-backup" title="3.10 Backup: Sichern & Wiederherstellen">
             Über 💾 öffnet sich das Backup-Menü: <b>☁️ In iCloud sichern</b> erstellt eine
             Sicherungsdatei (JSON) zum Speichern an einem beliebigen Ort; <b>⬆ Backup importieren</b>
-            spielt eine zuvor erstellte Sicherungsdatei zurück ein.
+            spielt eine zuvor erstellte Sicherungsdatei zurück ein. Die Sicherung umfasst alle
+            Tauchgänge, Reisen-Namen, Material-Angaben, alle Brevet-Einträge samt Fotos sowie
+            Startseiten-Titelbild und -Titel.
             <Callout kind="warn">Vor grösseren Aktionen (Mehrfachlöschung, neuer CSV-Import) lohnt
             sich vorab ein frisches Backup.</Callout>
           </Sub>
