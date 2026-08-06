@@ -1,6 +1,6 @@
 const { useState, useEffect, useRef } = React;
 
-const APP_VERSION = "2.6";
+const APP_VERSION = "2.6.1";
 
 // ── Startseite ───────────────────────────────────────────────────────────
 // Editierbares Titelbild (per Tap austauschbar, als Data-URL in Storage
@@ -17,6 +17,9 @@ const CHAPTERS = [
 // Änderungsverlauf — neuste zuerst. Wird beim Erhöhen der Version jeweils
 // von Hand ergänzt.
 const CHANGELOG = [
+  { version: "2.6.1", changes: [
+    "Brevet: automatische Kantenerkennung deutlich verbessert — statt grober Zeilen-/Spalten-Schätzung wird jetzt der tatsächlich umschlossene Bereich per Flutfüllung von den Bildrändern gefunden (Otsu-Schwelle, mit Fallback-Kette bei schwierigen Fotos)",
+  ]},
   { version: "2.6", changes: [
     "Brevet: Zuschnitt-Ecken werden jetzt automatisch per Kantenerkennung (Gradienten-Analyse) an den tatsächlichen Bildinhalt angepasst statt an einen festen Rand — funktioniert unabhängig davon, wie/wo genau fotografiert wurde; manuelles Nachjustieren bleibt weiterhin möglich",
   ]},

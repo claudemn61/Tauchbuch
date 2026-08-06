@@ -74,72 +74,215 @@ function warpQuadToCanvas(img, quad, outW, outH, gridN) {
   return canvas;
 }
 
-// ── Zuschnitt-Dialog mit 4 verschiebbaren Eckpunkten ────────────────────
 // ── Automatische Kantenerkennung ─────────────────────────────────────────
-// Findet die tatsächlichen Ausschnitt-Grenzen im Foto über eine
-// Gradienten-Projektion: das Bild wird verkleinert, in Graustufen
-// gewandelt, ein Kanten-Gradient (Sobel) berechnet und dann zeilen-/
-// spaltenweise aufsummiert. Wo die aufsummierte Kanten-"Energie" von aussen
-// nach innen eine Schwelle überschreitet, beginnt der eigentliche Inhalt
-// (das Dokument/die Karte) — unabhängig von Hintergrund, Beleuchtung oder
-// Position im Bild. Kein externes Bilderkennungs-Framework nötig.
+// Die reine Zeilen-/Spalten-Summierung war zu ungenau (Hintergrundtextur
+// und Inhalte im Dokument selbst verzerren die Summen). Stattdessen wird
+// jetzt der tatsächlich von Kanten umschlossene Bereich gesucht:
+// 1. Graustufen + leichte Weichzeichnung (Rauschen reduzieren)
+// 2. Sobel-Kantengradient, automatische Schwelle per Otsu-Methode
+// 3. Kanten-Maske leicht "aufdicken" (Dilatation), damit kleine Lücken
+//    in der Umriss-Linie nicht durchlässig bleiben
+// 4. Flutfüllung ausgehend von allen Bildrändern über die Nicht-Kanten-
+//    Pixel — alles, was dabei NICHT erreicht wird, liegt innerhalb einer
+//    geschlossenen Kontur (= vermutlich das Dokument)
+// 5. Grösste zusammenhängende "nicht erreichte" Fläche = Dokument;
+//    daraus die 4 Eckpunkte bestimmen
+// Schlägt ein Schritt fehl oder liefert ein unplausibles Ergebnis, greift
+// automatisch die nächste, einfachere Fallback-Stufe.
+function otsuThreshold(values, bins) {
+  bins = bins || 256;
+  let max = 0;
+  for (let i=0;i<values.length;i++) if (values[i]>max) max = values[i];
+  if (max <= 0) return 0;
+  const hist = new Float64Array(bins);
+  for (let i=0;i<values.length;i++) hist[Math.min(bins-1, Math.floor(values[i]/max*(bins-1)))]++;
+  const total = values.length;
+  let sum = 0; for (let i=0;i<bins;i++) sum += i*hist[i];
+  let sumB=0, wB=0, varMax=0, thBin=0;
+  for (let i=0;i<bins;i++) {
+    wB += hist[i];
+    if (wB===0) continue;
+    const wF = total - wB;
+    if (wF===0) break;
+    sumB += i*hist[i];
+    const mB = sumB/wB, mF = (sum-sumB)/wF;
+    const between = wB*wF*(mB-mF)*(mB-mF);
+    if (between > varMax) { varMax = between; thBin = i; }
+  }
+  return thBin/(bins-1)*max;
+}
+
+function detectContentBoundsViaFlood(img) {
+  const maxW = 380;
+  const scale = Math.min(1, maxW / img.naturalWidth);
+  const w = Math.max(2, Math.round(img.naturalWidth * scale));
+  const h = Math.max(2, Math.round(img.naturalHeight * scale));
+  const canvas = document.createElement("canvas");
+  canvas.width = w; canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(img, 0, 0, w, h);
+  const { data } = ctx.getImageData(0, 0, w, h);
+
+  // Graustufen + 3x3 Box-Blur in einem Durchgang (auf Graustufen-Array)
+  const gray0 = new Float32Array(w*h);
+  for (let i=0;i<w*h;i++) gray0[i] = 0.299*data[i*4] + 0.587*data[i*4+1] + 0.114*data[i*4+2];
+  const gray = new Float32Array(w*h);
+  for (let y=0;y<h;y++) {
+    for (let x=0;x<w;x++) {
+      let s=0, n=0;
+      for (let dy=-1;dy<=1;dy++) for (let dx=-1;dx<=1;dx++) {
+        const xx=x+dx, yy=y+dy;
+        if (xx>=0&&xx<w&&yy>=0&&yy<h) { s+=gray0[yy*w+xx]; n++; }
+      }
+      gray[y*w+x] = s/n;
+    }
+  }
+
+  const grad = new Float32Array(w*h);
+  for (let y=1;y<h-1;y++) {
+    for (let x=1;x<w-1;x++) {
+      const gx = gray[(y-1)*w+(x+1)] + 2*gray[y*w+(x+1)] + gray[(y+1)*w+(x+1)]
+               - gray[(y-1)*w+(x-1)] - 2*gray[y*w+(x-1)] - gray[(y+1)*w+(x-1)];
+      const gy = gray[(y+1)*w+(x-1)] + 2*gray[(y+1)*w+x] + gray[(y+1)*w+(x+1)]
+               - gray[(y-1)*w+(x-1)] - 2*gray[(y-1)*w+x] - gray[(y-1)*w+(x+1)];
+      grad[y*w+x] = Math.sqrt(gx*gx + gy*gy);
+    }
+  }
+
+  const otsu = otsuThreshold(grad);
+
+  const tryWithThreshold = (thMul) => {
+    const th = otsu * thMul;
+    const edge = new Uint8Array(w*h);
+    for (let i=0;i<w*h;i++) edge[i] = grad[i] >= th ? 1 : 0;
+    // Dilatation (1 Iteration, 4-Nachbarschaft) — schliesst kleine Lücken
+    const edgeD = new Uint8Array(w*h);
+    for (let y=0;y<h;y++) for (let x=0;x<w;x++) {
+      let v = edge[y*w+x];
+      if (!v) {
+        if (x>0 && edge[y*w+x-1]) v=1;
+        else if (x<w-1 && edge[y*w+x+1]) v=1;
+        else if (y>0 && edge[(y-1)*w+x]) v=1;
+        else if (y<h-1 && edge[(y+1)*w+x]) v=1;
+      }
+      edgeD[y*w+x] = v;
+    }
+
+    // Flutfüllung von allen Rändern aus über Nicht-Kanten-Pixel
+    const visited = new Uint8Array(w*h);
+    const stack = [];
+    for (let x=0;x<w;x++) { stack.push(x); stack.push(x+(h-1)*w); }
+    for (let y=0;y<h;y++) { stack.push(y*w); stack.push(y*w+(w-1)); }
+    while (stack.length) {
+      const idx = stack.pop();
+      if (idx<0 || idx>=w*h || visited[idx] || edgeD[idx]) continue;
+      visited[idx] = 1;
+      const x = idx % w, y = (idx / w) | 0;
+      if (x>0) stack.push(idx-1);
+      if (x<w-1) stack.push(idx+1);
+      if (y>0) stack.push(idx-w);
+      if (y<h-1) stack.push(idx+w);
+    }
+
+    // Grösste zusammenhängende "nicht erreichte" Fläche per einfachem
+    // Component-Labeling (BFS) suchen
+    const compId = new Int32Array(w*h).fill(-1);
+    let bestId = -1, bestSize = 0, bestBox = null;
+    let nextId = 0;
+    for (let start=0; start<w*h; start++) {
+      if (visited[start] || edgeD[start] || compId[start] !== -1) continue;
+      const id = nextId++;
+      let minX=w, maxX=0, minY=h, maxY=0, size=0;
+      const q = [start]; compId[start] = id;
+      while (q.length) {
+        const idx = q.pop();
+        size++;
+        const x = idx % w, y = (idx / w) | 0;
+        if (x<minX) minX=x; if (x>maxX) maxX=x;
+        if (y<minY) minY=y; if (y>maxY) maxY=y;
+        const neigh = [idx-1,idx+1,idx-w,idx+w];
+        for (const nIdx of neigh) {
+          if (nIdx<0 || nIdx>=w*h) continue;
+          if (compId[nIdx] !== -1 || visited[nIdx] || edgeD[nIdx]) continue;
+          // Zeilenüberlauf bei idx-1/idx+1 an Bildrand vermeiden
+          if ((nIdx===idx-1 || nIdx===idx+1) && ((idx%w===0 && nIdx===idx-1) || (idx%w===w-1 && nIdx===idx+1))) continue;
+          compId[nIdx] = id;
+          q.push(nIdx);
+        }
+      }
+      if (size > bestSize) { bestSize = size; bestId = id; bestBox = {minX,maxX,minY,maxY}; }
+    }
+
+    if (bestId === -1) return null;
+    const areaFrac = bestSize / (w*h);
+    const boxFrac = ((bestBox.maxX-bestBox.minX)*(bestBox.maxY-bestBox.minY)) / (w*h);
+    // Plausibilitäts-Check: Fläche darf weder winzig noch (fast) das
+    // ganze Bild sein, und die gefundene Fläche soll die Bounding-Box
+    // einigermassen ausfüllen (sonst eher Rauschen als ein Dokument).
+    if (areaFrac < 0.08 || areaFrac > 0.92 || boxFrac < 0.15 || (bestSize/((bestBox.maxX-bestBox.minX+1)*(bestBox.maxY-bestBox.minY+1))) < 0.35) {
+      return null;
+    }
+    const padX = (bestBox.maxX-bestBox.minX)*0.015, padY = (bestBox.maxY-bestBox.minY)*0.015;
+    return {
+      x0: Math.max(0, bestBox.minX-padX)/w, y0: Math.max(0, bestBox.minY-padY)/h,
+      x1: Math.min(w, bestBox.maxX+padX)/w, y1: Math.min(h, bestBox.maxY+padY)/h,
+    };
+  };
+
+  return tryWithThreshold(1.0) || tryWithThreshold(0.55);
+}
+
+// Einfachere Zeilen-/Spalten-Projektion als zweite Fallback-Stufe, falls
+// die Flutfüllung (z.B. bei sehr unruhigem Hintergrund) kein plausibles
+// Ergebnis liefert.
+function detectContentBoundsViaProjection(img) {
+  const maxW = 400;
+  const scale = Math.min(1, maxW / img.naturalWidth);
+  const w = Math.max(2, Math.round(img.naturalWidth * scale));
+  const h = Math.max(2, Math.round(img.naturalHeight * scale));
+  const canvas = document.createElement("canvas");
+  canvas.width = w; canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(img, 0, 0, w, h);
+  const { data } = ctx.getImageData(0, 0, w, h);
+  const gray = new Float32Array(w*h);
+  for (let i=0;i<w*h;i++) gray[i] = 0.299*data[i*4] + 0.587*data[i*4+1] + 0.114*data[i*4+2];
+  const grad = new Float32Array(w*h);
+  for (let y=1;y<h-1;y++) for (let x=1;x<w-1;x++) {
+    const gx = gray[(y-1)*w+(x+1)] + 2*gray[y*w+(x+1)] + gray[(y+1)*w+(x+1)]
+             - gray[(y-1)*w+(x-1)] - 2*gray[y*w+(x-1)] - gray[(y+1)*w+(x-1)];
+    const gy = gray[(y+1)*w+(x-1)] + 2*gray[(y+1)*w+x] + gray[(y+1)*w+(x+1)]
+             - gray[(y-1)*w+(x-1)] - 2*gray[(y-1)*w+x] - gray[(y-1)*w+(x+1)];
+    grad[y*w+x] = Math.sqrt(gx*gx + gy*gy);
+  }
+  const rowSum = new Float32Array(h), colSum = new Float32Array(w);
+  for (let y=0;y<h;y++) for (let x=0;x<w;x++) { const g=grad[y*w+x]; rowSum[y]+=g; colSum[x]+=g; }
+  const findEdge = (arr, fromStart) => {
+    const total = arr.reduce((a,b)=>a+b,0);
+    if (total <= 0) return null;
+    const thresh = total * 0.02;
+    let acc = 0;
+    if (fromStart) { for (let i=0;i<arr.length;i++){ acc+=arr[i]; if (acc>=thresh) return i; } }
+    else { for (let i=arr.length-1;i>=0;i--){ acc+=arr[i]; if (acc>=thresh) return i; } }
+    return null;
+  };
+  const top = findEdge(rowSum, true), bottom = findEdge(rowSum, false);
+  const left = findEdge(colSum, true), right = findEdge(colSum, false);
+  if (top==null || bottom==null || left==null || right==null || bottom<=top || right<=left ||
+      (bottom-top) < h*0.25 || (right-left) < w*0.25) return null;
+  const padX = (right-left)*0.02, padY = (bottom-top)*0.02;
+  return {
+    x0: Math.max(0, left-padX)/w, y0: Math.max(0, top-padY)/h,
+    x1: Math.min(w, right+padX)/w, y1: Math.min(h, bottom+padY)/h,
+  };
+}
+
 function detectContentBounds(img) {
   try {
-    const maxW = 400;
-    const scale = Math.min(1, maxW / img.naturalWidth);
-    const w = Math.max(2, Math.round(img.naturalWidth * scale));
-    const h = Math.max(2, Math.round(img.naturalHeight * scale));
-    const canvas = document.createElement("canvas");
-    canvas.width = w; canvas.height = h;
-    const ctx = canvas.getContext("2d");
-    ctx.drawImage(img, 0, 0, w, h);
-    const { data } = ctx.getImageData(0, 0, w, h);
-
-    const gray = new Float32Array(w*h);
-    for (let i=0;i<w*h;i++) {
-      gray[i] = 0.299*data[i*4] + 0.587*data[i*4+1] + 0.114*data[i*4+2];
-    }
-
-    const grad = new Float32Array(w*h);
-    for (let y=1;y<h-1;y++) {
-      for (let x=1;x<w-1;x++) {
-        const gx = gray[(y-1)*w+(x+1)] + 2*gray[y*w+(x+1)] + gray[(y+1)*w+(x+1)]
-                 - gray[(y-1)*w+(x-1)] - 2*gray[y*w+(x-1)] - gray[(y+1)*w+(x-1)];
-        const gy = gray[(y+1)*w+(x-1)] + 2*gray[(y+1)*w+x] + gray[(y+1)*w+(x+1)]
-                 - gray[(y-1)*w+(x-1)] - 2*gray[(y-1)*w+x] - gray[(y-1)*w+(x+1)];
-        grad[y*w+x] = Math.sqrt(gx*gx + gy*gy);
-      }
-    }
-
-    const rowSum = new Float32Array(h), colSum = new Float32Array(w);
-    for (let y=0;y<h;y++) for (let x=0;x<w;x++) { const g=grad[y*w+x]; rowSum[y]+=g; colSum[x]+=g; }
-
-    const findEdge = (arr, fromStart) => {
-      const total = arr.reduce((a,b)=>a+b,0);
-      if (total <= 0) return null;
-      const thresh = total * 0.02;
-      let acc = 0;
-      if (fromStart) { for (let i=0;i<arr.length;i++){ acc+=arr[i]; if (acc>=thresh) return i; } }
-      else { for (let i=arr.length-1;i>=0;i--){ acc+=arr[i]; if (acc>=thresh) return i; } }
-      return null;
-    };
-
-    const top = findEdge(rowSum, true), bottom = findEdge(rowSum, false);
-    const left = findEdge(colSum, true), right = findEdge(colSum, false);
-
-    // Sicherheitsnetz: Ergebnis unplausibel (zu klein, invertiert) →
-    // grosszügiger Standard-Rahmen statt eines verzerrten Vorschlags.
-    if (top==null || bottom==null || left==null || right==null || bottom<=top || right<=left ||
-        (bottom-top) < h*0.25 || (right-left) < w*0.25) {
-      return { x0:0.06, y0:0.06, x1:0.94, y1:0.94 };
-    }
-    const padX = (right-left)*0.02, padY = (bottom-top)*0.02;
-    return {
-      x0: Math.max(0, left-padX)/w, y0: Math.max(0, top-padY)/h,
-      x1: Math.min(w, right+padX)/w, y1: Math.min(h, bottom+padY)/h,
-    };
+    return detectContentBoundsViaFlood(img) || detectContentBoundsViaProjection(img) || { x0:0.06, y0:0.06, x1:0.94, y1:0.94 };
   } catch {
-    return { x0:0.06, y0:0.06, x1:0.94, y1:0.94 };
+    try { return detectContentBoundsViaProjection(img) || { x0:0.06, y0:0.06, x1:0.94, y1:0.94 }; }
+    catch { return { x0:0.06, y0:0.06, x1:0.94, y1:0.94 }; }
   }
 }
 
