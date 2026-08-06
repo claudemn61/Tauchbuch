@@ -838,7 +838,7 @@ function SidebarList({ dives, selectedId, onSelect }) {
   const filtered = matchDives(dives, filterText);
   const sorted = sortDives(filtered, sortId, sortDir);
   return (
-    <div style={{width:"clamp(340px, 22vw, 440px)",minWidth:340,height:"100vh",overflowY:"auto",borderRight:"1px solid rgba(255,255,255,0.08)",background:"#040e20",flexShrink:0}}>
+    <div style={{width:"clamp(340px, 22vw, 440px)",minWidth:340,height:"100vh",overflowY:"auto",borderRight:"1px solid rgba(255,255,255,0.08)",background:"#040e20",flexShrink:0,fontFamily:"-apple-system,BlinkMacSystemFont,sans-serif",color:"#e8f4fd"}}>
       <div style={{padding:"calc(14px + env(safe-area-inset-top, 0px)) 14px 8px",position:"sticky",top:0,background:"#040e20",zIndex:5,borderBottom:"1px solid rgba(255,255,255,0.06)"}}>
         <div style={{marginBottom:6}}>
           <SearchBar filterText={filterText} setFilterText={setFilterText} />
@@ -868,7 +868,7 @@ function SidebarDiveRow({ d, selectedId, onSelect }) {
   );
 }
 
-function DetailContent({ d, dives, setDives, setSelected, setView, saveDive, confirmDelete, setConfirmDelete, returnTo, reiseNumbers, pruneReisen, isWide, hideBackButton }) {
+function DetailContent({ d, dives, setDives, setSelected, setView, saveDive, confirmDelete, setConfirmDelete, returnTo, reiseNumbers, pruneReisen, isWide }) {
   const dIdx = dives.findIndex(x => x.id === d.id);
   const [bemerkungenEditing, setBemerkungenEditing] = useState(false);
   const [bemerkungenVal, setBemerkungenVal] = useState(d.bemerkungen || "");
@@ -942,7 +942,7 @@ function DetailContent({ d, dives, setDives, setSelected, setView, saveDive, con
     <div onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}
       style={{maxWidth:isWide?1100:480,margin:"0 auto",padding:"0 0 32px",background:"#040e20",minHeight:"100vh",color:"#e8f4fd",fontFamily:"-apple-system,BlinkMacSystemFont,sans-serif"}}>
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"calc(16px + env(safe-area-inset-top, 0px)) 16px 10px"}}>
-        {hideBackButton ? <span /> : <button onClick={goBack} style={{background:"none",border:"none",color:"#38bdf8",fontSize:22,cursor:"pointer"}}>←</button>}
+        <button onClick={goBack} style={{background:"none",border:"none",color:"#38bdf8",fontSize:22,cursor:"pointer"}}>←</button>
         <div style={{display:"flex",gap:6}}>
           <button onClick={()=>goToDive(1)} disabled={dIdx>=dives.length-1}
             style={{background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:20,padding:"6px 10px",color:dIdx>=dives.length-1?"rgba(232,244,253,0.2)":"#e8f4fd",fontSize:13,cursor:dIdx>=dives.length-1?"default":"pointer"}}>◀</button>
@@ -1362,7 +1362,7 @@ function TauchbuchApp() {
           <DetailContent d={selected} dives={sortByNumber(dives)} setDives={setDives} setSelected={setSelected}
             setView={setView} saveDive={saveDive} confirmDelete={confirmDelete} setConfirmDelete={setConfirmDelete}
             returnTo={returnTo} reiseNumbers={reiseNumbers} pruneReisen={pruneReisen}
-            hideBackButton={true} isWide={true} />
+            isWide={true} />
         </div>
       </div>
     );
