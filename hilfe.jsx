@@ -60,19 +60,21 @@ const TOC = [
     ["h-tb-such-einfach","3.4 Suche: einfache Volltextsuche"],
     ["h-tb-such-erweitert","3.5 Suche: erweiterte Suche"],
     ["h-tb-such-syntax","3.6 Suche: Freitext-Syntax für Profis"],
-    ["h-tb-neu","3.7 Neuen Tauchgang anlegen"],
-    ["h-tb-import","3.8 CSV-Import"],
-    ["h-tb-backup","3.9 Backup: Sichern & Wiederherstellen"],
-    ["h-tb-auswahl","3.10 Mehrfachauswahl"],
+    ["h-tb-karte","3.7 Karte aller angezeigten Spots"],
+    ["h-tb-neu","3.8 Neuen Tauchgang anlegen"],
+    ["h-tb-import","3.9 CSV-Import"],
+    ["h-tb-backup","3.10 Backup: Sichern & Wiederherstellen"],
+    ["h-tb-auswahl","3.11 Mehrfachauswahl"],
   ]},
   { id:"h-detail", label:"4. Tauchgang-Detailseite", subs:[
     ["h-detail-kopf","4.1 Kopfzeile"],
     ["h-detail-titel","4.2 Titel, Reise/TG-Nr., Tauchspot"],
     ["h-detail-bewertung","4.3 Bewertung & Nitrox/Air"],
-    ["h-detail-bemerkungen","4.4 Bemerkungen"],
-    ["h-detail-kacheln","4.5 Die vier Daten-Kacheln"],
-    ["h-detail-felder","4.6 Die vollständige Feldliste"],
-    ["h-detail-wischen","4.7 Zwischen Tauchgängen wischen"],
+    ["h-detail-karte","4.4 Koordinaten & Karte"],
+    ["h-detail-bemerkungen","4.5 Bemerkungen"],
+    ["h-detail-kacheln","4.6 Die vier Daten-Kacheln"],
+    ["h-detail-felder","4.7 Die vollständige Feldliste"],
+    ["h-detail-wischen","4.8 Zwischen Tauchgängen wischen"],
   ]},
   { id:"h-bulk", label:"5. Mehrfachauswahl bearbeiten", subs:[] },
   { id:"h-reisen", label:"6. Reisen", subs:[
@@ -259,31 +261,39 @@ function HilfeApp() {
               <Tr><Td>"mehrere wörter"</Td><Td>zusammenhängender Suchbegriff</Td><Td>"grosser Hai"</Td></Tr>
             </T>
             Gültige Feldnamen (auch Aliasse, z.B. nr/nummer, spot, vol): nr, datum, zeit, land,
-            ort, tauchspot, tg-nr, dauer, tiefe, temp, anzug, blei, flasche, volumen, nitrox,
-            buddy, reise, rating, bemerkung.
+            ort, tauchspot, koordinaten, tg-nr, dauer, tiefe, temp, anzug, blei, flasche, volumen,
+            nitrox, buddy, reise, rating, bemerkung.
             <Callout>Beispiel: <code>land:Aegypten UND tiefe&gt;=30 UND -Nachttauchgang</code> findet
             alle Tauchgänge in Ägypten ab 30 m, die keine Nachttauchgänge sind.</Callout>
           </Sub>
-          <Sub id="h-tb-neu" title="3.7 Neuen Tauchgang anlegen">
+          <Sub id="h-tb-karte" title="3.7 Karte aller angezeigten Spots">
+            Der 🌐-Button zwischen Suchfeld und Sortierung öffnet eine Karte mit allen aktuell
+            angezeigten Tauchgängen (also nach Suche/Filter), die im Feld „Koordinaten“ einen
+            gültigen Wert hinterlegt haben — die Karte passt sich automatisch so ein, dass alle
+            Punkte sichtbar sind. Hat kein angezeigter Tauchgang Koordinaten, erscheint stattdessen
+            ein Hinweis. Siehe auch <a href="#h-detail-karte">Kapitel 4.4</a> für die Karte eines
+            einzelnen Tauchgangs.
+          </Sub>
+          <Sub id="h-tb-neu" title="3.8 Neuen Tauchgang anlegen">
             <Badge>+ Tauchgang</Badge> legt sofort einen neuen, weitgehend leeren Tauchgang an und
             öffnet dessen Detailseite. Die Nummer wird automatisch auf die nächsthöhere freie
             Nummer gesetzt; Ausrüstungsfelder übernehmen die Werte des zuletzt angelegten
             Tauchgangs.
           </Sub>
-          <Sub id="h-tb-import" title="3.8 CSV-Import">
+          <Sub id="h-tb-import" title="3.9 CSV-Import">
             Über 📥 öffnet sich eine Import-Fläche: CSV-Datei per Klick auswählen oder per Drag &amp;
             Drop hineinziehen. Ein Fortschrittsbalken zeigt den Import-Status.
             <Callout>Jeder in der CSV vorkommende Ort wird automatisch als eigene Reise angelegt,
             sofern er noch nicht existiert.</Callout>
           </Sub>
-          <Sub id="h-tb-backup" title="3.9 Backup: Sichern & Wiederherstellen">
+          <Sub id="h-tb-backup" title="3.10 Backup: Sichern & Wiederherstellen">
             Über 💾 öffnet sich das Backup-Menü: <b>☁️ In iCloud sichern</b> erstellt eine
             Sicherungsdatei (JSON) zum Speichern an einem beliebigen Ort; <b>⬆ Backup importieren</b>
             spielt eine zuvor erstellte Sicherungsdatei zurück ein.
             <Callout kind="warn">Vor grösseren Aktionen (Mehrfachlöschung, neuer CSV-Import) lohnt
             sich vorab ein frisches Backup.</Callout>
           </Sub>
-          <Sub id="h-tb-auswahl" title="3.10 Mehrfachauswahl">
+          <Sub id="h-tb-auswahl" title="3.11 Mehrfachauswahl">
             ☑ aktiviert den Auswahl-Modus. Danach lassen sich einzelne Zeilen oder ganze
             Gruppenköpfe markieren:
             <T><Tr><Th>Button</Th><Th>Funktion</Th></Tr>
@@ -313,24 +323,39 @@ function HilfeApp() {
           </Sub>
           <Sub id="h-detail-bewertung" title="4.3 Bewertung & Nitrox/Air">
             Fünf antippbare Sterne (1–5); erneutes Tippen auf den aktiven Stern setzt auf 0 zurück.
-            Bei gesetztem Nitrox/Air-Wert erscheint ein farbiges Badge daneben.
+            Bei gesetztem Nitrox/Air-Wert erscheint ein farbiges Badge daneben. Ganz rechts in
+            dieser Zeile befindet sich der 🌐-Button für die Karte (siehe nächster Abschnitt).
           </Sub>
-          <Sub id="h-detail-bemerkungen" title="4.4 Bemerkungen">
+          <Sub id="h-detail-karte" title="4.4 Koordinaten & Karte">
+            Im Feld <Field>Koordinaten</Field> (siehe Feldliste weiter unten) lassen sich die
+            GPS-Koordinaten des Tauchspots eintragen. Erkannt werden mehrere gängige Schreibweisen:
+            <T><Tr><Th>Format</Th><Th>Beispiel</Th></Tr>
+              <Tr><Td>Dezimalgrad</Td><Td>27.2578, 33.8116</Td></Tr>
+              <Tr><Td>Dezimalgrad mit Himmelsrichtung</Td><Td>27.2578N, 33.8116E</Td></Tr>
+              <Tr><Td>Grad + Dezimalminuten (übliches GPS-Format)</Td><Td>27°15.468'N 33°48.696'E</Td></Tr>
+              <Tr><Td>Grad/Minuten/Sekunden</Td><Td>27°15'28.1"N, 33°48'41.8"E</Td></Tr>
+            </T>
+            Der 🌐-Button auf der Bewertungszeile öffnet bzw. schliesst eine Karte direkt unter den
+            Bemerkungen, die den Spot anhand der eingetragenen Koordinaten anzeigt. Sind keine
+            (gültigen) Koordinaten hinterlegt, erscheint stattdessen ein Hinweis mit Format-Beispiel.
+          </Sub>
+          <Sub id="h-detail-bemerkungen" title="4.5 Bemerkungen">
             Mehrzeiliges Freitextfeld für Beobachtungen — antippen öffnet die Bearbeitung.
           </Sub>
-          <Sub id="h-detail-kacheln" title="4.5 Die vier Daten-Kacheln">
+          <Sub id="h-detail-kacheln" title="4.6 Die vier Daten-Kacheln">
             Vier frei wählbare Kacheln, standardmässig Dauer, max. Tiefe, Wassertemp., Zeit. Ein
             Tipp auf Beschriftung + ⚙ öffnet die Feldauswahl (14 Optionen); ein Tipp auf den Wert
             öffnet direkt dessen Bearbeitung.
             <Callout kind="tip">Die gewählte Belegung gilt geräteweit für alle Tauchgänge.</Callout>
           </Sub>
-          <Sub id="h-detail-felder" title="4.6 Die vollständige Feldliste">
+          <Sub id="h-detail-felder" title="4.7 Die vollständige Feldliste">
             <T><Tr><Th>Feld</Th><Th>Beschreibung</Th></Tr>
               <Tr><Td>Datum</Td><Td>Tauchdatum (TT.MM.JJJJ)</Td></Tr>
               <Tr><Td>Land</Td><Td>Freitext</Td></Tr>
               <Tr><Td>Ort, Reise</Td><Td>Auswahlliste aller Reisen — setzt Ort und Reise-Zuordnung gleichzeitig</Td></Tr>
               <Tr><Td>TG-Nr.</Td><Td>Nummer innerhalb der Reise</Td></Tr>
               <Tr><Td>Tauchspot</Td><Td>Konkreter Tauchplatz</Td></Tr>
+              <Tr><Td>Koordinaten</Td><Td>GPS-Position des Spots (mehrere Formate erkannt, siehe 4.4)</Td></Tr>
               <Tr><Td>Anzug</Td><Td>Freitext, z.B. „5mm“</Td></Tr>
               <Tr><Td>Blei</Td><Td>Auswahl 3–8 kg</Td></Tr>
               <Tr><Td>Flasche</Td><Td>Alu / Stahl</Td></Tr>
@@ -339,7 +364,7 @@ function HilfeApp() {
               <Tr><Td>Buddy</Td><Td>Name des Tauchpartners</Td></Tr>
             </T>
           </Sub>
-          <Sub id="h-detail-wischen" title="4.7 Zwischen Tauchgängen wischen">
+          <Sub id="h-detail-wischen" title="4.8 Zwischen Tauchgängen wischen">
             Auf Touch-Geräten: nach links wischen = nächster (neuerer) Tauchgang, nach rechts =
             vorheriger (älterer) — analog zu ◀/▶.
           </Sub>

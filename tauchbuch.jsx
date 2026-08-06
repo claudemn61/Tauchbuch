@@ -176,11 +176,31 @@ function fmtTime(t) {
 // "27.2578, 33.8116" oder "27.2578,33.8116". Liefert null bei allem
 // anderen (auch bei ungültigen Wertebereichen), damit der Globus-Button
 // zuverlässig weiss, ob eine Karte gezeigt werden kann.
+// Erkennt Koordinaten in mehreren gängigen Schreibweisen:
+//   Dezimalgrad:        "27.2578, 33.8116"  oder  "27.2578 -33.8116"
+//   mit Himmelsrichtung: "27.2578N, 33.8116E"  (auch ohne Komma: "27.2578N 33.8116E")
+//   Grad+Dezimalminuten (DMM, üblich bei Handheld-GPS): "27°15.468'N 33°48.696'E"
+//   Grad/Minuten/Sekunden (DMS): 27°15'28.1"N, 33°48'41.8"E
+// Ein Minus vor der Gradzahl UND eine Himmelsrichtung schliessen sich in der
+// Praxis aus; ist eine Himmelsrichtung (S/W) angegeben, hat sie Vorrang.
+const COORD_TOKEN_RE = /(-?\d+(?:\.\d+)?)\s*[°º]?\s*(?:(\d+(?:\.\d+)?)\s*['′]\s*(?:(\d+(?:\.\d+)?)\s*(?:"|″)\s*)?)?\s*([NSEWnsew])?/g;
+function coordTokenToDecimal(m) {
+  const deg = parseFloat(m[1]);
+  const min = m[2] ? parseFloat(m[2]) : 0;
+  const sec = m[3] ? parseFloat(m[3]) : 0;
+  const hemi = m[4] ? m[4].toUpperCase() : null;
+  let value = Math.abs(deg) + min/60 + sec/3600;
+  if (hemi === "S" || hemi === "W") value = -value;
+  else if (!hemi && deg < 0) value = -value;
+  return value;
+}
 function parseCoords(str) {
   if (!str) return null;
-  const m = String(str).match(/(-?\d+(?:\.\d+)?)\s*[,;]\s*(-?\d+(?:\.\d+)?)/);
-  if (!m) return null;
-  const lat = parseFloat(m[1]), lon = parseFloat(m[2]);
+  const s = String(str).trim();
+  const matches = [...s.matchAll(COORD_TOKEN_RE)].filter(m => /\d/.test(m[0]));
+  if (matches.length < 2) return null;
+  const lat = coordTokenToDecimal(matches[0]);
+  const lon = coordTokenToDecimal(matches[1]);
   if (isNaN(lat) || isNaN(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) return null;
   return { lat, lon };
 }
@@ -920,7 +940,7 @@ function DetailContent({ d, dives, setDives, setSelected, setView, saveDive, con
               <MiniMap points={[{lat:coords.lat, lon:coords.lon, label:d.tauchspot||d.name}]} />
             ) : (
               <div style={{background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:12,padding:"16px",fontSize:12,color:"rgba(232,244,253,0.5)",textAlign:"center"}}>
-                Keine Koordinaten hinterlegt. Unter „Koordinaten" z.B. „27.2578, 33.8116" eintragen.
+                Keine Koordinaten hinterlegt. Unter „Koordinaten" z.B. „27.2578, 33.8116" oder „27°15.468'N 33°48.696'E" eintragen.
               </div>
             )}
           </div>
