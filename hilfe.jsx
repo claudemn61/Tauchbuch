@@ -224,6 +224,9 @@ function HilfeApp() {
             Sterne-Bewertung, darunter Datum · Tauchspot (oder Ort) · Land, und rechts unten je
             nach Sortierung Dauer + max. Tiefe oder den Wert des gewählten Sortierfelds. Ein Tipp
             öffnet die Detailseite.
+            <Callout kind="tip">Der Tauchspot-Name erscheint hellgrün statt grau, sobald für diesen
+            Tauchgang gültige Koordinaten hinterlegt sind (siehe <a href="#h-detail-karte">Kapitel 4.4</a>)
+            — so ist auf einen Blick erkennbar, welche Tauchgänge sich auf der Karte anzeigen lassen.</Callout>
           </Sub>
           <Sub id="h-tb-gruppierung" title="3.2 Gruppierung: Jahr oder Reise">
             Über 📅/🧭 wird umgeschaltet: <Field>Nach Jahr</Field> zeigt einen blauen Gruppenkopf pro
@@ -270,9 +273,10 @@ function HilfeApp() {
             Der 🌐-Button zwischen Suchfeld und Sortierung öffnet eine Karte mit allen aktuell
             angezeigten Tauchgängen (also nach Suche/Filter), die im Feld „Koordinaten“ einen
             gültigen Wert hinterlegt haben — die Karte passt sich automatisch so ein, dass alle
-            Punkte sichtbar sind. Hat kein angezeigter Tauchgang Koordinaten, erscheint stattdessen
-            ein Hinweis. Siehe auch <a href="#h-detail-karte">Kapitel 4.4</a> für die Karte eines
-            einzelnen Tauchgangs.
+            Punkte sichtbar sind. Jeder Marker zeigt dauerhaft seine Tauchgang-Nummer über dem Pin;
+            ein Tipp auf den Marker öffnet zusätzlich ein Sprechblasen-Popup mit dem Tauchspot-Namen.
+            Hat kein angezeigter Tauchgang Koordinaten, erscheint stattdessen ein Hinweis. Siehe
+            auch <a href="#h-detail-karte">Kapitel 4.4</a> für die Karte eines einzelnen Tauchgangs.
           </Sub>
           <Sub id="h-tb-neu" title="3.8 Neuen Tauchgang anlegen">
             <Badge>+ Tauchgang</Badge> legt sofort einen neuen, weitgehend leeren Tauchgang an und
@@ -336,8 +340,9 @@ function HilfeApp() {
               <Tr><Td>Grad/Minuten/Sekunden</Td><Td>27°15'28.1"N, 33°48'41.8"E</Td></Tr>
             </T>
             Der 🌐-Button auf der Bewertungszeile öffnet bzw. schliesst eine Karte direkt unter den
-            Bemerkungen, die den Spot anhand der eingetragenen Koordinaten anzeigt. Sind keine
-            (gültigen) Koordinaten hinterlegt, erscheint stattdessen ein Hinweis mit Format-Beispiel.
+            Bemerkungen, die den Spot anhand der eingetragenen Koordinaten anzeigt — der Marker
+            zeigt dauerhaft die Tauchgang-Nummer über dem Pin. Sind keine (gültigen) Koordinaten
+            hinterlegt, erscheint stattdessen ein Hinweis mit Format-Beispiel.
           </Sub>
           <Sub id="h-detail-bemerkungen" title="4.5 Bemerkungen">
             Mehrzeiliges Freitextfeld für Beobachtungen — antippen öffnet die Bearbeitung.

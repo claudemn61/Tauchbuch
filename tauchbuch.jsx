@@ -219,12 +219,23 @@ function MiniMap({ points, height }) {
     window.L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       maxZoom: 18, attribution: "© OpenStreetMap-Mitwirkende",
     }).addTo(map);
-    points.forEach(p => window.L.marker([p.lat, p.lon]).addTo(map).bindPopup(p.label || ""));
+    points.forEach(p => {
+      const marker = window.L.marker([p.lat, p.lon]).addTo(map);
+      if (p.label) marker.bindPopup(p.label);
+      // TG-Nummer ständig sichtbar über dem Marker, nicht erst beim Antippen
+      if (p.num != null) marker.bindTooltip(String(p.num), { permanent: true, direction: "top", offset: [0,-6], className: "dive-map-tt" }).openTooltip();
+    });
     if (points.length === 1) map.setView([points[0].lat, points[0].lon], 11);
     else map.fitBounds(window.L.latLngBounds(points.map(p => [p.lat, p.lon])), { padding: [30, 30] });
     return () => map.remove();
   }, [key]);
-  return <div ref={elRef} style={{width:"100%",height:height||220,borderRadius:12,overflow:"hidden",background:"#0a1628"}} />;
+  return (
+    <>
+      <style>{`.dive-map-tt{background:#0a1628;color:#7dd3fc;border:1px solid rgba(125,211,252,0.5);font-weight:700;font-size:11px;padding:1px 6px;box-shadow:none;}
+.dive-map-tt::before{border-top-color:rgba(125,211,252,0.5);}`}</style>
+      <div ref={elRef} style={{width:"100%",height:height||220,borderRadius:12,overflow:"hidden",background:"#0a1628"}} />
+    </>
+  );
 }
 // Kleiner runder Globus-Button, wie er sowohl auf der Detailseite als auch
 // in der Listen-Werkzeugleiste verwendet wird.
@@ -937,7 +948,7 @@ function DetailContent({ d, dives, setDives, setSelected, setView, saveDive, con
         {mapOpen && (
           <div style={{marginBottom:14}}>
             {coords ? (
-              <MiniMap points={[{lat:coords.lat, lon:coords.lon, label:d.tauchspot||d.name}]} />
+              <MiniMap points={[{lat:coords.lat, lon:coords.lon, num:d.name, label:d.tauchspot||d.name}]} />
             ) : (
               <div style={{background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:12,padding:"16px",fontSize:12,color:"rgba(232,244,253,0.5)",textAlign:"center"}}>
                 Keine Koordinaten hinterlegt. Unter „Koordinaten" z.B. „27.2578, 33.8116" oder „27°15.468'N 33°48.696'E" eintragen.
@@ -1641,7 +1652,7 @@ function TauchbuchApp() {
           )}
           {listMapOpen && (() => {
             const pts = filtered
-              .map(d => { const c = parseCoords(d.koordinaten); return c ? { lat:c.lat, lon:c.lon, label:`${d.name}: ${d.tauchspot||d.ort||""}` } : null; })
+              .map(d => { const c = parseCoords(d.koordinaten); return c ? { lat:c.lat, lon:c.lon, num:d.name, label:`${d.name}: ${d.tauchspot||d.ort||""}` } : null; })
               .filter(Boolean);
             return (
               <div style={{marginTop:10}}>
