@@ -217,37 +217,53 @@ function parseCoords(str) {
   return { lat, lon };
 }
 
-// Leichtgewichtige Karte (Leaflet + MapTiler-Vektorkacheln, deutsche
-// Beschriftung) für einen oder mehrere Punkte. Bei einem Punkt wird
-// regional gezoomt (Umgebung des Spots), bei mehreren automatisch auf
-// alle Punkte eingepasst. `points` wird über einen stabilen String-Key
-// verglichen, damit die Karte nicht bei jedem Render neu aufgebaut wird.
+// Leichtgewichtige Karte (MapTiler SDK direkt, ohne Leaflet-Adapter —
+// deutsche Beschriftung) für einen oder mehrere Punkte. Bei einem Punkt
+// wird regional gezoomt (Umgebung des Spots), bei mehreren automatisch
+// auf alle Punkte eingepasst. `points` wird über einen stabilen
+// String-Key verglichen, damit die Karte nicht bei jedem Render neu
+// aufgebaut wird.
 const MAPTILER_API_KEY = "HFElbKEufz9KOHI4w2jB";
 
 function MiniMap({ points, height }) {
   const elRef = useRef(null);
+  const mapRef = useRef(null);
   const key = JSON.stringify(points);
   useEffect(() => {
-    if (!elRef.current || !window.L || !points.length) return;
-    const map = window.L.map(elRef.current, { attributionControl: false });
-    window.L.maptilerLayer({
-      apiKey: MAPTILER_API_KEY, language: "de",
-      attribution: "© MapTiler © OpenStreetMap-Mitwirkende",
-    }).addTo(map);
-    points.forEach(p => {
-      const marker = window.L.marker([p.lat, p.lon]).addTo(map);
-      if (p.label) marker.bindPopup(p.label);
-      // TG-Nummer ständig sichtbar über dem Marker, nicht erst beim Antippen
-      if (p.num != null) marker.bindTooltip(String(p.num), { permanent: true, direction: "top", offset: [0,-6], className: "dive-map-tt" }).openTooltip();
+    if (!elRef.current || !window.maptilersdk || !points.length) return;
+    const sdk = window.maptilersdk;
+    const map = new sdk.Map({
+      container: elRef.current,
+      apiKey: MAPTILER_API_KEY,
+      style: sdk.MapStyle.STREETS,
+      language: "de",
+      center: [points[0].lon, points[0].lat],
+      zoom: 10,
     });
-    if (points.length === 1) map.setView([points[0].lat, points[0].lon], 11);
-    else map.fitBounds(window.L.latLngBounds(points.map(p => [p.lat, p.lon])), { padding: [30, 30] });
-    return () => map.remove();
+    mapRef.current = map;
+
+    points.forEach(p => {
+      const marker = new sdk.Marker().setLngLat([p.lon, p.lat]);
+      if (p.label) marker.setPopup(new sdk.Popup({ offset: 20 }).setText(p.label));
+      marker.addTo(map);
+      // TG-Nummer ständig sichtbar über dem Marker, nicht erst beim Antippen
+      if (p.num != null) {
+        const el = document.createElement("div");
+        el.className = "dive-map-tt";
+        el.textContent = String(p.num);
+        new sdk.Marker({ element: el, anchor: "bottom", offset: [0, -30] }).setLngLat([p.lon, p.lat]).addTo(map);
+      }
+    });
+
+    if (points.length > 1) {
+      const lons = points.map(p => p.lon), lats = points.map(p => p.lat);
+      map.fitBounds([[Math.min(...lons), Math.min(...lats)], [Math.max(...lons), Math.max(...lats)]], { padding: 30 });
+    }
+    return () => { map.remove(); mapRef.current = null; };
   }, [key]);
   return (
     <>
-      <style>{`.dive-map-tt{background:#0a1628;color:#7dd3fc;border:1px solid rgba(125,211,252,0.5);font-weight:700;font-size:11px;padding:1px 6px;box-shadow:none;}
-.dive-map-tt::before{border-top-color:rgba(125,211,252,0.5);}`}</style>
+      <style>{`.dive-map-tt{background:#0a1628;color:#7dd3fc;border:1px solid rgba(125,211,252,0.5);font-weight:700;font-size:11px;padding:1px 6px;border-radius:6px;white-space:nowrap;}`}</style>
       <div ref={elRef} style={{width:"100%",height:height||220,borderRadius:12,overflow:"hidden",background:"#0a1628"}} />
     </>
   );
