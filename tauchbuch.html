@@ -264,7 +264,7 @@
             const stack = (e && (e.stack || e.message)) || String(e);
             const compStack = this.state.info && this.state.info.componentStack || "";
             return React.createElement("div", {
-              style: { padding: "20px 16px", color: "#f87171", fontFamily: "monospace", fontSize: 12, whiteSpace: "pre-wrap", lineHeight: 1.6 }
+              style: { padding: "20px 16px", paddingTop: "calc(20px + env(safe-area-inset-top, 0px))", color: "#f87171", fontFamily: "monospace", fontSize: 12, whiteSpace: "pre-wrap", lineHeight: 1.6 }
             }, "APP-FEHLER:\n\n" + stack + (compStack ? "\n\nKOMPONENTEN-STACK:" + compStack : ""));
           }
           return this.props.children;
