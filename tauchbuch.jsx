@@ -230,7 +230,7 @@ function MiniMap({ points, height }) {
   useEffect(() => {
     if (!elRef.current || !window.L || !points.length) return;
     const map = window.L.map(elRef.current, { attributionControl: false });
-    window.L.maptiler.maptilerLayer({
+    window.L.maptilerLayer({
       apiKey: MAPTILER_API_KEY, language: "de",
       attribution: "© MapTiler © OpenStreetMap-Mitwirkende",
     }).addTo(map);
