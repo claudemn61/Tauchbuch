@@ -12,7 +12,7 @@ function useIsWide() {
   return isWide;
 }
 
-const APP_VERSION = "2.7.2";
+const APP_VERSION = "2.7.3";
 
 // ── Startseite ───────────────────────────────────────────────────────────
 // Editierbares Titelbild (per Tap austauschbar, als Data-URL in Storage

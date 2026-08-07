@@ -217,19 +217,22 @@ function parseCoords(str) {
   return { lat, lon };
 }
 
-// Leichtgewichtige Karte (Leaflet + OpenStreetMap-Kacheln) für einen oder
-// mehrere Punkte. Bei einem Punkt wird regional gezoomt (Umgebung des
-// Spots), bei mehreren automatisch auf alle Punkte eingepasst. `points`
-// wird über einen stabilen String-Key verglichen, damit die Karte nicht
-// bei jedem Render neu aufgebaut wird.
+// Leichtgewichtige Karte (Leaflet + MapTiler-Vektorkacheln, deutsche
+// Beschriftung) für einen oder mehrere Punkte. Bei einem Punkt wird
+// regional gezoomt (Umgebung des Spots), bei mehreren automatisch auf
+// alle Punkte eingepasst. `points` wird über einen stabilen String-Key
+// verglichen, damit die Karte nicht bei jedem Render neu aufgebaut wird.
+const MAPTILER_API_KEY = "HFElbKEufz9KOHI4w2jB";
+
 function MiniMap({ points, height }) {
   const elRef = useRef(null);
   const key = JSON.stringify(points);
   useEffect(() => {
     if (!elRef.current || !window.L || !points.length) return;
     const map = window.L.map(elRef.current, { attributionControl: false });
-    window.L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      maxZoom: 18, attribution: "© OpenStreetMap-Mitwirkende",
+    window.L.maptilerLayer({
+      apiKey: MAPTILER_API_KEY, language: "de",
+      attribution: "© MapTiler © OpenStreetMap-Mitwirkende",
     }).addTo(map);
     points.forEach(p => {
       const marker = window.L.marker([p.lat, p.lon]).addTo(map);
