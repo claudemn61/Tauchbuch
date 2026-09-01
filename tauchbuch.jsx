@@ -540,41 +540,61 @@ const DIVE_SORT_OPTIONS = [
   { id: "rating", label: "Bewertung", type: "number" },
 ];
 
-// ── Mehrstufige Gruppierung (analog Flugbuch: Gr. 1°/Gr. 2°, frei wählbares
-// Feld pro Ebene) — jedes Feld liefert den Anzeige-/Gruppenschlüssel (get)
-// und einen vergleichbaren Sortierwert für die Gruppenreihenfolge (sortKey,
-// numerisch wo sinnvoll wie Jahr/Monat/Bewertung, sonst alphabetisch).
+// ── Mehrstufige Gruppierung (analog Flugbuch: Gr. 1°/Gr. 2°) ───────────────
+// Nutzt dieselbe Feldliste wie die Sortierung (DIVE_SORT_OPTIONS, "nach allen
+// Datenfeldern") plus zwei gruppierungs-spezifische Zusatzfelder (Jahr,
+// Monat), die als Sortierfeld keinen Sinn ergäben (Datum deckt das bereits
+// ab), als Gruppierung aber zentral sind.
 const MONTH_NAMES = ["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"];
-const GROUP_FIELDS = [
-  { id: "year", label: "Jahr", get: d => d.year || "—", sortKey: d => parseInt(d.year,10) || 0 },
-  { id: "month", label: "Monat", get: d => { const ts = parseDateToTs(d.date); return ts ? MONTH_NAMES[new Date(ts).getMonth()] : "—"; }, sortKey: d => { const ts = parseDateToTs(d.date); return ts ? new Date(ts).getMonth() : -1; } },
-  { id: "reise", label: "Reise", get: d => d.customFields?.reise || "—", sortKey: d => d.customFields?.reise || "" },
-  { id: "land", label: "Land", get: d => d.land || "—", sortKey: d => d.land || "" },
-  { id: "ort", label: "Ort", get: d => d.ort || "—", sortKey: d => d.ort || "" },
-  { id: "tauchspot", label: "Tauchspot", get: d => d.tauchspot || "—", sortKey: d => d.tauchspot || "" },
-  { id: "anzug", label: "Anzug", get: d => d.anzug || "—", sortKey: d => d.anzug || "" },
-  { id: "flasche", label: "Flasche", get: d => d.flasche || "—", sortKey: d => d.flasche || "" },
-  { id: "volumen", label: "Volumen", get: d => d.volumen || "—", sortKey: d => d.volumen || "" },
-  { id: "nitrox", label: "Nitrox", get: d => d.nitrox || "—", sortKey: d => d.nitrox || "" },
-  { id: "buddy", label: "Buddy", get: d => d.buddy || "—", sortKey: d => d.buddy || "" },
-  { id: "rating", label: "Bewertung", get: d => d.rating ? "★".repeat(d.rating) : "Keine Bewertung", sortKey: d => d.rating || 0 },
+const GROUP_EXTRA_FIELDS = [
+  { id: "year", label: "Jahr" },
+  { id: "month", label: "Monat" },
 ];
+const GROUP_FIELDS = [...GROUP_EXTRA_FIELDS, ...DIVE_SORT_OPTIONS];
+
+// Anzeige-Label UND Gruppenschlüssel in einem (Gruppen mit gleichem Label
+// gehören zusammen) — für die normalen Sortierfelder wird die bereits
+// vorhandene formatSortValue()-Formatierung wiederverwendet, damit Anzeige
+// und Sortierlogik nie auseinanderlaufen.
+function groupFieldLabel(d, fieldId) {
+  if (fieldId === "year") return d.year || "—";
+  if (fieldId === "month") { const ts = parseDateToTs(d.date); return ts ? MONTH_NAMES[new Date(ts).getMonth()] : "—"; }
+  const v = formatSortValue(d, fieldId);
+  return (v || v === 0) ? String(v) : "—";
+}
+// Vergleichbarer Rohwert für die Reihenfolge der Gruppen — numerisch wo
+// möglich (nutzt diveFieldValue, dieselbe Basis wie die Sortierung).
+function groupFieldSortValue(d, fieldId) {
+  if (fieldId === "year") return parseInt(d.year, 10) || 0;
+  if (fieldId === "month") { const ts = parseDateToTs(d.date); return ts ? new Date(ts).getMonth() : -1; }
+  return diveFieldValue(d, fieldId);
+}
 function groupDives(dives, fieldId, order) {
-  const fieldDef = GROUP_FIELDS.find(f => f.id === fieldId);
-  if (!fieldDef) return [];
+  if (!fieldId || fieldId === "none") return [];
   const map = new Map();
   dives.forEach(d => {
-    const key = fieldDef.get(d);
-    if (!map.has(key)) map.set(key, { key, sortKey: fieldDef.sortKey(d), items: [] });
+    const key = groupFieldLabel(d, fieldId);
+    if (!map.has(key)) map.set(key, { key, items: [] });
     map.get(key).items.push(d);
   });
   const groups = [...map.values()];
+  groups.forEach(g => {
+    // Reise-Gruppen chronologisch nach dem Datum des letzten Tauchgangs
+    // (nicht alphabetisch) — konsistent mit der Reisen-Seite.
+    g.sortKey = fieldId === "reise"
+      ? g.items.reduce((m,d) => Math.max(m, parseDateToTs(d.date)), 0)
+      : groupFieldSortValue(g.items[0], fieldId);
+  });
   groups.sort((a,b) => {
     const av = a.sortKey, bv = b.sortKey;
     const cmp = (typeof av === "number" && typeof bv === "number") ? av-bv : String(av).localeCompare(String(bv), "de", { sensitivity: "base" });
     return order === "asc" ? cmp : -cmp;
   });
   return groups;
+}
+function groupHeaderColor(fieldId, big) {
+  if (fieldId === "reise") return "#fbbf24";
+  return big ? "#38bdf8" : "#7dd3fc";
 }
 
 function formatSortValue(d, sortId) {
@@ -992,7 +1012,7 @@ function DiveRow({ d, onClick, sortId, selectMode, isSelected, onToggleSelect })
 // (grösser, mit Gesamtdauer), sonst eingerückte, kleinere Unter-Ebene.
 // Ein Tipp klappt die Gruppe ein/aus; im Auswahl-Modus markiert er
 // stattdessen alle Tauchgänge der Gruppe (analog Flugbuch).
-function GroupHeader({ label, count, totalMin, collapsed, onToggle, selectMode, allSelected, onSelectAll, big, extra }) {
+function GroupHeader({ label, count, totalMin, collapsed, onToggle, selectMode, allSelected, onSelectAll, big, extra, color }) {
   return (
     <div onClick={selectMode ? onSelectAll : onToggle}
       style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:big?"8px 16px":"6px 16px 6px 30px",cursor:"pointer",background:"rgba(255,255,255,0.02)",borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
@@ -1002,7 +1022,7 @@ function GroupHeader({ label, count, totalMin, collapsed, onToggle, selectMode, 
             {allSelected && <span style={{color:"#0a1628",fontSize:big?11:10,fontWeight:900}}>✓</span>}
           </div>
         )}
-        <span style={{fontWeight:700,color:big?"#38bdf8":"#7dd3fc",fontSize:big?14:12,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+        <span style={{fontWeight:700,color,fontSize:big?14:12,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
           {label} · {count} TG
           {extra && <span style={{color:"#fff",fontWeight:400,fontSize:12}}> · {extra}</span>}
         </span>
@@ -1706,6 +1726,7 @@ function TauchbuchApp() {
   }
 
   const filtered = matchDives(dives, filterText);
+  const level1Groups = groupField1==="none" ? [] : groupDives(filtered, groupField1, groupOrder1);
 
   const toggleSelect = (id) => setSelectedIds(prev => { const n = new Set(prev); n.has(id)?n.delete(id):n.add(id); return n; });
 
@@ -1751,7 +1772,7 @@ function TauchbuchApp() {
             style={{flex:"1 1 0",minWidth:0,height:44,boxSizing:"border-box",display:"flex",alignItems:"center",justifyContent:"center",background:listMapOpen?"rgba(56,189,248,0.15)":"rgba(255,255,255,0.05)",border:`1px solid ${listMapOpen?"rgba(56,189,248,0.35)":"rgba(255,255,255,0.1)"}`,borderRadius:10,color:"#fff",fontSize:20,cursor:"pointer"}}>
             🌐
           </button>
-          <button onClick={()=>setGroupField1(f=>f==="year"?"reise":"year")} title={groupField1==="year"?"Gruppiert nach Jahr (zu Reise wechseln)":"Gruppiert nach Reise (zu Jahr wechseln)"}
+          <button onClick={()=>{ setGroupField1(f=>f==="year"?"reise":"year"); setGroupOrder1("desc"); }} title={groupField1==="year"?"Gruppiert nach Jahr (zu Reise wechseln)":"Gruppiert nach Reise (zu Jahr wechseln)"}
             style={{flex:"1 1 0",minWidth:0,height:44,boxSizing:"border-box",display:"flex",alignItems:"center",justifyContent:"center",background:groupField1==="reise"?"rgba(245,166,35,0.18)":"rgba(255,255,255,0.05)",border:`1px solid ${groupField1==="reise"?"rgba(245,166,35,0.4)":"rgba(255,255,255,0.1)"}`,borderRadius:10,color:groupField1==="reise"?"#f5a623":"#fff",fontSize:20,cursor:"pointer"}}>
             {groupField1==="year" ? "📅" : "🧭"}
           </button>
@@ -2067,68 +2088,100 @@ function TauchbuchApp() {
               </div>
             )}
 
-            {/* Gruppierung Ebene 1 — Feld frei wählbar (inkl. "Keine" = flache Liste) */}
+            {/* Gruppierung Ebene 1 — Feld frei wählbar (inkl. "Keine" = flache Liste).
+                Erneutes Anwählen desselben Feldes im Dropdown kehrt dessen Richtung um
+                (analog Flugbuch) statt eines separaten Richtung-Buttons. */}
             <div style={{display:"flex",gap:8,marginTop:8}}>
               <button onClick={()=>setShowGroup1Menu(s=>!s)}
                 style={{flex:"1 1 0",minWidth:0,boxSizing:"border-box",display:"flex",justifyContent:"space-between",alignItems:"center",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,padding:"8px 8px",color:"#fff",fontSize:12,cursor:"pointer"}}>
-                <span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>⇅ Gr. 1°: {groupField1==="none"?"Keine":GROUP_FIELDS.find(f=>f.id===groupField1)?.label}</span>
+                <span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                  ⇅ Gr. 1°: {groupField1==="none"?"Keine":GROUP_FIELDS.find(f=>f.id===groupField1)?.label}
+                  {groupField1!=="none" && (groupOrder1==="asc"?" ↑":" ↓")}
+                </span>
                 <span style={{flexShrink:0,marginLeft:4}}>{showGroup1Menu?"▾":"▸"}</span>
               </button>
-              <button onClick={()=>setGroupOrder1(o=>o==="asc"?"desc":"asc")} title={groupOrder1==="asc"?"Aufsteigend":"Absteigend"}
-                style={{flex:"0 0 auto",width:38,height:38,boxSizing:"border-box",display:"flex",alignItems:"center",justifyContent:"center",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,color:"#fff",fontSize:16,fontWeight:700,cursor:"pointer"}}>
-                {groupOrder1==="asc"?"↑":"↓"}
-              </button>
-              {groupField1!=="none" && groupField2==="none" && (
-                <button onClick={()=>{ const other = GROUP_FIELDS.find(f=>f.id!==groupField1) || GROUP_FIELDS[0]; setGroupField2(other.id); }}
-                  title="Zweite Gruppierungs-Ebene hinzufügen"
-                  style={{flex:"0 0 auto",width:38,height:38,boxSizing:"border-box",display:"flex",alignItems:"center",justifyContent:"center",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,color:"#fff",fontSize:16,fontWeight:700,cursor:"pointer"}}>
-                  +
-                </button>
-              )}
+              {groupField1!=="none" && (() => {
+                const g1Keys = level1Groups.map(g=>`1:${groupField1}:${g.key}`);
+                const allCollapsed1 = g1Keys.length>0 && g1Keys.every(k=>collapsedGroups.has(k));
+                return (
+                  <button onClick={()=>setCollapsedGroups(prev=>{
+                      const n = new Set(prev);
+                      g1Keys.forEach(k => allCollapsed1 ? n.delete(k) : n.add(k));
+                      return n;
+                    })}
+                    title={allCollapsed1?"Alle Gr. 1°-Gruppen aufklappen":"Alle Gr. 1°-Gruppen zuklappen"}
+                    style={{flex:"0 0 auto",width:38,height:38,boxSizing:"border-box",display:"flex",alignItems:"center",justifyContent:"center",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,color:"#fff",fontSize:16,fontWeight:700,cursor:"pointer"}}>
+                    {allCollapsed1?"+":"−"}
+                  </button>
+                );
+              })()}
             </div>
             {showGroup1Menu && (
               <div style={{marginTop:6,background:"#14253a",border:"1px solid rgba(255,255,255,0.12)",borderRadius:12,padding:6,maxHeight:280,overflowY:"auto",boxShadow:"0 8px 24px rgba(0,0,0,0.4)"}}>
-                <div onClick={()=>{setGroupField1("none");setGroupField2("none");setShowGroup1Menu(false);}}
+                <div onClick={()=>{setGroupField1("none");setShowGroup1Menu(false);}}
                   style={{padding:"9px 12px",borderRadius:8,fontSize:13,cursor:"pointer",color:groupField1==="none"?"#7dd3fc":"rgba(232,244,253,0.75)",background:groupField1==="none"?"rgba(14,165,233,0.15)":"transparent"}}>
                   Keine (flache Liste)
                 </div>
                 {GROUP_FIELDS.map(o=>(
-                  <div key={o.id} onClick={()=>{setGroupField1(o.id);setShowGroup1Menu(false);}}
+                  <div key={o.id} onClick={()=>{
+                      if (groupField1===o.id) setGroupOrder1(d=>d==="asc"?"desc":"asc");
+                      else { setGroupField1(o.id); setGroupOrder1("desc"); }
+                      setShowGroup1Menu(false);
+                    }}
                     style={{padding:"9px 12px",borderRadius:8,fontSize:13,cursor:"pointer",color:o.id===groupField1?"#7dd3fc":"rgba(232,244,253,0.75)",background:o.id===groupField1?"rgba(14,165,233,0.15)":"transparent"}}>
-                    {o.label}
+                    {o.label}{groupField1===o.id && (groupOrder1==="asc"?" ↑":" ↓")}
                   </div>
                 ))}
               </div>
             )}
 
-            {/* Gruppierung Ebene 2 — optional, per + oben aktiviert */}
-            {groupField1!=="none" && groupField2!=="none" && (<>
-              <div style={{display:"flex",gap:8,marginTop:8}}>
-                <button onClick={()=>setShowGroup2Menu(s=>!s)}
-                  style={{flex:"1 1 0",minWidth:0,boxSizing:"border-box",display:"flex",justifyContent:"space-between",alignItems:"center",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,padding:"8px 8px",color:"#fff",fontSize:12,cursor:"pointer"}}>
-                  <span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>⇅ Gr. 2°: {GROUP_FIELDS.find(f=>f.id===groupField2)?.label}</span>
-                  <span style={{flexShrink:0,marginLeft:4}}>{showGroup2Menu?"▾":"▸"}</span>
-                </button>
-                <button onClick={()=>setGroupOrder2(o=>o==="asc"?"desc":"asc")} title={groupOrder2==="asc"?"Aufsteigend":"Absteigend"}
-                  style={{flex:"0 0 auto",width:38,height:38,boxSizing:"border-box",display:"flex",alignItems:"center",justifyContent:"center",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,color:"#fff",fontSize:16,fontWeight:700,cursor:"pointer"}}>
-                  {groupOrder2==="asc"?"↑":"↓"}
-                </button>
-                <button onClick={()=>setGroupField2("none")} title="Zweite Gruppierungs-Ebene entfernen"
-                  style={{flex:"0 0 auto",width:38,height:38,boxSizing:"border-box",display:"flex",alignItems:"center",justifyContent:"center",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,color:"#fff",fontSize:16,fontWeight:700,cursor:"pointer"}}>
-                  −
-                </button>
-              </div>
-              {showGroup2Menu && (
-                <div style={{marginTop:6,background:"#14253a",border:"1px solid rgba(255,255,255,0.12)",borderRadius:12,padding:6,maxHeight:280,overflowY:"auto",boxShadow:"0 8px 24px rgba(0,0,0,0.4)"}}>
-                  {GROUP_FIELDS.map(o=>(
-                    <div key={o.id} onClick={()=>{setGroupField2(o.id);setShowGroup2Menu(false);}}
-                      style={{padding:"9px 12px",borderRadius:8,fontSize:13,cursor:"pointer",color:o.id===groupField2?"#7dd3fc":"rgba(232,244,253,0.75)",background:o.id===groupField2?"rgba(14,165,233,0.15)":"transparent"}}>
-                      {o.label}
-                    </div>
-                  ))}
+            {/* Gruppierung Ebene 2 — feste Zeile wie Ebene 1, "Keine" schaltet sie aus */}
+            <div style={{display:"flex",gap:8,marginTop:8}}>
+              <button onClick={()=>setShowGroup2Menu(s=>!s)}
+                style={{flex:"1 1 0",minWidth:0,boxSizing:"border-box",display:"flex",justifyContent:"space-between",alignItems:"center",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,padding:"8px 8px",color:"#fff",fontSize:12,cursor:"pointer"}}>
+                <span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                  ⇅ Gr. 2°: {groupField2==="none"?"Keine":GROUP_FIELDS.find(f=>f.id===groupField2)?.label}
+                  {groupField2!=="none" && (groupOrder2==="asc"?" ↑":" ↓")}
+                </span>
+                <span style={{flexShrink:0,marginLeft:4}}>{showGroup2Menu?"▾":"▸"}</span>
+              </button>
+              {groupField1!=="none" && groupField2!=="none" && (() => {
+                const g2Keys = [];
+                level1Groups.forEach(g1 => {
+                  groupDives(g1.items, groupField2, groupOrder2).forEach(g2 => g2Keys.push(`2:${groupField2}:${g1.key}>${g2.key}`));
+                });
+                const allCollapsed2 = g2Keys.length>0 && g2Keys.every(k=>collapsedGroups.has(k));
+                return (
+                  <button onClick={()=>setCollapsedGroups(prev=>{
+                      const n = new Set(prev);
+                      g2Keys.forEach(k => allCollapsed2 ? n.delete(k) : n.add(k));
+                      return n;
+                    })}
+                    title={allCollapsed2?"Alle Gr. 2°-Gruppen aufklappen":"Alle Gr. 2°-Gruppen zuklappen"}
+                    style={{flex:"0 0 auto",width:38,height:38,boxSizing:"border-box",display:"flex",alignItems:"center",justifyContent:"center",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,color:"#fff",fontSize:16,fontWeight:700,cursor:"pointer"}}>
+                    {allCollapsed2?"+":"−"}
+                  </button>
+                );
+              })()}
+            </div>
+            {showGroup2Menu && (
+              <div style={{marginTop:6,background:"#14253a",border:"1px solid rgba(255,255,255,0.12)",borderRadius:12,padding:6,maxHeight:280,overflowY:"auto",boxShadow:"0 8px 24px rgba(0,0,0,0.4)"}}>
+                <div onClick={()=>{setGroupField2("none");setShowGroup2Menu(false);}}
+                  style={{padding:"9px 12px",borderRadius:8,fontSize:13,cursor:"pointer",color:groupField2==="none"?"#7dd3fc":"rgba(232,244,253,0.75)",background:groupField2==="none"?"rgba(14,165,233,0.15)":"transparent"}}>
+                  Keine
                 </div>
-              )}
-            </>)}
+                {GROUP_FIELDS.map(o=>(
+                  <div key={o.id} onClick={()=>{
+                      if (groupField2===o.id) setGroupOrder2(d=>d==="asc"?"desc":"asc");
+                      else { setGroupField2(o.id); setGroupOrder2("desc"); }
+                      setShowGroup2Menu(false);
+                    }}
+                    style={{padding:"9px 12px",borderRadius:8,fontSize:13,cursor:"pointer",color:o.id===groupField2?"#7dd3fc":"rgba(232,244,253,0.75)",background:o.id===groupField2?"rgba(14,165,233,0.15)":"transparent"}}>
+                    {o.label}{groupField2===o.id && (groupOrder2==="asc"?" ↑":" ↓")}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
         {listMapOpen && (() => {
@@ -2171,11 +2224,10 @@ function TauchbuchApp() {
           );
         })()
       ) : (() => {
-        const level1 = groupDives(filtered, groupField1, groupOrder1);
-        if (!level1.length) return <div style={{padding:"40px 16px",textAlign:"center",color:"rgba(232,244,253,0.4)",fontSize:13}}>Keine Treffer.</div>;
+        if (!level1Groups.length) return <div style={{padding:"40px 16px",textAlign:"center",color:"rgba(232,244,253,0.4)",fontSize:13}}>Keine Treffer.</div>;
         return (
           <div>
-            {level1.map(g1 => {
+            {level1Groups.map(g1 => {
               const g1Key = `1:${groupField1}:${g1.key}`;
               const collapsed1 = collapsedGroups.has(g1Key);
               const totalMin1 = g1.items.reduce((s,d)=>s+(d.durationMin||0),0);
@@ -2185,6 +2237,7 @@ function TauchbuchApp() {
               return (
                 <div key={g1Key}>
                   <GroupHeader label={g1.key} count={g1.items.length} totalMin={totalMin1} collapsed={collapsed1} big extra={extra1}
+                    color={groupHeaderColor(groupField1, true)}
                     selectMode={selectMode} allSelected={allSelected1}
                     onToggle={()=>setCollapsedGroups(s=>{const n=new Set(s);n.has(g1Key)?n.delete(g1Key):n.add(g1Key);return n;})}
                     onSelectAll={()=>setSelectedIds(prev=>{const n=new Set(prev);g1Ids.forEach(id=>allSelected1?n.delete(id):n.add(id));return n;})} />
@@ -2203,6 +2256,7 @@ function TauchbuchApp() {
                       return (
                         <div key={g2Key}>
                           <GroupHeader label={g2.key} count={g2.items.length} collapsed={collapsed2}
+                            color={groupHeaderColor(groupField2, false)}
                             selectMode={selectMode} allSelected={allSelected2}
                             onToggle={()=>setCollapsedGroups(s=>{const n=new Set(s);n.has(g2Key)?n.delete(g2Key):n.add(g2Key);return n;})}
                             onSelectAll={()=>setSelectedIds(prev=>{const n=new Set(prev);g2Ids.forEach(id=>allSelected2?n.delete(id):n.add(id));return n;})} />
