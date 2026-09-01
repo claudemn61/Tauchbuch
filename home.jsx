@@ -12,7 +12,7 @@ function useIsWide() {
   return isWide;
 }
 
-const APP_VERSION = "2.8.1";
+const APP_VERSION = "2.8.2";
 
 // ── Startseite ───────────────────────────────────────────────────────────
 // Editierbares Titelbild (per Tap austauschbar, als Data-URL in Storage
@@ -29,10 +29,13 @@ const CHAPTERS = [
 // Änderungsverlauf — neuste zuerst. Wird beim Erhöhen der Version jeweils
 // von Hand ergänzt.
 const CHANGELOG = [
+  { version: "2.8.2", changes: [
+    "Bugfix CSV-Import: Blei-Werte mit Einheit (z.B. \"4kg\") wurden nicht erkannt, weil die feste Blei-Auswahl nur reine Zahlen kennt — wird jetzt vor der Übernahme bereinigt; Auswahl um 2 kg ergänzt",
+  ]},
   { version: "2.8.1", changes: [
-    "Gruppierung komplett überarbeitet: bis zu zwei frei wählbare Ebenen (Jahr, Monat, Reise, Land, Ort, Tauchspot, Anzug, Flasche, Volumen, Nitrox, Buddy, Bewertung, oder \"Keine\" für eine flache Liste) statt des bisherigen festen Jahr/Reise-Umschalters — mit eigener Sortierrichtung je Ebene und +/− zum Hinzufügen/Entfernen der zweiten Ebene, direkt im 🔍-Panel",
-    "Sortierrichtung jetzt ein kompaktes Pfeil-Icon direkt neben dem Sortierfeld statt eigener Textzeile",
-    "Die −/+ Icons von 2.8 (\"Alle reduzieren/erweitern\") sind entfallen — Gruppen werden einzeln per Tipp auf den Gruppenkopf auf-/zugeklappt",
+    "Gruppierung komplett überarbeitet: bis zu zwei unabhängige, frei wählbare Ebenen (Jahr, Monat, Reise, Land, Ort, Tauchspot, Anzug, Flasche, Volumen, Nitrox, Buddy, Bewertung, oder \"Keine\") statt des bisherigen festen Jahr/Reise-Umschalters, dauerhaft im 🔍-Panel sichtbar",
+    "Jede Ebene hat ein eigenes Dropdown \"Gruppen sortieren nach…\" (Name, Anzahl, oder beliebiges Datenfeld) sowie ein ➖/➕-Icon, das alle Gruppen dieser Ebene auf einmal zu-/aufklappt",
+    "Reise-Gruppenköpfe bleiben orange, alle anderen sind hellblau; der 📅/🧭-Schnellumschalter für Gr. 1° (Jahr/Reise) bleibt erhalten",
   ]},
   { version: "2.8", changes: [
     "CSV-Import erkennt jetzt automatisch auch andere Spaltenstrukturen als den bekannten Logbuch-Export (Kopfzeile mit deutschen/englischen Feldnamen, Komma/Semikolon/Tab, ISO- und TT/MM/JJJJ-Datumsformate)",
