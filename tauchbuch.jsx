@@ -1066,22 +1066,53 @@ function SidebarList({ dives, selectedId, onSelect }) {
   const [filterText, setFilterText] = useState("");
   const [sortId, setSortId] = useState("number");
   const [sortDir, setSortDir] = useState("desc");
+  const [showSortMenu, setShowSortMenu] = useState(false);
   const filtered = matchDives(dives, filterText);
   const sorted = sortDives(filtered, sortId, sortDir);
+  const years = [...new Set(filtered.map(d=>d.year).filter(Boolean))].sort((a,b)=>b-a);
   return (
     <div style={{width:"clamp(340px, 22vw, 440px)",minWidth:340,height:"100vh",overflowY:"auto",borderRight:"1px solid rgba(255,255,255,0.08)",background:"#040e20",flexShrink:0,fontFamily:"-apple-system,BlinkMacSystemFont,sans-serif",color:"#e8f4fd"}}>
       <div style={{padding:"calc(14px + env(safe-area-inset-top, 0px)) 14px 8px",position:"sticky",top:0,background:"#040e20",zIndex:5,borderBottom:"1px solid rgba(255,255,255,0.06)"}}>
         <div style={{marginBottom:6}}>
           <SearchBar filterText={filterText} setFilterText={setFilterText} />
         </div>
-        <button onClick={()=>setSortDir(d=>d==="asc"?"desc":"asc")}
-          style={{background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:8,padding:"5px 10px",color:"#7dd3fc",fontSize:11,cursor:"pointer"}}>
-          Nr. {sortDir==="asc"?"↑":"↓"}
-        </button>
+        <div style={{display:"flex",gap:6,position:"relative"}}>
+          <button onClick={()=>setShowSortMenu(s=>!s)}
+            style={{flex:1,display:"flex",justifyContent:"space-between",alignItems:"center",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:8,padding:"6px 10px",color:"rgba(232,244,253,0.8)",fontSize:11,cursor:"pointer"}}>
+            <span>⇅ {DIVE_SORT_OPTIONS.find(o=>o.id===sortId)?.label||"—"}</span>
+            <span>{showSortMenu?"▾":"▸"}</span>
+          </button>
+          <button onClick={()=>setSortDir(d=>d==="asc"?"desc":"asc")}
+            style={{background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:8,padding:"6px 10px",color:"#7dd3fc",fontSize:12,cursor:"pointer"}}>
+            {sortDir==="asc"?"↑":"↓"}
+          </button>
+          {showSortMenu && (
+            <div style={{position:"absolute",top:"calc(100% + 4px)",left:0,right:0,background:"#14253a",border:"1px solid rgba(255,255,255,0.12)",borderRadius:10,padding:5,maxHeight:240,overflowY:"auto",zIndex:10,boxShadow:"0 8px 24px rgba(0,0,0,0.4)"}}>
+              {DIVE_SORT_OPTIONS.map(o=>(
+                <div key={o.id} onClick={()=>{setSortId(o.id);setShowSortMenu(false);}}
+                  style={{padding:"7px 10px",borderRadius:6,fontSize:12,cursor:"pointer",color:o.id===sortId?"#7dd3fc":"rgba(232,244,253,0.75)",background:o.id===sortId?"rgba(14,165,233,0.15)":"transparent"}}>
+                  {o.label}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
-      {sorted.map(d => (
-        <SidebarDiveRow key={d.id} d={d} selectedId={selectedId} onSelect={onSelect} />
-      ))}
+      {sortId !== "date" ? (
+        sorted.map(d => (
+          <SidebarDiveRow key={d.id} d={d} selectedId={selectedId} onSelect={onSelect} />
+        ))
+      ) : years.map(yr => {
+        const yDives = sortDives(filtered.filter(d=>d.year===yr), sortId, sortDir);
+        return (
+          <div key={yr}>
+            <div style={{padding:"8px 14px",fontSize:12,fontWeight:700,color:"#7dd3fc",background:"rgba(255,255,255,0.02)"}}>{yr} · {yDives.length}</div>
+            {yDives.map(d => (
+              <SidebarDiveRow key={d.id} d={d} selectedId={selectedId} onSelect={onSelect} />
+            ))}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -1973,7 +2004,7 @@ function TauchbuchApp() {
             </button>
           </div>
           {showSortMenu && (
-            <div style={{marginTop:6,background:"#14253a",border:"1px solid rgba(255,255,255,0.12)",borderRadius:12,padding:6,maxHeight:280,overflowY:"auto",boxShadow:"0 8px 24px rgba(0,0,0,0.4)",position:"absolute",right:16,zIndex:50,width:180}}>
+            <div style={{marginTop:6,background:"#14253a",border:"1px solid rgba(255,255,255,0.12)",borderRadius:12,padding:6,maxHeight:280,overflowY:"auto",boxShadow:"0 8px 24px rgba(0,0,0,0.4)"}}>
               {DIVE_SORT_OPTIONS.map(o=>(
                 <div key={o.id} onClick={()=>{setSortId(o.id);setShowSortMenu(false);}}
                   style={{padding:"9px 12px",borderRadius:8,fontSize:13,cursor:"pointer",color:o.id===sortId?"#7dd3fc":"rgba(232,244,253,0.75)",background:o.id===sortId?"rgba(14,165,233,0.15)":"transparent"}}>
