@@ -1362,6 +1362,7 @@ function TauchbuchApp() {
   const [sortId, setSortId] = useState("number");
   const [sortDir, setSortDir] = useState("desc");
   const [showSortMenu, setShowSortMenu] = useState(false);
+  const [showSearchMenu, setShowSearchMenu] = useState(false);
   const [listMapOpen, setListMapOpen] = useState(false);
   const [collapsedYears, setCollapsedYears] = useState(new Set());
   const [groupBy, setGroupBy] = useState("year"); // "year" | "reise"
@@ -1676,8 +1677,8 @@ function TauchbuchApp() {
           </div>
         </div>
 
-        {/* Icon-Buttons: Import / Backup / Auswahl / Karte / Gruppierung / Richtung / Auf-Zu
-            — Reihenfolge analog zum Flugbuch (dort: Import/Backup/Auswahl/Karte/Richtung/Gruppierung) */}
+        {/* Icon-Buttons: Import / Backup / Auswahl / Karte / Gruppierung / Suche+Sortierung
+            — Sortierrichtung und Alle-reduzieren/erweitern stecken im 🔍-Panel darunter */}
         <div style={{padding:"10px 16px 0",display:"flex",gap:6}}>
           <button onClick={()=>{ setShowImportMenu(m=>!m); setShowBackupMenu(false); }} title="CSV Import"
             style={{flex:"1 1 0",minWidth:0,aspectRatio:"1",boxSizing:"border-box",display:"flex",alignItems:"center",justifyContent:"center",background:showImportMenu?"rgba(56,189,248,0.15)":"rgba(255,255,255,0.05)",border:`1px solid ${showImportMenu?"rgba(56,189,248,0.35)":"rgba(255,255,255,0.1)"}`,borderRadius:10,color:"#fff",fontSize:19,cursor:"pointer"}}>
@@ -1699,17 +1700,9 @@ function TauchbuchApp() {
             style={{flex:"1 1 0",minWidth:0,height:44,boxSizing:"border-box",display:"flex",alignItems:"center",justifyContent:"center",background:groupBy==="reise"?"rgba(245,166,35,0.18)":"rgba(255,255,255,0.05)",border:`1px solid ${groupBy==="reise"?"rgba(245,166,35,0.4)":"rgba(255,255,255,0.1)"}`,borderRadius:10,color:groupBy==="reise"?"#f5a623":"#fff",fontSize:20,cursor:"pointer"}}>
             {groupBy==="year" ? "📅" : "🧭"}
           </button>
-          <button onClick={()=>setSortDir(d=>d==="asc"?"desc":"asc")} title={sortDir==="asc"?"Aufsteigend":"Absteigend"}
-            style={{flex:"1 1 0",minWidth:0,height:44,boxSizing:"border-box",display:"flex",alignItems:"center",justifyContent:"center",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,color:"#fff",fontSize:20,cursor:"pointer"}}>
-            {sortDir==="asc"?"↑":"↓"}
-          </button>
-          <button onClick={()=>{
-              if (groupBy==="year") setCollapsedYears(s=>s.size===0?new Set(years):new Set());
-              else setCollapsedReisen(s=>s.size===0?new Set(reiseOrder):new Set());
-            }}
-            title={(groupBy==="year"?collapsedYears:collapsedReisen).size===0?"Alle reduzieren":"Alle erweitern"}
-            style={{flex:"1 1 0",minWidth:0,height:44,boxSizing:"border-box",display:"flex",alignItems:"center",justifyContent:"center",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,color:"#fff",fontSize:16,fontWeight:700,letterSpacing:1,cursor:"pointer"}}>
-            {(groupBy==="year"?collapsedYears:collapsedReisen).size===0?"⊟⊟":"⊞⊞"}
+          <button onClick={()=>setShowSearchMenu(m=>!m)} title="Suche / Sortierung"
+            style={{flex:"1 1 0",minWidth:0,height:44,boxSizing:"border-box",display:"flex",alignItems:"center",justifyContent:"center",background:(showSearchMenu||filterText)?"rgba(56,189,248,0.15)":"rgba(255,255,255,0.05)",border:`1px solid ${(showSearchMenu||filterText)?"rgba(56,189,248,0.35)":"rgba(255,255,255,0.1)"}`,borderRadius:10,color:"#fff",fontSize:20,cursor:"pointer"}}>
+            🔍
           </button>
         </div>
 
@@ -1991,47 +1984,62 @@ function TauchbuchApp() {
           );
         })()}
 
-        {/* Suche / Sortierung */}
-        <div style={{padding:"12px 16px 6px",position:"relative"}}>
-          <div style={{display:"flex",gap:8,alignItems:"flex-start"}}>
-            <div style={{flex:"1 1 0",minWidth:0,position:"relative"}}>
-              <SearchBar filterText={filterText} setFilterText={setFilterText} />
-            </div>
-            <button onClick={()=>setShowSortMenu(s=>!s)}
-              style={{flex:"1 1 0",minWidth:0,boxSizing:"border-box",display:"flex",justifyContent:"space-between",alignItems:"center",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,padding:"8px 8px",color:"#fff",fontSize:12,cursor:"pointer"}}>
-              <span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>⇅ {DIVE_SORT_OPTIONS.find(o=>o.id===sortId)?.label||"—"}</span>
-              <span style={{flexShrink:0,marginLeft:4}}>{showSortMenu?"▾":"▸"}</span>
-            </button>
-          </div>
-          {showSortMenu && (
-            <div style={{marginTop:6,background:"#14253a",border:"1px solid rgba(255,255,255,0.12)",borderRadius:12,padding:6,maxHeight:280,overflowY:"auto",boxShadow:"0 8px 24px rgba(0,0,0,0.4)"}}>
-              {DIVE_SORT_OPTIONS.map(o=>(
-                <div key={o.id} onClick={()=>{setSortId(o.id);setShowSortMenu(false);}}
-                  style={{padding:"9px 12px",borderRadius:8,fontSize:13,cursor:"pointer",color:o.id===sortId?"#7dd3fc":"rgba(232,244,253,0.75)",background:o.id===sortId?"rgba(14,165,233,0.15)":"transparent"}}>
-                  {o.label}
-                </div>
-              ))}
-            </div>
-          )}
-          {listMapOpen && (() => {
-            const source = selectedIds.size ? filtered.filter(d=>selectedIds.has(d.id)) : filtered;
-            const pts = source
-              .map(d => { const c = parseCoords(d.koordinaten); return c ? { lat:c.lat, lon:c.lon, num:d.name, label:`${d.name}: ${d.tauchspot||d.ort||""}` } : null; })
-              .filter(Boolean);
-            return (
-              <div style={{marginTop:10}}>
-                {selectedIds.size>0 && <div style={{fontSize:10,color:"rgba(232,244,253,0.4)",marginBottom:6}}>Nur {selectedIds.size} markierte Tauchgänge</div>}
-                {pts.length ? (
-                  <MiniMap points={pts} height={260} />
-                ) : (
-                  <div style={{background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:12,padding:"16px",fontSize:12,color:"rgba(232,244,253,0.5)",textAlign:"center"}}>
-                    Keine der aktuell angezeigten Tauchgänge hat Koordinaten hinterlegt.
-                  </div>
-                )}
+        {/* Suche / Sortierung / Gruppen-Klappfunktion — gebündelt hinter dem 🔍-Badge */}
+        {showSearchMenu && (
+          <div style={{padding:"12px 16px 6px",position:"relative"}}>
+            <div style={{display:"flex",gap:8,alignItems:"flex-start"}}>
+              <div style={{flex:"1 1 0",minWidth:0,position:"relative"}}>
+                <SearchBar filterText={filterText} setFilterText={setFilterText} />
               </div>
-            );
-          })()}
-        </div>
+              <button onClick={()=>setShowSortMenu(s=>!s)}
+                style={{flex:"1 1 0",minWidth:0,boxSizing:"border-box",display:"flex",justifyContent:"space-between",alignItems:"center",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,padding:"8px 8px",color:"#fff",fontSize:12,cursor:"pointer"}}>
+                <span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>⇅ {DIVE_SORT_OPTIONS.find(o=>o.id===sortId)?.label||"—"}</span>
+                <span style={{flexShrink:0,marginLeft:4}}>{showSortMenu?"▾":"▸"}</span>
+              </button>
+            </div>
+            {showSortMenu && (
+              <div style={{marginTop:6,background:"#14253a",border:"1px solid rgba(255,255,255,0.12)",borderRadius:12,padding:6,maxHeight:280,overflowY:"auto",boxShadow:"0 8px 24px rgba(0,0,0,0.4)"}}>
+                {DIVE_SORT_OPTIONS.map(o=>(
+                  <div key={o.id} onClick={()=>{setSortId(o.id);setShowSortMenu(false);}}
+                    style={{padding:"9px 12px",borderRadius:8,fontSize:13,cursor:"pointer",color:o.id===sortId?"#7dd3fc":"rgba(232,244,253,0.75)",background:o.id===sortId?"rgba(14,165,233,0.15)":"transparent"}}>
+                    {o.label}
+                  </div>
+                ))}
+              </div>
+            )}
+            <div style={{display:"flex",gap:8,marginTop:8}}>
+              <button onClick={()=>setSortDir(d=>d==="asc"?"desc":"asc")}
+                style={{flex:"1 1 0",minWidth:0,boxSizing:"border-box",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,padding:"8px 8px",color:"#fff",fontSize:12,fontWeight:700,cursor:"pointer",textAlign:"center"}}>
+                {sortDir==="asc"?"↑ Aufsteigend":"↓ Absteigend"}
+              </button>
+              <button onClick={()=>{
+                  if (groupBy==="year") setCollapsedYears(s=>s.size===0?new Set(years):new Set());
+                  else setCollapsedReisen(s=>s.size===0?new Set(reiseOrder):new Set());
+                }}
+                style={{flex:"1 1 0",minWidth:0,boxSizing:"border-box",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,padding:"8px 8px",color:"#fff",fontSize:12,fontWeight:700,cursor:"pointer",textAlign:"center"}}>
+                {(groupBy==="year"?collapsedYears:collapsedReisen).size===0?"⊟⊟ Alle reduzieren":"⊞⊞ Alle erweitern"}
+              </button>
+            </div>
+          </div>
+        )}
+        {listMapOpen && (() => {
+          const source = selectedIds.size ? filtered.filter(d=>selectedIds.has(d.id)) : filtered;
+          const pts = source
+            .map(d => { const c = parseCoords(d.koordinaten); return c ? { lat:c.lat, lon:c.lon, num:d.name, label:`${d.name}: ${d.tauchspot||d.ort||""}` } : null; })
+            .filter(Boolean);
+          return (
+            <div style={{padding:"12px 16px 0"}}>
+              {selectedIds.size>0 && <div style={{fontSize:10,color:"rgba(232,244,253,0.4)",marginBottom:6}}>Nur {selectedIds.size} markierte Tauchgänge</div>}
+              {pts.length ? (
+                <MiniMap points={pts} height={260} />
+              ) : (
+                <div style={{background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:12,padding:"16px",fontSize:12,color:"rgba(232,244,253,0.5)",textAlign:"center"}}>
+                  Keine der aktuell angezeigten Tauchgänge hat Koordinaten hinterlegt.
+                </div>
+              )}
+            </div>
+          );
+        })()}
       </div>
 
       {/* Liste */}
