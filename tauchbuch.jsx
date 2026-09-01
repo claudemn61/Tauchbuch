@@ -110,6 +110,18 @@ function numOrNull(s) {
   return isNaN(n) ? null : n;
 }
 
+// Blei wird überall als feste Zahlen-Auswahl (BLEI_OPTIONS) dargestellt —
+// ein CSV-Wert wie "4kg" passt textuell nicht zur Option "4" und das Feld
+// erscheint dann leer, obwohl der Wert eigentlich erkannt wurde. Löst die
+// erste Zahl aus dem Text (Einheit/Präfix wie "kg" wird verworfen) und
+// bleibt bewusst ein String, da BLEI_OPTIONS ebenfalls Strings sind.
+function cleanBleiValue(s) {
+  const v = String(s || "").trim();
+  if (!v || v === "—" || v === "-") return "";
+  const m = v.replace(",", ".").match(/\d+(\.\d+)?/);
+  return m ? m[0] : v;
+}
+
 // Alte Exporte/Einträge nutzten "Ja"/"Nein"; das Feld heisst inzwischen
 // Air/Nitrox — hier werden bestehende Werte beim Import/Laden mitgezogen.
 function normalizeNitroxValue(v) {
@@ -182,7 +194,7 @@ function parseLegacyDiversLogRows(rows) {
       maxDepth: numOrNull(cols[13]),
       waterTemp: numOrNull(cols[14]),
       anzug: clean(cols[15]),
-      blei: clean(cols[16]),
+      blei: cleanBleiValue(cols[16]),
       flasche: clean(cols[17]),
       volumen: clean(cols[18]),
       nitrox: normalizeNitroxValue(clean(cols[19])),
@@ -314,7 +326,7 @@ function parseGenericRows(rows) {
       maxDepth: numOrNull(clean(cols, "maxDepth")),
       waterTemp: numOrNull(clean(cols, "waterTemp")),
       anzug: clean(cols, "anzug"),
-      blei: clean(cols, "blei"),
+      blei: cleanBleiValue(clean(cols, "blei")),
       flasche: clean(cols, "flasche"),
       volumen: clean(cols, "volumen"),
       nitrox: normalizeNitroxValue(clean(cols, "nitrox")),
@@ -792,7 +804,7 @@ function newDiveSearchRow() { return { field: "ort", op: ":", value: "" }; }
 const NITROX_OPTIONS = ["Air", "Nitrox"];
 const VOLUMEN_OPTIONS = ["15 L", "12 L"];
 const FLASCHE_OPTIONS = ["Alu", "Stahl"];
-const BLEI_OPTIONS = ["3", "4", "5", "6", "7", "8"];
+const BLEI_OPTIONS = ["2", "3", "4", "5", "6", "7", "8"];
 const DEFAULT_ANZUG = "Lang 5/4/3";
 
 const TAUCH_TILE_OPTIONS = [
