@@ -237,24 +237,28 @@ function HilfeApp() {
             Tauchgang gültige Koordinaten hinterlegt sind (siehe <a href="#h-detail-karte">Kapitel 4.4</a>)
             — so ist auf einen Blick erkennbar, welche Tauchgänge sich auf der Karte anzeigen lassen.</Callout>
           </Sub>
-          <Sub id="h-tb-gruppierung" title="3.2 Gruppierung: zwei feste Ebenen, frei wählbares Feld">
-            Im 🔍-Panel (siehe Kapitel 3.3) zeigt die Liste immer zwei Gruppierungs-Zeilen,
-            <Field> Gr. 1°</Field> (äussere, grössere Gruppe, z.B. Jahr) und <Field>Gr. 2°</Field>
-            (verschachtelt darin, z.B. Monat innerhalb jedes Jahres). Beide lassen sich unabhängig
-            auf jedes Datenfeld setzen (Jahr, Monat oder jedes sortierbare Feld aus Kapitel 3.3) —
-            oder auf <Field>Keine</Field>, um diese Ebene auszuschalten (bei Gr. 1° = flache Liste
-            ganz ohne Gruppierung). Ein zweiter Tipp auf das bereits gewählte Feld im Dropdown kehrt
-            dessen Reihenfolge um (↑/↓) statt eines separaten Richtung-Buttons.
-            Reise-Gruppen sind dabei immer chronologisch nach dem Datum ihres letzten Tauchgangs
-            geordnet (nicht alphabetisch), Jahr/Monat/Bewertung numerisch, alle anderen Felder
-            alphabetisch.<br/><br/>
-            Das graue <Badge>−</Badge>/<Badge>+</Badge>-Kästchen rechts neben Gr. 1° bzw. Gr. 2°
-            klappt alle Gruppen dieser Ebene auf einmal zu (−) bzw. wieder auf (+). Ein Tipp direkt
-            auf einen einzelnen Gruppenkopf in der Liste klappt nur diese eine Gruppe ein/aus — im
-            Auswahl-Modus markiert er stattdessen alle Tauchgänge der Gruppe.
-            Reise-Gruppenköpfe erscheinen orange, alle anderen blau.
-            Der 📅/🧭-Button in der Symbolleiste bleibt als Schnellumschalter zwischen Jahr und
-            Reise für Ebene 1 erhalten.
+          <Sub id="h-tb-gruppierung" title="3.2 Gruppierung: zwei unabhängige Ebenen">
+            Im 🔍-Panel (siehe Kapitel 3.3) zeigt die Liste zwei Gruppierungs-Zeilen,
+            <Field> Gr. 1°</Field> (äussere Gruppe) und <Field>Gr. 2°</Field> (darin verschachtelt,
+            z.B. Monat innerhalb jedes Jahres). Beide lassen sich unabhängig auf ein Feld setzen
+            (Jahr, Monat, Land, Ort, Tauchspot, Anzug, Flasche, Volumen, Nitrox, Buddy, Reise oder
+            Bewertung) oder auf <Field>Keine</Field>. Ist Gr. 1° auf <Field>Keine</Field>, Gr. 2°
+            aber gesetzt, übernimmt Gr. 2° automatisch die Rolle der äusseren Gruppe statt
+            verschachtelt zu bleiben; sind beide <Field>Keine</Field>, ist die Liste flach.<br/><br/>
+            Jede Ebene hat ein eigenes, kleineres Dropdown daneben — <Field>Gruppen sortieren
+            nach…</Field> — mit dem sich die Reihenfolge der Gruppen selbst festlegen lässt:
+            <Field>Name</Field> (Standard, nach dem Gruppierfeld selbst), <Field>Anzahl</Field>
+            (Tauchgänge je Gruppe) oder jedes beliebige Datenfeld als Vergleichswert (bei mehreren
+            Tauchgängen je Gruppe die Summe bei Dauer/Bewertung, sonst der kleinste Wert bzw. bei
+            Text der alphabetisch erste). Ein Tipp auf das bereits aktive Sortierfeld kehrt dessen
+            Richtung um (↑/↓).<br/><br/>
+            Das graue <Badge>➖</Badge>/<Badge>➕</Badge>-Kästchen rechts daneben klappt alle
+            Gruppen dieser Ebene auf einmal zu bzw. wieder auf. Ein Tipp direkt auf einen einzelnen
+            Gruppenkopf in der Liste klappt nur diese eine Gruppe ein/aus — im Auswahl-Modus
+            markiert er stattdessen alle Tauchgänge der Gruppe. Reise-Gruppenköpfe erscheinen
+            orange, alle anderen hellblau.
+            Der 📅/🧭-Button in der Symbolleiste bleibt als Schnellumschalter für Gr. 1° zwischen
+            Jahr und (chronologisch nach Datum geordneter) Reise erhalten.
           </Sub>
           <Sub id="h-tb-sortierung" title="3.3 Sortierung">
             Über 🔍 öffnet/schliesst sich das Such-, Sortier- und Gruppierungs-Panel. Darin öffnet
