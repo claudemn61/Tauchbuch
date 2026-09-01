@@ -2017,7 +2017,7 @@ function TauchbuchApp() {
                   else setCollapsedReisen(s=>s.size===0?new Set(reiseOrder):new Set());
                 }}
                 style={{flex:"1 1 0",minWidth:0,boxSizing:"border-box",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,padding:"8px 8px",color:"#fff",fontSize:12,fontWeight:700,cursor:"pointer",textAlign:"center"}}>
-                {(groupBy==="year"?collapsedYears:collapsedReisen).size===0?"⊟⊟ Alle reduzieren":"⊞⊞ Alle erweitern"}
+                {(groupBy==="year"?collapsedYears:collapsedReisen).size===0?"− Alle reduzieren":"+ Alle erweitern"}
               </button>
             </div>
           </div>

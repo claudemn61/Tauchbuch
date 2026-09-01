@@ -248,7 +248,7 @@ function HilfeApp() {
             Sortier-Button (⇅) eine Liste aller sortierbaren Felder (Nr., Datum, Zeit, Land, Ort,
             Tauchspot, TG-Nr., Dauer, max. Tiefe, Wassertemp., Anzug, Blei, Flasche, Volumen,
             Nitrox, Buddy, Reise, Bewertung); darunter schalten zwei weitere Buttons die
-            Sortierrichtung (↑/↓) sowie „Alle reduzieren/erweitern" (⊟⊟/⊞⊞) für die aktuell
+            Sortierrichtung (↑/↓) sowie „Alle reduzieren/erweitern" (−/+) für die aktuell
             gewählte Gruppierung (Jahr oder Reise, siehe Kapitel 3.2) um.
           </Sub>
           <Sub id="h-tb-such-einfach" title="3.4 Suche: einfache Volltextsuche">
