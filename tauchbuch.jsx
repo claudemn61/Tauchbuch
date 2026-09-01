@@ -1725,9 +1725,18 @@ function TauchbuchApp() {
           </div>
         )}
 
-        {/* Auswahl-Aktionsleiste: Kopieren / Bearbeiten / Löschen / Tauchreise */}
+        {/* Auswahl-Aktionsleiste: Alle / Kopieren / Bearbeiten / Löschen / Tauchreise */}
         {selectMode && (
           <div style={{padding:"8px 16px 0",display:"flex",gap:8}}>
+            <button onClick={()=>{
+                const allIds = filtered.map(d=>d.id);
+                const allSelected = allIds.length>0 && allIds.every(id=>selectedIds.has(id));
+                setSelectedIds(allSelected ? new Set() : new Set(allIds));
+              }}
+              title="Alle auswählen/abwählen"
+              style={{flex:"1 1 0",minWidth:0,boxSizing:"border-box",background:"rgba(148,163,184,0.15)",border:"1px solid rgba(148,163,184,0.3)",borderRadius:10,padding:"9px 4px",color:"#cbd5e1",fontSize:13,fontWeight:700,cursor:"pointer",textAlign:"center"}}>
+              {filtered.length>0 && filtered.every(d=>selectedIds.has(d.id)) ? "☐ Alle" : "☑ Alle"}
+            </button>
             <button onClick={async()=>{
                 if (!selectedIds.size) { setCopyMsg("Keine Tauchgänge ausgewählt."); return; }
                 const chosen = dives.filter(d=>selectedIds.has(d.id));
