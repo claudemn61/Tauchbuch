@@ -12,7 +12,7 @@ function useIsWide() {
   return isWide;
 }
 
-const APP_VERSION = "2.7.3";
+const APP_VERSION = "2.8";
 
 // ── Startseite ───────────────────────────────────────────────────────────
 // Editierbares Titelbild (per Tap austauschbar, als Data-URL in Storage
@@ -29,6 +29,13 @@ const CHAPTERS = [
 // Änderungsverlauf — neuste zuerst. Wird beim Erhöhen der Version jeweils
 // von Hand ergänzt.
 const CHANGELOG = [
+  { version: "2.8", changes: [
+    "CSV-Import erkennt jetzt automatisch auch andere Spaltenstrukturen als den bekannten Logbuch-Export (Kopfzeile mit deutschen/englischen Feldnamen, Komma/Semikolon/Tab, ISO- und TT/MM/JJJJ-Datumsformate)",
+    "Tauchbuch-Liste: Auswahlleiste um \"Alle auswählen/abwählen\" sowie eine Reise-Zuordnung per Dropdown ergänzt",
+    "Suche, Sortierung und \"Alle reduzieren/erweitern\" jetzt unter einem 🔍-Button gebündelt (analog zu Import/Backup); Sidebar-Liste (iPad/Mac) hat jetzt ebenfalls ein Sortierfeld-Dropdown und gruppiert nach Jahr, wenn nach Datum sortiert wird",
+    "\"Alle reduzieren/erweitern\" jetzt zwei kompakte −/+ Icon-Badges statt Textbutton",
+    "Import/Backup/Auswahl-Badges optisch ans Flugbuch angeglichen; Backup-Button heisst neu \"Backup sichern\" statt \"In iCloud sichern\" (Tauchbuch und Flugbuch)",
+  ]},
   { version: "2.7.2", changes: [
     "Bugfix: Backup erfasste bisher nur Tauchgänge und Reisen-Namen — jetzt zusätzlich Material, alle Brevet-Einträge samt Fotos sowie Startseiten-Titelbild und -Titel",
     "Tauchbuch-Liste: Symbolleisten-Reihenfolge an Flugbuch angeglichen (Import/Backup/Auswahl/Karte/Gruppierung/Richtung/Auf-Zu), Karten-Button aus der Suchzeile in die Symbolleiste verschoben",
