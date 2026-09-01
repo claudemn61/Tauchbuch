@@ -1710,8 +1710,14 @@ function TauchbuchApp() {
       for (const d of data.dives) await window.storage.set(`dive:${d.id}`, JSON.stringify(d));
       let restoredExtras = 0;
       if (data.extra && typeof data.extra === "object") {
+        // exportBackup() nimmt jeden Wert 1:1 aus dem Storage (z.B. das
+        // Titelbild ist dort ein roher Data-URL-String, kein JSON) und
+        // versucht ihn nur testweise zu parsen — hier muss dieselbe
+        // Fallunterscheidung rückwärts angewendet werden, sonst wird ein
+        // roher String (Titelbild) fälschlich nochmals JSON-kodiert und
+        // ist danach als Data-URL unbrauchbar.
         for (const [k, v] of Object.entries(data.extra)) {
-          await window.storage.set(k, JSON.stringify(v));
+          await window.storage.set(k, typeof v === "string" ? v : JSON.stringify(v));
           restoredExtras++;
         }
       }
