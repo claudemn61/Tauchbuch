@@ -305,7 +305,7 @@ function HilfeApp() {
             sofern er noch nicht existiert.</Callout>
           </Sub>
           <Sub id="h-tb-backup" title="3.10 Backup: Sichern & Wiederherstellen">
-            Über 💾 öffnet sich das Backup-Menü: <b>☁️ In iCloud sichern</b> erstellt eine
+            Über 💾 öffnet sich das Backup-Menü: <b>☁️ Backup sichern</b> erstellt eine
             Sicherungsdatei (JSON) zum Speichern an einem beliebigen Ort; <b>⬆ Backup importieren</b>
             spielt eine zuvor erstellte Sicherungsdatei zurück ein. Die Sicherung umfasst alle
             Tauchgänge, Reisen-Namen, Material-Angaben, alle Brevet-Einträge samt Fotos sowie
