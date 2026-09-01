@@ -225,8 +225,7 @@ function HilfeApp() {
             <Tr><Td>☑ / ✕</Td><Td>Mehrfachauswahl-Modus ein-/ausschalten</Td></Tr>
             <Tr><Td>🌐</Td><Td>Karte aller angezeigten Spots öffnen (Kapitel 3.7)</Td></Tr>
             <Tr><Td>📅 / 🧭</Td><Td>Gruppierung: nach Jahr (📅) oder nach Reise (🧭)</Td></Tr>
-            <Tr><Td>↑ / ↓</Td><Td>Sortierrichtung: aufsteigend/absteigend</Td></Tr>
-            <Tr><Td>⊟⊟ / ⊞⊞</Td><Td>Alle Gruppen reduzieren bzw. erweitern</Td></Tr>
+            <Tr><Td>🔍</Td><Td>Suche, Sortierung, Sortierrichtung sowie Alle-reduzieren/erweitern öffnen/schliessen</Td></Tr>
           </T>
 
           <Sub id="h-tb-liste" title="3.1 Die Liste: Aufbau einer Zeile">
@@ -245,14 +244,16 @@ function HilfeApp() {
             markiert er stattdessen alle Tauchgänge der Gruppe.
           </Sub>
           <Sub id="h-tb-sortierung" title="3.3 Sortierung">
-            Der Sortier-Button (⇅) öffnet eine Liste aller sortierbaren Felder (Nr., Datum, Zeit,
-            Land, Ort, Tauchspot, TG-Nr., Dauer, max. Tiefe, Wassertemp., Anzug, Blei, Flasche,
-            Volumen, Nitrox, Buddy, Reise, Bewertung). Die Richtung wird über den Pfeil-Button
-            daneben umgeschaltet.
+            Über 🔍 öffnet/schliesst sich das Such- und Sortier-Panel. Darin öffnet der
+            Sortier-Button (⇅) eine Liste aller sortierbaren Felder (Nr., Datum, Zeit, Land, Ort,
+            Tauchspot, TG-Nr., Dauer, max. Tiefe, Wassertemp., Anzug, Blei, Flasche, Volumen,
+            Nitrox, Buddy, Reise, Bewertung); darunter schalten zwei weitere Buttons die
+            Sortierrichtung (↑/↓) sowie „Alle reduzieren/erweitern" (⊟⊟/⊞⊞) für die aktuell
+            gewählte Gruppierung (Jahr oder Reise, siehe Kapitel 3.2) um.
           </Sub>
           <Sub id="h-tb-such-einfach" title="3.4 Suche: einfache Volltextsuche">
-            Das Suchfeld 🔍 durchsucht standardmässig alle Felder eines Tauchgangs gleichzeitig.
-            Ein Tipp auf ✕ im Suchfeld leert die Suche.
+            Das Suchfeld im 🔍-Panel durchsucht standardmässig alle Felder eines Tauchgangs
+            gleichzeitig. Ein Tipp auf ✕ im Suchfeld leert die Suche.
           </Sub>
           <Sub id="h-tb-such-erweitert" title="3.5 Suche: erweiterte Suche">
             Ein Tipp ins Suchfeld öffnet einen Baukasten: pro Zeile ein Feld, ein Operator und ein
