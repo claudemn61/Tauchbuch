@@ -56,7 +56,7 @@ const TOC = [
   ]},
   { id:"h-tauchbuch", label:"3. Logbuch (Tauchgänge)", subs:[
     ["h-tb-liste","3.1 Die Liste: Aufbau einer Zeile"],
-    ["h-tb-gruppierung","3.2 Gruppierung: Jahr oder Reise"],
+    ["h-tb-gruppierung","3.2 Gruppierung: bis zu zwei frei wählbare Ebenen"],
     ["h-tb-sortierung","3.3 Sortierung"],
     ["h-tb-such-einfach","3.4 Suche: einfache Volltextsuche"],
     ["h-tb-such-erweitert","3.5 Suche: erweiterte Suche"],
@@ -224,8 +224,8 @@ function HilfeApp() {
             <Tr><Td>💾</Td><Td>Backup-Menü öffnen/schliessen</Td></Tr>
             <Tr><Td>☑ / ✕</Td><Td>Mehrfachauswahl-Modus ein-/ausschalten</Td></Tr>
             <Tr><Td>🌐</Td><Td>Karte aller angezeigten Spots öffnen (Kapitel 3.7)</Td></Tr>
-            <Tr><Td>📅 / 🧭</Td><Td>Gruppierung: nach Jahr (📅) oder nach Reise (🧭)</Td></Tr>
-            <Tr><Td>🔍</Td><Td>Suche, Sortierung, Sortierrichtung sowie Alle-reduzieren/erweitern öffnen/schliessen</Td></Tr>
+            <Tr><Td>📅 / 🧭</Td><Td>Schnellumschalter Gruppierungs-Ebene 1: Jahr (📅) oder Reise (🧭)</Td></Tr>
+            <Tr><Td>🔍</Td><Td>Suche, Sortierung und Gruppierung (bis zu zwei Ebenen) öffnen/schliessen</Td></Tr>
           </T>
 
           <Sub id="h-tb-liste" title="3.1 Die Liste: Aufbau einer Zeile">
@@ -237,19 +237,26 @@ function HilfeApp() {
             Tauchgang gültige Koordinaten hinterlegt sind (siehe <a href="#h-detail-karte">Kapitel 4.4</a>)
             — so ist auf einen Blick erkennbar, welche Tauchgänge sich auf der Karte anzeigen lassen.</Callout>
           </Sub>
-          <Sub id="h-tb-gruppierung" title="3.2 Gruppierung: Jahr oder Reise">
-            Über 📅/🧭 wird umgeschaltet: <Field>Nach Jahr</Field> zeigt einen blauen Gruppenkopf pro
-            Jahr; <Field>Nach Reise</Field> einen gelben Gruppenkopf pro Reise (Reihenfolge wie unter
-            Reisen). Ein Tipp auf den Gruppenkopf klappt die Gruppe ein/aus — im Auswahl-Modus
-            markiert er stattdessen alle Tauchgänge der Gruppe.
+          <Sub id="h-tb-gruppierung" title="3.2 Gruppierung: bis zu zwei frei wählbare Ebenen">
+            Im 🔍-Panel (siehe Kapitel 3.3) lässt sich die Liste in bis zu zwei Ebenen gruppieren,
+            frei wählbar aus Jahr, Monat, Reise, Land, Ort, Tauchspot, Anzug, Flasche, Volumen,
+            Nitrox, Buddy oder Bewertung — oder <Field>Keine</Field> für eine flache Liste ohne
+            Gruppierung. <Field>Gr. 1°</Field> ist die äussere, grössere Gruppe (z.B. Jahr);
+            über den <Badge>+</Badge>-Button daneben lässt sich eine zweite, verschachtelte Ebene
+            <Field> Gr. 2°</Field> aktivieren (z.B. Monat innerhalb jedes Jahres), <Badge>−</Badge>
+            entfernt sie wieder. Je Ebene lässt sich zusätzlich die Reihenfolge der Gruppen selbst
+            umschalten (↑/↓, alphabetisch bzw. numerisch/chronologisch je nach Feld).
+            Ein Tipp auf einen Gruppenkopf klappt die Gruppe ein/aus — im Auswahl-Modus markiert er
+            stattdessen alle Tauchgänge der Gruppe. Der 📅/🧭-Button in der Symbolleiste bleibt als
+            Schnellumschalter zwischen Jahr und Reise für Ebene 1 erhalten.
           </Sub>
           <Sub id="h-tb-sortierung" title="3.3 Sortierung">
-            Über 🔍 öffnet/schliesst sich das Such- und Sortier-Panel. Darin öffnet der
-            Sortier-Button (⇅) eine Liste aller sortierbaren Felder (Nr., Datum, Zeit, Land, Ort,
-            Tauchspot, TG-Nr., Dauer, max. Tiefe, Wassertemp., Anzug, Blei, Flasche, Volumen,
-            Nitrox, Buddy, Reise, Bewertung); daneben schalten die Buttons Sortierrichtung (↑/↓)
-            sowie − und + alle Gruppen der aktuell gewählten Gruppierung (Jahr oder Reise, siehe
-            Kapitel 3.2) auf einmal ein bzw. aus.
+            Über 🔍 öffnet/schliesst sich das Such-, Sortier- und Gruppierungs-Panel. Darin öffnet
+            der Sortier-Button (⇅) eine Liste aller sortierbaren Felder (Nr., Datum, Zeit, Land,
+            Ort, Tauchspot, TG-Nr., Dauer, max. Tiefe, Wassertemp., Anzug, Blei, Flasche, Volumen,
+            Nitrox, Buddy, Reise, Bewertung) — diese Sortierung bestimmt die Reihenfolge der
+            Tauchgänge innerhalb jeder Gruppe (siehe Kapitel 3.2). Der Pfeil-Button daneben schaltet
+            die Richtung (↑/↓) um.
           </Sub>
           <Sub id="h-tb-such-einfach" title="3.4 Suche: einfache Volltextsuche">
             Das Suchfeld im 🔍-Panel durchsucht standardmässig alle Felder eines Tauchgangs

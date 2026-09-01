@@ -12,7 +12,7 @@ function useIsWide() {
   return isWide;
 }
 
-const APP_VERSION = "2.8";
+const APP_VERSION = "2.8.1";
 
 // ── Startseite ───────────────────────────────────────────────────────────
 // Editierbares Titelbild (per Tap austauschbar, als Data-URL in Storage
@@ -29,6 +29,11 @@ const CHAPTERS = [
 // Änderungsverlauf — neuste zuerst. Wird beim Erhöhen der Version jeweils
 // von Hand ergänzt.
 const CHANGELOG = [
+  { version: "2.8.1", changes: [
+    "Gruppierung komplett überarbeitet: bis zu zwei frei wählbare Ebenen (Jahr, Monat, Reise, Land, Ort, Tauchspot, Anzug, Flasche, Volumen, Nitrox, Buddy, Bewertung, oder \"Keine\" für eine flache Liste) statt des bisherigen festen Jahr/Reise-Umschalters — mit eigener Sortierrichtung je Ebene und +/− zum Hinzufügen/Entfernen der zweiten Ebene, direkt im 🔍-Panel",
+    "Sortierrichtung jetzt ein kompaktes Pfeil-Icon direkt neben dem Sortierfeld statt eigener Textzeile",
+    "Die −/+ Icons von 2.8 (\"Alle reduzieren/erweitern\") sind entfallen — Gruppen werden einzeln per Tipp auf den Gruppenkopf auf-/zugeklappt",
+  ]},
   { version: "2.8", changes: [
     "CSV-Import erkennt jetzt automatisch auch andere Spaltenstrukturen als den bekannten Logbuch-Export (Kopfzeile mit deutschen/englischen Feldnamen, Komma/Semikolon/Tab, ISO- und TT/MM/JJJJ-Datumsformate)",
     "Tauchbuch-Liste: Auswahlleiste um \"Alle auswählen/abwählen\" sowie eine Reise-Zuordnung per Dropdown ergänzt",
