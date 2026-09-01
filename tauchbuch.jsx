@@ -13,22 +13,46 @@ function useIsWide() {
 }
 
 
-// ── CSV Parsing (Divers Log / Logbuch Export) ───────────────────────────────
-// Column layout of the export (0-indexed):
-// 0 Nr. | 1 Datum | 2 Zeit | 3 Nr.(dup) | 4 Datum(dup) | 5 x | 6 Jahr |
-// 7 Ort(dup) | 8 Land | 9 Ort | 10 TG-Nr. | 11 Tauchspot | 12 Dauer |
-// 13 max. Tiefe | 14 Wassertemp | 15 Anzug | 16 Blei | 17 Alu/Stahl |
-// 18 Vol. | 19 Nitrox | 20 Buddy | 21 Bemerkungen | 22 Nr.(dup) | 23 Datum(dup)
+// ── CSV Parsing ──────────────────────────────────────────────────────────
+// Zwei Quellformate werden erkannt:
+//  1. "Divers Log"-Export mit fester Spaltenreihenfolge (0-indexed):
+//     0 Nr. | 1 Datum | 2 Zeit | 3 Nr.(dup) | 4 Datum(dup) | 5 x | 6 Jahr |
+//     7 Ort(dup) | 8 Land | 9 Ort | 10 TG-Nr. | 11 Tauchspot | 12 Dauer |
+//     13 max. Tiefe | 14 Wassertemp | 15 Anzug | 16 Blei | 17 Alu/Stahl |
+//     18 Vol. | 19 Nitrox | 20 Buddy | 21 Bemerkungen | 22 Nr.(dup) | 23 Datum(dup)
+//     Erkannt an der charakteristischen Spaltenverdopplung (siehe isLegacyDiversLogRows).
+//  2. Beliebige andere CSV-Exporte (Subsurface, MacDive, Excel/Numbers-Export
+//     o.ä.) mit einer Kopfzeile aus benannten Spalten in beliebiger
+//     Reihenfolge — Spalten werden per Namens-Alias zugeordnet (siehe
+//     HEADER_ALIASES), unbekannte Spalten einfach ignoriert.
 // Summary/placeholder rows ("Neu", totals) have no Datum and are skipped.
-function splitCsvLine(line) {
-  const cols = []; let cur = "", inQ = false;
-  for (const ch of line) {
-    if (ch === '"') inQ = !inQ;
-    else if (ch === "," && !inQ) { cols.push(cur); cur = ""; }
-    else cur += ch;
+
+// Quote-bewusster CSV-Parser über den gesamten Text (nicht zeilenweise), damit
+// Zellen mit eingebetteten Zeilenumbrüchen (z.B. mehrzeilige Bemerkungen)
+// korrekt behandelt werden. Unterstützt "" als escapte Anführungszeichen.
+function parseCsvRows(text, delim) {
+  const rows = []; let row = [], field = "", inQ = false;
+  const s = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (inQ) {
+      if (ch === '"') { if (s[i+1] === '"') { field += '"'; i++; } else inQ = false; }
+      else field += ch;
+    } else if (ch === '"') inQ = true;
+    else if (ch === delim) { row.push(field); field = ""; }
+    else if (ch === "\n") { row.push(field); rows.push(row); row = []; field = ""; }
+    else field += ch;
   }
-  cols.push(cur);
-  return cols;
+  if (field.length || row.length) { row.push(field); rows.push(row); }
+  return rows.filter(r => r.some(c => c.trim().length));
+}
+
+// Trennzeichen anhand der Kopfzeile erkennen — deutsche Excel-Exporte nutzen
+// oft ";" (weil "," als Dezimaltrenner reserviert ist), andere Tools Tabs.
+function detectDelimiter(headerLine) {
+  const counts = { ",": 0, ";": 0, "\t": 0 };
+  for (const ch of headerLine) if (ch in counts) counts[ch]++;
+  return Object.keys(counts).sort((a,b) => counts[b]-counts[a])[0] || ",";
 }
 
 function parseDateToTs(d) {
@@ -40,15 +64,50 @@ function parseDateToTs(d) {
   return new Date(+yy, +mm - 1, +dd).getTime();
 }
 
+// Wandelt gängige Fremdformate (ISO "yyyy-mm-dd", "dd/mm/yyyy", "mm/dd/yyyy")
+// in unser Standardformat "dd.mm.yyyy" um, damit Sortierung/Jahr (parseDateToTs)
+// funktionieren. Unbekannte Formate werden unverändert übernommen (Rohtext
+// bleibt sichtbar, lässt sich manuell korrigieren).
+function normalizeDateStr(raw) {
+  const s = String(raw || "").trim();
+  if (!s) return "";
+  let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (m) return `${+m[3]}.${+m[2]}.${m[1]}`;
+  if (/^\d{1,2}\.\d{1,2}\.\d{2,4}/.test(s)) return s;
+  m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (m) {
+    const a = +m[1], b = +m[2];
+    // TT/MM mehrdeutig zu MM/TT (US) — nur eindeutig, wenn eine der beiden
+    // Zahlen > 12 ist; sonst wird die europäische Reihenfolge TT/MM angenommen.
+    if (a > 12 && b <= 12) return `${a}.${b}.${m[3]}`;
+    if (b > 12 && a <= 12) return `${b}.${a}.${m[3]}`;
+    return `${a}.${b}.${m[3]}`;
+  }
+  return s;
+}
+
 function parseDurationToMin(s) {
   if (!s) return 0;
   const hm = String(s).match(/(\d+)\s*h\s*(\d+)\s*m/i);
   if (hm) return (+hm[1]) * 60 + (+hm[2]);
+  const hms = String(s).match(/^(\d+):(\d{2}):(\d{2})$/);
+  if (hms) return (+hms[1]) * 60 + (+hms[2]) + Math.round(+hms[3] / 60);
+  const mmss = String(s).match(/^(\d{1,3}):(\d{2})$/);
+  if (mmss) return +mmss[1] + Math.round(+mmss[2] / 60);
   const m = String(s).match(/(\d+)\s*m/i);
   if (m) return +m[1];
-  const plain = String(s).match(/^\d+$/);
-  if (plain) return +s;
+  const plain = String(s).match(/^\d+(\.\d+)?$/);
+  if (plain) return Math.round(+s);
   return 0;
+}
+
+// Zahl aus Freitext lösen — toleriert "°"-Suffix, Dezimalkomma und Platzhalter
+// wie "—"/"-" (liefert dann null statt 0, damit "keine Angabe" von "0" unterscheidbar bleibt).
+function numOrNull(s) {
+  const v = String(s || "").trim().replace("°", "").replace(",", ".");
+  if (!v || v === "—" || v === "-") return null;
+  const n = parseFloat(v);
+  return isNaN(n) ? null : n;
 }
 
 // Alte Exporte/Einträge nutzten "Ja"/"Nein"; das Feld heisst inzwischen
@@ -82,21 +141,32 @@ function fmtReiseDateRange(dives) {
   return `${a.getDate()}.${a.getMonth()+1}.${yy(a.getFullYear())}-${b.getDate()}.${b.getMonth()+1}.${yy(b.getFullYear())}`;
 }
 
-function parseDiveCsv(text) {
-  const lines = text.replace(/\r/g, "").split("\n").filter(l => l.trim().length);
+// Strukturmerkmal des Divers-Log-Exports statt Header-Text (der je nach
+// Sprache/Version variieren kann): Nr. und Datum tauchen dupliziert in
+// Spalte 3/4 wieder auf (siehe Spaltenlayout oben). Wird das in einer der
+// ersten Datenzeilen gefunden, gilt die feste Positions-Zuordnung.
+function isLegacyDiversLogRows(rows) {
+  for (let i = 1; i < Math.min(rows.length, 5); i++) {
+    const cols = rows[i];
+    if (cols.length < 24) continue;
+    const nr = (cols[0] || "").trim();
+    if (!nr || !/^\d+(\.\d+)?$/.test(nr)) continue;
+    if ((cols[3] || "").trim() !== nr) continue;
+    const datum = (cols[1] || "").trim();
+    if (!datum || (cols[4] || "").trim() !== datum) continue;
+    return true;
+  }
+  return false;
+}
+
+function parseLegacyDiversLogRows(rows) {
   const dives = [];
-  for (let i = 1; i < lines.length; i++) {
-    const cols = splitCsvLine(lines[i]);
+  for (let i = 1; i < rows.length; i++) {
+    const cols = rows[i];
     const clean = s => (s || "").trim();
     const nr = clean(cols[0]);
     const datum = clean(cols[1]);
     if (!nr || !/^\d+(\.\d+)?$/.test(nr) || !datum) continue; // skip placeholder/summary rows
-    const numOrNull = s => {
-      const v = clean(s).replace("°", "").replace(",", ".");
-      if (!v || v === "—" || v === "-") return null;
-      const n = parseFloat(v);
-      return isNaN(n) ? null : n;
-    };
     const durationStr = clean(cols[12]);
     const dive = {
       id: `dive_${nr}`,
@@ -127,6 +197,148 @@ function parseDiveCsv(text) {
     dives.push(dive);
   }
   return dives;
+}
+
+// Namens-Aliase (deutsch/englisch, kleingeschrieben, ohne Punkte) für
+// Kopfzeilen-Spalten anderer CSV-Strukturen (Subsurface-, MacDive-,
+// Excel/Numbers-Exporte o.ä.). Bei mehreren Treffern gewinnt die erste
+// passende Spalte von links.
+const HEADER_ALIASES = {
+  name: ["nr","#","number","dive nr","dive number","tauchgang nr","tauchgang","log","dive #","id"],
+  date: ["datum","date"],
+  time: ["zeit","uhrzeit","time","start time","time in","einstiegszeit"],
+  land: ["land","country"],
+  ort: ["ort","location","site location","region","area"],
+  tauchspot: ["tauchspot","spot","site","tauchplatz","dive site","site name","location name"],
+  tgNr: ["tg-nr","tg nr","tgnr","dive number at site","site dive number"],
+  durationStr: ["dauer","duration","zeit unter wasser","bottom time","dive time"],
+  maxDepth: ["max tiefe","maxtiefe","tiefe","depth","max depth","maxdepth","greatest depth"],
+  waterTemp: ["wassertemp","wassertemperatur","water temp","watertemp","temp","temperatur","temperature","water temperature"],
+  anzug: ["anzug","suit","exposure suit","wetsuit","exposuresuit","neopren"],
+  blei: ["blei","weight","gewicht","gewichte","lead","weights"],
+  flasche: ["flasche","tank","cylinder","zylinder","tank type"],
+  volumen: ["volumen","volume","tank size","gasvolumen","tank volume"],
+  nitrox: ["nitrox","gas","gasmischung","gas mix","air/nitrox","mix","gas type"],
+  buddy: ["buddy","partner","dive buddy","begleitung","buddies"],
+  bemerkungen: ["bemerkungen","notes","comment","comments","notiz","notizen","remarks","notes/comments","spezielles","besonderes"],
+  koordinaten: ["koordinaten","coordinates","gps","position","coordinate","lat/lon","gps coordinates"],
+  rating: ["bewertung","rating","stars","sterne"],
+  reise: ["reise","trip","reise/trip","journey","tour"],
+};
+function normHeader(s) {
+  return String(s || "").trim().toLowerCase().replace(/\./g, "").replace(/\s+/g, " ").trim();
+}
+// Kopfzeile in einzelne Wörter zerlegt (Klammern/Schrägstriche/Sonderzeichen
+// als Trenner) — Basis für den unscharfen Zweitversuch unten.
+function headerWords(norm) {
+  return norm.replace(/[()°/,;:_-]/g, " ").split(/\s+/).filter(Boolean);
+}
+// Prüft, ob die (ebenfalls in Wörter zerlegte) Alias-Phrase als zusammen-
+// hängende Wortfolge in den Kopfzeilen-Wörtern vorkommt — z.B. matcht Alias
+// "tiefe" gegen Kopfzeile "Tiefe (m)" (Wörter: tiefe, m), ohne dass "tief"
+// versehentlich in einem unrelated längeren Wort anschlägt.
+function headerContainsAlias(words, alias) {
+  const aliasWords = alias.replace(/[()°/,;:_-]/g, " ").split(/\s+/).filter(Boolean);
+  if (!aliasWords.length) return false;
+  for (let i = 0; i <= words.length - aliasWords.length; i++) {
+    if (aliasWords.every((w, j) => words[i + j] === w)) return true;
+  }
+  return false;
+}
+function buildColMap(headerRow) {
+  const colMap = {};
+  const consumed = new Set(); // Spalten, die per Sonderregel schon eindeutig vergeben sind
+  // Sonderfall zuerst: "Zeit (min)"/"Time (min)" o.ä. ist trotz "Zeit" die
+  // Tauchzeit/Dauer, nicht die Uhrzeit — sonst würde die generische
+  // Wort-Zuordnung unten die Spalte zusätzlich (fälschlich) dem Feld "time"
+  // zuschlagen, weil "zeit"/"time" auch dessen Alias ist.
+  headerRow.forEach((cell, idx) => {
+    const norm = normHeader(cell);
+    if (colMap.durationStr === undefined && /(zeit|time)/.test(norm) && /\bmin/.test(norm)) {
+      colMap.durationStr = idx;
+      consumed.add(idx);
+    }
+  });
+  headerRow.forEach((cell, idx) => {
+    if (consumed.has(idx)) return;
+    const norm = normHeader(cell);
+    if (!norm) return;
+    for (const [field, aliases] of Object.entries(HEADER_ALIASES)) {
+      if (colMap[field] === undefined && aliases.includes(norm)) colMap[field] = idx;
+    }
+  });
+  // Unscharfer Zweitversuch für Spalten, die noch keinem Feld zugeordnet
+  // sind (z.B. "Tauchplatz / Ort" oder "Tiefe (m)" statt exakt "tauchspot"
+  // bzw. "tiefe"): Alias als Wortfolge innerhalb der Kopfzeile suchen.
+  headerRow.forEach((cell, idx) => {
+    if (consumed.has(idx)) return;
+    const norm = normHeader(cell);
+    if (!norm) return;
+    const words = headerWords(norm);
+    for (const [field, aliases] of Object.entries(HEADER_ALIASES)) {
+      if (colMap[field] !== undefined) continue;
+      if (aliases.some(a => headerContainsAlias(words, a))) colMap[field] = idx;
+    }
+  });
+  return colMap;
+}
+
+function parseGenericRows(rows) {
+  const colMap = buildColMap(rows[0]);
+  if (colMap.date === undefined) return []; // ohne erkennbare Datumsspalte kein sinnvoller Import
+  const clean = (cols, field) => colMap[field] === undefined ? "" : (cols[colMap[field]] || "").trim();
+  const dives = [];
+  let autoNr = 0;
+  const mappedIdx = Object.values(colMap);
+  for (let i = 1; i < rows.length; i++) {
+    const cols = rows[i];
+    // Nicht am fehlenden Datum aufhängen (manche echten Tauchgänge haben das
+    // Datum schlicht nicht eingetragen) — nur Zeilen ohne jeden erkennbaren
+    // Inhalt in einer zugeordneten Spalte gelten als Platzhalter/Summenzeile.
+    if (!mappedIdx.some(idx => (cols[idx] || "").trim())) continue;
+    const datum = normalizeDateStr(clean(cols, "date"));
+    autoNr++;
+    const nr = clean(cols, "name") || String(autoNr);
+    const durationStr = clean(cols, "durationStr");
+    const dive = {
+      id: `dive_${nr}`,
+      name: nr,
+      date: datum,
+      time: clean(cols, "time"),
+      land: clean(cols, "land"),
+      ort: clean(cols, "ort"),
+      tgNr: clean(cols, "tgNr"),
+      tauchspot: clean(cols, "tauchspot"),
+      durationStr,
+      durationMin: parseDurationToMin(durationStr),
+      maxDepth: numOrNull(clean(cols, "maxDepth")),
+      waterTemp: numOrNull(clean(cols, "waterTemp")),
+      anzug: clean(cols, "anzug"),
+      blei: clean(cols, "blei"),
+      flasche: clean(cols, "flasche"),
+      volumen: clean(cols, "volumen"),
+      nitrox: normalizeNitroxValue(clean(cols, "nitrox")),
+      buddy: clean(cols, "buddy"),
+      bemerkungen: clean(cols, "bemerkungen"),
+      koordinaten: clean(cols, "koordinaten"),
+      rating: numOrNull(clean(cols, "rating")) || 0,
+      customFields: { reise: clean(cols, "reise") },
+    };
+    const ts = parseDateToTs(dive.date);
+    dive.year = ts ? String(new Date(ts).getFullYear()) : "";
+    dives.push(dive);
+  }
+  return dives;
+}
+
+function parseDiveCsv(text) {
+  const cleaned = text.replace(/^\uFEFF/, "");
+  const firstLineEnd = cleaned.indexOf("\n");
+  const firstLine = (firstLineEnd >= 0 ? cleaned.slice(0, firstLineEnd) : cleaned).replace(/\r$/, "");
+  const delim = detectDelimiter(firstLine);
+  const rows = parseCsvRows(cleaned, delim);
+  if (!rows.length) return [];
+  return isLegacyDiversLogRows(rows) ? parseLegacyDiversLogRows(rows) : parseGenericRows(rows);
 }
 
 function sortByNumber(dives) {
@@ -1437,15 +1649,15 @@ function TauchbuchApp() {
             — Reihenfolge analog zum Flugbuch (dort: Import/Backup/Auswahl/Karte/Richtung/Gruppierung) */}
         <div style={{padding:"10px 16px 0",display:"flex",gap:6}}>
           <button onClick={()=>{ setShowImportMenu(m=>!m); setShowBackupMenu(false); }} title="CSV Import"
-            style={{flex:"1 1 0",minWidth:0,height:44,boxSizing:"border-box",display:"flex",alignItems:"center",justifyContent:"center",background:showImportMenu?"rgba(56,189,248,0.15)":"rgba(255,255,255,0.05)",border:`1px solid ${showImportMenu?"rgba(56,189,248,0.35)":"rgba(255,255,255,0.1)"}`,borderRadius:10,color:"#fff",fontSize:20,cursor:"pointer"}}>
+            style={{flex:"1 1 0",minWidth:0,aspectRatio:"1",boxSizing:"border-box",display:"flex",alignItems:"center",justifyContent:"center",background:showImportMenu?"rgba(56,189,248,0.15)":"rgba(255,255,255,0.05)",border:`1px solid ${showImportMenu?"rgba(56,189,248,0.35)":"rgba(255,255,255,0.1)"}`,borderRadius:10,color:"#fff",fontSize:19,cursor:"pointer"}}>
             📥
           </button>
           <button onClick={()=>{ setShowBackupMenu(m=>!m); setShowImportMenu(false); }} title="Backup"
-            style={{flex:"1 1 0",minWidth:0,height:44,boxSizing:"border-box",display:"flex",alignItems:"center",justifyContent:"center",background:showBackupMenu?"rgba(56,189,248,0.15)":"rgba(255,255,255,0.05)",border:`1px solid ${showBackupMenu?"rgba(56,189,248,0.35)":"rgba(255,255,255,0.1)"}`,borderRadius:10,color:"#fff",fontSize:20,cursor:"pointer"}}>
+            style={{flex:"1 1 0",minWidth:0,aspectRatio:"1",boxSizing:"border-box",display:"flex",alignItems:"center",justifyContent:"center",background:showBackupMenu?"rgba(56,189,248,0.15)":"rgba(255,255,255,0.05)",border:`1px solid ${showBackupMenu?"rgba(56,189,248,0.35)":"rgba(255,255,255,0.1)"}`,borderRadius:10,color:"#fff",fontSize:19,cursor:"pointer"}}>
             💾
           </button>
           <button onClick={()=>{ setSelectMode(m=>!m); setSelectedIds(new Set()); setCopyMsg(""); }} title="Auswahl"
-            style={{flex:"1 1 0",minWidth:0,height:44,boxSizing:"border-box",display:"flex",alignItems:"center",justifyContent:"center",background:selectMode?"rgba(14,165,233,0.18)":"rgba(255,255,255,0.05)",border:`1px solid ${selectMode?"rgba(14,165,233,0.4)":"rgba(255,255,255,0.1)"}`,borderRadius:10,color:"#fff",fontSize:24,cursor:"pointer"}}>
+            style={{flex:"1 1 0",minWidth:0,aspectRatio:"1",boxSizing:"border-box",display:"flex",alignItems:"center",justifyContent:"center",background:selectMode?"rgba(14,165,233,0.18)":"rgba(255,255,255,0.05)",border:`1px solid ${selectMode?"rgba(14,165,233,0.4)":"rgba(255,255,255,0.1)"}`,borderRadius:10,color:"#fff",fontSize:23,cursor:"pointer"}}>
             {selectMode?"✕":"☑"}
           </button>
           <button onClick={()=>setListMapOpen(o=>!o)} title="Karte anzeigen"
@@ -1515,7 +1727,7 @@ function TauchbuchApp() {
 
         {/* Auswahl-Aktionsleiste: Kopieren / Bearbeiten / Löschen / Tauchreise */}
         {selectMode && (
-          <div style={{padding:"8px 16px 0",display:"flex",gap:6}}>
+          <div style={{padding:"8px 16px 0",display:"flex",gap:8}}>
             <button onClick={async()=>{
                 if (!selectedIds.size) { setCopyMsg("Keine Tauchgänge ausgewählt."); return; }
                 const chosen = dives.filter(d=>selectedIds.has(d.id));
@@ -1578,6 +1790,27 @@ function TauchbuchApp() {
               style={{flex:"1 1 0",minWidth:0,boxSizing:"border-box",background:"rgba(239,68,68,0.15)",border:"1px solid rgba(239,68,68,0.3)",borderRadius:10,padding:"9px 4px",color:"#f87171",fontSize:13,fontWeight:700,cursor:"pointer",textAlign:"center"}}>
               🗑 {selectedIds.size}
             </button>
+            <select
+              value=""
+              onChange={async e=>{
+                const reiseName = e.target.value;
+                if (!reiseName) return;
+                if (!selectedIds.size) { setCopyMsg("Keine Tauchgänge ausgewählt."); return; }
+                const chosen = dives.filter(d=>selectedIds.has(d.id));
+                for (const d of chosen) {
+                  const updated = { ...d, ort: reiseName, customFields: { ...(d.customFields||{}), reise: reiseName } };
+                  await saveDive(updated);
+                }
+                setDives(prev => prev.map(d => selectedIds.has(d.id)
+                  ? { ...d, ort: reiseName, customFields: { ...(d.customFields||{}), reise: reiseName } } : d));
+                setCopyMsg(`✓ ${chosen.length} Tauchgang${chosen.length!==1?"gänge":""} → "${reiseName}" zugeordnet.`);
+                e.target.value = "";
+              }}
+              title="Auswahl einer Reise zuordnen"
+              style={{flex:"1 1 0",minWidth:0,boxSizing:"border-box",background:"rgba(245,166,35,0.15)",border:"1px solid rgba(245,166,35,0.3)",borderRadius:10,padding:"9px 4px",color:"#f5a623",fontSize:13,fontWeight:700,cursor:"pointer",textAlign:"center",appearance:"none",WebkitAppearance:"none"}}>
+              <option value="" style={{background:"#040e20"}}>🧭 {selectedIds.size}</option>
+              {reisenNames.map(n => <option key={n} value={n} style={{background:"#040e20"}}>{n}</option>)}
+            </select>
           </div>
         )}
 

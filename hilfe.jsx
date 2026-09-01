@@ -297,6 +297,10 @@ function HilfeApp() {
           <Sub id="h-tb-import" title="3.9 CSV-Import">
             Über 📥 öffnet sich eine Import-Fläche: CSV-Datei per Klick auswählen oder per Drag &amp;
             Drop hineinziehen. Ein Fortschrittsbalken zeigt den Import-Status.
+            Erkannt werden sowohl der bekannte Logbuch-Export als auch andere CSV-Strukturen
+            (z.B. aus Subsurface, MacDive oder selbst in Excel/Numbers vorbereitet) — dafür
+            genügt eine Kopfzeile mit erkennbaren Spaltennamen (Datum, Ort, Tiefe, Dauer, …
+            auf Deutsch oder Englisch) sowie Komma, Semikolon oder Tab als Trennzeichen.
             <Callout>Jeder in der CSV vorkommende Ort wird automatisch als eigene Reise angelegt,
             sofern er noch nicht existiert.</Callout>
           </Sub>
