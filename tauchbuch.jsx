@@ -213,14 +213,14 @@ const HEADER_ALIASES = {
   tgNr: ["tg-nr","tg nr","tgnr","dive number at site","site dive number"],
   durationStr: ["dauer","duration","zeit unter wasser","bottom time","dive time"],
   maxDepth: ["max tiefe","maxtiefe","tiefe","depth","max depth","maxdepth","greatest depth"],
-  waterTemp: ["wassertemp","wassertemperatur","water temp","watertemp","temp","temperature","water temperature"],
-  anzug: ["anzug","suit","exposure suit","wetsuit","exposuresuit"],
-  blei: ["blei","weight","gewicht","lead","weights"],
+  waterTemp: ["wassertemp","wassertemperatur","water temp","watertemp","temp","temperatur","temperature","water temperature"],
+  anzug: ["anzug","suit","exposure suit","wetsuit","exposuresuit","neopren"],
+  blei: ["blei","weight","gewicht","gewichte","lead","weights"],
   flasche: ["flasche","tank","cylinder","zylinder","tank type"],
   volumen: ["volumen","volume","tank size","gasvolumen","tank volume"],
   nitrox: ["nitrox","gas","gasmischung","gas mix","air/nitrox","mix","gas type"],
   buddy: ["buddy","partner","dive buddy","begleitung","buddies"],
-  bemerkungen: ["bemerkungen","notes","comment","comments","notiz","notizen","remarks","notes/comments"],
+  bemerkungen: ["bemerkungen","notes","comment","comments","notiz","notizen","remarks","notes/comments","spezielles","besonderes"],
   koordinaten: ["koordinaten","coordinates","gps","position","coordinate","lat/lon","gps coordinates"],
   rating: ["bewertung","rating","stars","sterne"],
   reise: ["reise","trip","reise/trip","journey","tour"],
@@ -228,13 +228,56 @@ const HEADER_ALIASES = {
 function normHeader(s) {
   return String(s || "").trim().toLowerCase().replace(/\./g, "").replace(/\s+/g, " ").trim();
 }
+// Kopfzeile in einzelne Wörter zerlegt (Klammern/Schrägstriche/Sonderzeichen
+// als Trenner) — Basis für den unscharfen Zweitversuch unten.
+function headerWords(norm) {
+  return norm.replace(/[()°/,;:_-]/g, " ").split(/\s+/).filter(Boolean);
+}
+// Prüft, ob die (ebenfalls in Wörter zerlegte) Alias-Phrase als zusammen-
+// hängende Wortfolge in den Kopfzeilen-Wörtern vorkommt — z.B. matcht Alias
+// "tiefe" gegen Kopfzeile "Tiefe (m)" (Wörter: tiefe, m), ohne dass "tief"
+// versehentlich in einem unrelated längeren Wort anschlägt.
+function headerContainsAlias(words, alias) {
+  const aliasWords = alias.replace(/[()°/,;:_-]/g, " ").split(/\s+/).filter(Boolean);
+  if (!aliasWords.length) return false;
+  for (let i = 0; i <= words.length - aliasWords.length; i++) {
+    if (aliasWords.every((w, j) => words[i + j] === w)) return true;
+  }
+  return false;
+}
 function buildColMap(headerRow) {
   const colMap = {};
+  const consumed = new Set(); // Spalten, die per Sonderregel schon eindeutig vergeben sind
+  // Sonderfall zuerst: "Zeit (min)"/"Time (min)" o.ä. ist trotz "Zeit" die
+  // Tauchzeit/Dauer, nicht die Uhrzeit — sonst würde die generische
+  // Wort-Zuordnung unten die Spalte zusätzlich (fälschlich) dem Feld "time"
+  // zuschlagen, weil "zeit"/"time" auch dessen Alias ist.
   headerRow.forEach((cell, idx) => {
+    const norm = normHeader(cell);
+    if (colMap.durationStr === undefined && /(zeit|time)/.test(norm) && /\bmin/.test(norm)) {
+      colMap.durationStr = idx;
+      consumed.add(idx);
+    }
+  });
+  headerRow.forEach((cell, idx) => {
+    if (consumed.has(idx)) return;
     const norm = normHeader(cell);
     if (!norm) return;
     for (const [field, aliases] of Object.entries(HEADER_ALIASES)) {
       if (colMap[field] === undefined && aliases.includes(norm)) colMap[field] = idx;
+    }
+  });
+  // Unscharfer Zweitversuch für Spalten, die noch keinem Feld zugeordnet
+  // sind (z.B. "Tauchplatz / Ort" oder "Tiefe (m)" statt exakt "tauchspot"
+  // bzw. "tiefe"): Alias als Wortfolge innerhalb der Kopfzeile suchen.
+  headerRow.forEach((cell, idx) => {
+    if (consumed.has(idx)) return;
+    const norm = normHeader(cell);
+    if (!norm) return;
+    const words = headerWords(norm);
+    for (const [field, aliases] of Object.entries(HEADER_ALIASES)) {
+      if (colMap[field] !== undefined) continue;
+      if (aliases.some(a => headerContainsAlias(words, a))) colMap[field] = idx;
     }
   });
   return colMap;
@@ -246,10 +289,14 @@ function parseGenericRows(rows) {
   const clean = (cols, field) => colMap[field] === undefined ? "" : (cols[colMap[field]] || "").trim();
   const dives = [];
   let autoNr = 0;
+  const mappedIdx = Object.values(colMap);
   for (let i = 1; i < rows.length; i++) {
     const cols = rows[i];
+    // Nicht am fehlenden Datum aufhängen (manche echten Tauchgänge haben das
+    // Datum schlicht nicht eingetragen) — nur Zeilen ohne jeden erkennbaren
+    // Inhalt in einer zugeordneten Spalte gelten als Platzhalter/Summenzeile.
+    if (!mappedIdx.some(idx => (cols[idx] || "").trim())) continue;
     const datum = normalizeDateStr(clean(cols, "date"));
-    if (!datum) continue; // Zeile ohne Datum: Platzhalter/Summenzeile
     autoNr++;
     const nr = clean(cols, "name") || String(autoNr);
     const durationStr = clean(cols, "durationStr");
