@@ -697,7 +697,7 @@ const DATE_QUERY_FIELDS = ["date"];
 const TIME_QUERY_FIELDS = ["time"];
 
 function evalDiveToken(d, tok) {
-  const m = tok.match(/^([\wäöü\-]+)\s*(>=|<=|!=|≠|>|<|=|:)\s*(.+)$/i);
+  const m = tok.match(/^([\wäöü\-]+)\s*(>=|<=|!:|!=|≠|>|<|=|:)\s*(.+)$/i);
   if (m) {
     const fieldRaw = m[1].toLowerCase();
     const op = (m[2] === "≠" ? "!=" : m[2]);
@@ -739,12 +739,16 @@ function evalDiveToken(d, tok) {
       if (op === "!=") return fvSec !== cmp;
       return fvSec === cmp;
     }
-    // Textfelder: ":" (Standard) = enthält; "=" exakt; "!=" enthält nicht;
-    // >/</>=/<= alphabetischer Vergleich. 1:1 wie im Flugbuch.
+    // Textfelder: ":" (Standard) = enthält; "!:" = enthält nicht (Umkehrung
+    // von ":", praktisch z.B. um Tauchgänge OHNE Koordinaten zu finden —
+    // koordinaten!:x); "=" exakt; "!=" ungleich (Umkehrung von "="); >/</
+    // >=/<= alphabetischer Vergleich. Das Flugbuch kennt nur "!=" (dort
+    // doppelt belegt als enthält-nicht), hier bewusst sauber getrennt.
     const fvStr = String(fv), rawStr = raw;
     if (op === ":") return fvStr.toLowerCase().includes(rawStr.toLowerCase());
+    if (op === "!:") return !fvStr.toLowerCase().includes(rawStr.toLowerCase());
     if (op === "=") return fvStr.toLowerCase() === rawStr.toLowerCase();
-    if (op === "!=") return !fvStr.toLowerCase().includes(rawStr.toLowerCase());
+    if (op === "!=") return fvStr.toLowerCase() !== rawStr.toLowerCase();
     const cmpAlpha = fvStr.localeCompare(rawStr, "de", { sensitivity: "base" });
     if (op === ">") return cmpAlpha > 0;
     if (op === "<") return cmpAlpha < 0;
@@ -762,14 +766,15 @@ function evalDiveToken(d, tok) {
 }
 
 // Zerlegt eine Suchquery in Tokens — inkl. "(", ")" für echte Klammerung
-// und "feld:op\"mehrere wörter\"" für Werte mit Leerzeichen. 1:1 aus dem
-// Flugbuch übernommen (dort tokenizeQuery).
+// und "feld:op\"mehrere wörter\"" für Werte mit Leerzeichen. Aus dem
+// Flugbuch übernommen (dort tokenizeQuery), Operator-Alternation um "!:"
+// (enthält nicht) erweitert.
 function tokenizeDiveQuery(q) {
   const s = q.trim()
     .replace(/\s+(UND|AND)\s+/gi, " && ")
     .replace(/\s+(ODER|OR)\s+/gi, " || ")
     .replace(/&&/g, " && ").replace(/\|\|/g, " || ");
-  const re = /\(|\)|&&|\|\||[\wäöü\-]+(?:>=|<=|!=|≠|>|<|=|:)"[^"]*"|[\wäöü\-]+(?:>=|<=|!=|≠|>|<|=|:)\S+|\+\S+|-\S+|"[^"]*"|\S+/gi;
+  const re = /\(|\)|&&|\|\||[\wäöü\-]+(?:>=|<=|!:|!=|≠|>|<|=|:)"[^"]*"|[\wäöü\-]+(?:>=|<=|!:|!=|≠|>|<|=|:)\S+|\+\S+|-\S+|"[^"]*"|\S+/gi;
   const tokens = [];
   let m;
   while ((m = re.exec(s))) {
@@ -853,7 +858,22 @@ const DIVE_SEARCH_FIELDS = [
   { id: "bemerkung", label: "Bemerkung", type: "text" },
 ];
 const DIVE_ADV_OPS_NUM = [">=", "<=", "!=", ">", "<", "=", "between"];
-const DIVE_ADV_OPS_TEXT = [":", "=", "!=", ">", "<", ">=", "<="];
+const DIVE_ADV_OPS_TEXT = [":", "!:", "=", "!=", ">", "<", ">=", "<="];
+// Klartext-Label je Operator — bleibt im geschlossenen Auswahlfeld sichtbar
+// (nicht nur als Kurzform im Suchfeld-Text), damit z.B. "!:" nicht mit "!="
+// verwechselt wird. Vergleichsoperatoren bleiben als reines Symbol, da
+// selbsterklärend.
+const DIVE_OP_LABELS = {
+  ":": ": enthält",
+  "!:": "!: enthält nicht",
+  "=": "= exakt",
+  "!=": "!= ungleich",
+  ">": ">",
+  "<": "<",
+  ">=": "≥",
+  "<=": "≤",
+  "between": "zw.",
+};
 
 // Findet zusammenhängende Läufe von >=2 benachbarten "grouped"-Zeilen — die
 // werden mit runder Klammer umschlossen (im Text UND als sichtbare Klammer-
@@ -907,7 +927,7 @@ function buildAdvancedDiveQuery(rows) {
 function newDiveSearchRow() { return { field: "ort", op: ":", value: "", combinator: "AND", grouped: false }; }
 
 function parseDiveTermToken(tok) {
-  const m = tok.match(/^([\wäöü\-]+)\s*(>=|<=|!=|≠|>|<|=|:)\s*(.+)$/i);
+  const m = tok.match(/^([\wäöü\-]+)\s*(>=|<=|!:|!=|≠|>|<|=|:)\s*(.+)$/i);
   if (!m) return null;
   const field = FIELD_ALIASES[m[1].toLowerCase()] || m[1].toLowerCase();
   if (!DIVE_SEARCH_FIELDS.some(f => f.id === field)) return null;
@@ -1257,7 +1277,7 @@ function SearchBar({ filterText, setFilterText }) {
               const grouped = inSet.has(idx);
               return (
                 <div key={idx} style={{
-                  display:"flex",gap:6,alignItems:"center",
+                  display:"flex",flexWrap:"wrap",gap:6,alignItems:"center",
                   borderLeft: grouped ? "2px solid rgba(167,139,250,0.6)" : "2px solid transparent",
                   borderTopLeftRadius: startSet.has(idx) ? 6 : 0,
                   borderBottomLeftRadius: endSet.has(idx) ? 6 : 0,
@@ -1291,17 +1311,17 @@ function SearchBar({ filterText, setFilterText }) {
                     const ops = isNumeric ? DIVE_ADV_OPS_NUM : DIVE_ADV_OPS_TEXT;
                     return (
                       <select value={row.op || (isNumeric ? "=" : ":")} onChange={e=>updateRow(idx,{op:e.target.value})}
-                        style={{background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:8,padding:"5px 2px",color:"#e8f4fd",fontSize:12,width:isNumeric?68:44,flexShrink:0}}>
-                        {ops.map(o=><option key={o} value={o} style={{background:"#0a1628"}}>{o==="between"?"zw.":o}</option>)}
+                        style={{background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:8,padding:"5px 4px",color:"#e8f4fd",fontSize:12,width:isNumeric?92:118,flexShrink:0}}>
+                        {ops.map(o=><option key={o} value={o} style={{background:"#0a1628"}}>{DIVE_OP_LABELS[o]||o}</option>)}
                       </select>
                     );
                   })()}
                   <input value={row.value||""} onChange={e=>updateRow(idx,{value:e.target.value})}
                     placeholder={row.op==="between" ? "von…" : "Wert…"}
-                    style={{flex:1,minWidth:0,background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:8,padding:"5px 8px",color:"#e8f4fd",fontSize:12}} />
+                    style={{flex:"1 1 90px",minWidth:90,background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:8,padding:"5px 8px",color:"#e8f4fd",fontSize:12}} />
                   {row.op==="between" && (
                     <input value={row.value2||""} onChange={e=>updateRow(idx,{value2:e.target.value})} placeholder="bis…"
-                      style={{flex:1,minWidth:0,background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:8,padding:"5px 8px",color:"#e8f4fd",fontSize:12}} />
+                      style={{flex:"1 1 90px",minWidth:90,background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:8,padding:"5px 8px",color:"#e8f4fd",fontSize:12}} />
                   )}
                   <button onClick={()=>removeRow(idx)} style={{background:"none",border:"none",color:"rgba(232,244,253,0.35)",cursor:"pointer",fontSize:14,padding:"0 2px",flexShrink:0}}>✕</button>
                 </div>
