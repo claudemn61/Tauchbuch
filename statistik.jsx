@@ -102,10 +102,33 @@ function computeStats(dives) {
   };
 }
 
+// ── Verlinkung ins Tauchbuch ─────────────────────────────────────────────
+// Jede Kachel/Balken/Zeile führt gefiltert (bzw. bei einem konkreten
+// Tauchgang direkt in dessen Detailansicht) ins Tauchbuch; "Zurück" dort
+// führt an genau diese Stelle in der Statistik zurück (Scroll-Position wird
+// in der returnTo-URL mitgeschickt, da es sich um echte Seitenwechsel ohne
+// eigenen Router handelt).
+function statistikReturnUrl() {
+  return "statistik.html?scrollY=" + Math.round(window.scrollY || window.pageYOffset || 0);
+}
+function diveListUrl({ openDiveId, filterField, filterValue, filterLabel, groupField } = {}) {
+  const p = new URLSearchParams();
+  if (openDiveId != null) p.set("openDiveId", String(openDiveId));
+  if (filterField && filterValue != null) {
+    p.set("filterField", filterField);
+    p.set("filterValue", String(filterValue));
+    if (filterLabel != null) p.set("filterLabel", String(filterLabel));
+  }
+  if (groupField) p.set("groupField", groupField);
+  p.set("returnTo", statistikReturnUrl());
+  return "tauchbuch.html?" + p.toString();
+}
+function goDiveList(opts) { window.location.href = diveListUrl(opts); }
+
 // ── UI-Bausteine ─────────────────────────────────────────────────────────
-function StatTile({ label, value, sub }) {
+function StatTile({ label, value, sub, onClick }) {
   return (
-    <div style={{background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:14,padding:"14px 12px",textAlign:"center"}}>
+    <div onClick={onClick} style={{background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:14,padding:"14px 12px",textAlign:"center",cursor:onClick?"pointer":"default"}}>
       <div style={{fontSize:20,fontWeight:800,color:"#f87171"}}>{value}</div>
       <div style={{fontSize:10,color:"rgba(232,244,253,0.5)",textTransform:"uppercase",letterSpacing:0.4,marginTop:4}}>{label}</div>
       {sub && <div style={{fontSize:10,color:"rgba(232,244,253,0.3)",marginTop:2}}>{sub}</div>}
@@ -122,10 +145,10 @@ function SectionCard({ title, children }) {
   );
 }
 
-function BarRow({ label, count, max, color, suffix }) {
+function BarRow({ label, count, max, color, suffix, onClick }) {
   const pct = Math.max(4, Math.round(count/max*100));
   return (
-    <div style={{marginBottom:9}}>
+    <div onClick={onClick} style={{marginBottom:9,cursor:onClick?"pointer":"default"}}>
       <div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:3}}>
         <span style={{color:"#e8f4fd",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:"70%"}}>{label}</span>
         <span style={{color:"rgba(232,244,253,0.5)",flexShrink:0}}>{count}{suffix||""}</span>
@@ -137,9 +160,9 @@ function BarRow({ label, count, max, color, suffix }) {
   );
 }
 
-function RankRow({ rank, primary, secondary, value }) {
+function RankRow({ rank, primary, secondary, value, onClick }) {
   return (
-    <div style={{display:"flex",alignItems:"center",gap:10,padding:"7px 0",borderBottom:"1px solid rgba(255,255,255,0.05)"}}>
+    <div onClick={onClick} style={{display:"flex",alignItems:"center",gap:10,padding:"7px 0",borderBottom:"1px solid rgba(255,255,255,0.05)",cursor:onClick?"pointer":"default"}}>
       <span style={{width:20,fontSize:12,fontWeight:700,color:"rgba(232,244,253,0.35)",flexShrink:0}}>{rank}</span>
       <div style={{flex:1,minWidth:0}}>
         <div style={{fontSize:13,color:"#e8f4fd",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{primary}</div>
@@ -167,6 +190,21 @@ function StatistikApp() {
       setLoaded(true);
     })();
   }, []);
+
+  // Scroll-Position wiederherstellen, wenn wir per "Zurück" aus dem
+  // Tauchbuch hierher zurückkommen (siehe statistikReturnUrl) — kein SPA-
+  // Router hier, daher ein echter Seitenwechsel und die Position kommt als
+  // URL-Parameter mit statt aus einem State.
+  useEffect(() => {
+    if (!loaded) return;
+    try {
+      const y = new URLSearchParams(window.location.search).get("scrollY");
+      if (y != null) {
+        requestAnimationFrame(() => requestAnimationFrame(() => window.scrollTo(0, parseInt(y, 10) || 0)));
+        window.history.replaceState(null, "", "statistik.html");
+      }
+    } catch {}
+  }, [loaded]);
 
   if (!loaded) return null;
   const stats = computeStats(dives);
@@ -203,24 +241,26 @@ function StatistikApp() {
           {/* Kennzahlen — auf breiten Bildschirmen mehr Spalten, damit die
               Kacheln nebeneinander statt gestapelt Platz finden */}
           <div style={{display:"grid",gridTemplateColumns:isWide?"repeat(5,1fr)":"1fr 1fr 1fr",gap:8,marginBottom:14}}>
-            <StatTile label="Tauchgänge" value={stats.n} />
-            <StatTile label="Gesamtzeit" value={fmtDuration(stats.totalMin)} />
-            <StatTile label="Ø Dauer" value={fmtDuration(stats.avgDurationMin)} />
-            <StatTile label="Ø Tiefe" value={stats.avgDepth!=null?stats.avgDepth.toFixed(1)+" m":"—"} />
-            <StatTile label="Max. Tiefe" value={stats.maxDepthDive?stats.maxDepthDive.maxDepth+" m":"—"} sub={stats.maxDepthDive?"TG "+stats.maxDepthDive.name:null} />
-            <StatTile label="Ø Wassertemp." value={stats.avgTemp!=null?stats.avgTemp.toFixed(1)+"°":"—"} />
-            <StatTile label="Reisen" value={stats.reisenCount} />
-            <StatTile label="Länder" value={stats.laenderCount} />
-            <StatTile label="Orte" value={stats.ortCount} />
-            <StatTile label="Nitrox-Anteil" value={stats.nitroxPct+"%"} />
-            <StatTile label="Ø Bewertung" value={stats.avgRating!=null?stats.avgRating.toFixed(1)+"★":"—"} />
+            <StatTile label="Tauchgänge" value={stats.n} onClick={()=>goDiveList()} />
+            <StatTile label="Gesamtzeit" value={fmtDuration(stats.totalMin)} onClick={()=>goDiveList()} />
+            <StatTile label="Ø Dauer" value={fmtDuration(stats.avgDurationMin)} onClick={()=>goDiveList()} />
+            <StatTile label="Ø Tiefe" value={stats.avgDepth!=null?stats.avgDepth.toFixed(1)+" m":"—"} onClick={()=>goDiveList()} />
+            <StatTile label="Max. Tiefe" value={stats.maxDepthDive?stats.maxDepthDive.maxDepth+" m":"—"} sub={stats.maxDepthDive?"TG "+stats.maxDepthDive.name:null}
+              onClick={stats.maxDepthDive?()=>goDiveList({openDiveId:stats.maxDepthDive.id}):undefined} />
+            <StatTile label="Ø Wassertemp." value={stats.avgTemp!=null?stats.avgTemp.toFixed(1)+"°":"—"} onClick={()=>goDiveList()} />
+            <StatTile label="Reisen" value={stats.reisenCount} onClick={stats.reisenCount?()=>goDiveList({groupField:"reise"}):undefined} />
+            <StatTile label="Länder" value={stats.laenderCount} onClick={stats.laenderCount?()=>goDiveList({groupField:"land"}):undefined} />
+            <StatTile label="Orte" value={stats.ortCount} onClick={stats.ortCount?()=>goDiveList({groupField:"ort"}):undefined} />
+            <StatTile label="Nitrox-Anteil" value={stats.nitroxPct+"%"} onClick={stats.nitroxCount?()=>goDiveList({filterField:"nitrox",filterValue:"Nitrox"}):undefined} />
+            <StatTile label="Ø Bewertung" value={stats.avgRating!=null?stats.avgRating.toFixed(1)+"★":"—"} onClick={()=>goDiveList()} />
           </div>
 
           {/* Jahres-Verlauf */}
           {stats.years.length > 0 && (
             <SectionCard title="Tauchgänge pro Jahr">
               {stats.years.map(([yr, v]) => (
-                <BarRow key={yr} label={yr} count={v.count} max={stats.maxYearCount} color="#f87171" suffix=" TG" />
+                <BarRow key={yr} label={yr} count={v.count} max={stats.maxYearCount} color="#f87171" suffix=" TG"
+                  onClick={()=>goDiveList({filterField:"year",filterValue:yr})} />
               ))}
             </SectionCard>
           )}
@@ -229,7 +269,8 @@ function StatistikApp() {
           {stats.topDepth.length > 0 && (
             <SectionCard title="Tiefste Tauchgänge">
               {stats.topDepth.map((d,i) => (
-                <RankRow key={d.id} rank={i+1} primary={d.tauchspot||d.ort||"—"} secondary={`TG ${d.name} · ${d.date}`} value={d.maxDepth+" m"} />
+                <RankRow key={d.id} rank={i+1} primary={d.tauchspot||d.ort||"—"} secondary={`TG ${d.name} · ${d.date}`} value={d.maxDepth+" m"}
+                  onClick={()=>goDiveList({openDiveId:d.id})} />
               ))}
             </SectionCard>
           )}
@@ -238,7 +279,8 @@ function StatistikApp() {
           {stats.topDuration.length > 0 && (
             <SectionCard title="Längste Tauchgänge">
               {stats.topDuration.map((d,i) => (
-                <RankRow key={d.id} rank={i+1} primary={d.tauchspot||d.ort||"—"} secondary={`TG ${d.name} · ${d.date}`} value={fmtDuration(d.durationMin)} />
+                <RankRow key={d.id} rank={i+1} primary={d.tauchspot||d.ort||"—"} secondary={`TG ${d.name} · ${d.date}`} value={fmtDuration(d.durationMin)}
+                  onClick={()=>goDiveList({openDiveId:d.id})} />
               ))}
             </SectionCard>
           )}
@@ -247,7 +289,8 @@ function StatistikApp() {
           {stats.topSpots.length > 0 && (
             <SectionCard title="Häufigste Tauchspots">
               {stats.topSpots.map(([spot, count]) => (
-                <BarRow key={spot} label={spot} count={count} max={stats.maxSpotCount} color="#fb923c" suffix=" TG" />
+                <BarRow key={spot} label={spot} count={count} max={stats.maxSpotCount} color="#fb923c" suffix=" TG"
+                  onClick={()=>goDiveList({filterField:"tauchspot",filterValue:spot})} />
               ))}
             </SectionCard>
           )}
@@ -256,7 +299,8 @@ function StatistikApp() {
           {stats.byLand.length > 0 && (
             <SectionCard title="Länder">
               {stats.byLand.map(([land, count]) => (
-                <BarRow key={land} label={land} count={count} max={stats.maxLandCount} color="#38bdf8" suffix=" TG" />
+                <BarRow key={land} label={land} count={count} max={stats.maxLandCount} color="#38bdf8" suffix=" TG"
+                  onClick={()=>goDiveList({filterField:"land",filterValue:land})} />
               ))}
             </SectionCard>
           )}
@@ -265,7 +309,8 @@ function StatistikApp() {
           {stats.topBuddies.length > 0 && (
             <SectionCard title="Häufigste Buddys">
               {stats.topBuddies.map(([buddy, count]) => (
-                <BarRow key={buddy} label={"👤 "+buddy} count={count} max={stats.maxBuddyCount} color="#4ade80" suffix=" TG" />
+                <BarRow key={buddy} label={"👤 "+buddy} count={count} max={stats.maxBuddyCount} color="#4ade80" suffix=" TG"
+                  onClick={()=>goDiveList({filterField:"buddy",filterValue:buddy})} />
               ))}
             </SectionCard>
           )}
@@ -273,7 +318,8 @@ function StatistikApp() {
           {/* Bewertungsverteilung */}
           <SectionCard title="Bewertungsverteilung">
             {stats.ratingDist.map(r => (
-              <BarRow key={r.stars} label={"★".repeat(r.stars)} count={r.count} max={stats.maxRatingCount} color="#f59e0b" suffix=" TG" />
+              <BarRow key={r.stars} label={"★".repeat(r.stars)} count={r.count} max={stats.maxRatingCount} color="#f59e0b" suffix=" TG"
+                onClick={r.count?()=>goDiveList({filterField:"rating",filterValue:r.stars,filterLabel:"★".repeat(r.stars)}):undefined} />
             ))}
           </SectionCard>
 
@@ -281,7 +327,8 @@ function StatistikApp() {
           {stats.anzugCounts.length > 0 && (
             <SectionCard title="Anzüge im Einsatz">
               {stats.anzugCounts.map(([anzug, count]) => (
-                <BarRow key={anzug} label={anzug} count={count} max={Math.max(...stats.anzugCounts.map(a=>a[1]))} color="#a78bfa" suffix=" TG" />
+                <BarRow key={anzug} label={anzug} count={count} max={Math.max(...stats.anzugCounts.map(a=>a[1]))} color="#a78bfa" suffix=" TG"
+                  onClick={()=>goDiveList({filterField:"anzug",filterValue:anzug})} />
               ))}
             </SectionCard>
           )}
@@ -290,7 +337,8 @@ function StatistikApp() {
             <SectionCard title="Flaschentyp">
               <div style={{display:"flex",gap:8}}>
                 {stats.flascheCounts.map(([flasche, count]) => (
-                  <div key={flasche} style={{flex:1,background:"rgba(255,255,255,0.03)",borderRadius:10,padding:"10px 8px",textAlign:"center"}}>
+                  <div key={flasche} onClick={()=>goDiveList({filterField:"flasche",filterValue:flasche})}
+                    style={{flex:1,background:"rgba(255,255,255,0.03)",borderRadius:10,padding:"10px 8px",textAlign:"center",cursor:"pointer"}}>
                     <div style={{fontSize:18,fontWeight:800,color:"#f87171"}}>{count}</div>
                     <div style={{fontSize:11,color:"rgba(232,244,253,0.5)",marginTop:2}}>{flasche}</div>
                   </div>
