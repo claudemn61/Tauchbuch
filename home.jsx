@@ -12,7 +12,7 @@ function useIsWide() {
   return isWide;
 }
 
-const APP_VERSION = "2.8.3";
+const APP_VERSION = "2.8.4";
 
 // ── Startseite ───────────────────────────────────────────────────────────
 // Editierbares Titelbild (per Tap austauschbar, als Data-URL in Storage
@@ -29,6 +29,9 @@ const CHAPTERS = [
 // Änderungsverlauf — neuste zuerst. Wird beim Erhöhen der Version jeweils
 // von Hand ergänzt.
 const CHANGELOG = [
+  { version: "2.8.4", changes: [
+    "Karte: Tauchgänge derselben Reise werden chronologisch mit einer gestrichelten roten Linie verbunden",
+  ]},
   { version: "2.8.3", changes: [
     "Statistik: jede Kennzahl, jeder Balken und jeder Rang ist antippbar und öffnet das Tauchbuch entsprechend gefiltert (bzw. bei einem einzelnen Tauchgang direkt dessen Detailansicht); Zurück führt an dieselbe Stelle in der Statistik",
   ]},

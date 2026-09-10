@@ -303,6 +303,9 @@ function HilfeApp() {
             gültigen Wert hinterlegt haben — die Karte passt sich automatisch so ein, dass alle
             Punkte sichtbar sind. Jeder Marker zeigt dauerhaft seine Tauchgang-Nummer über dem Pin;
             ein Tipp auf den Marker öffnet zusätzlich ein Sprechblasen-Popup mit dem Tauchspot-Namen.
+            Tauchgänge derselben Reise werden zusätzlich chronologisch mit einer gestrichelten roten
+            Linie verbunden (pro Reise eine eigene Linie; Tauchgänge ohne Reise oder als einziger
+            ihrer Reise auf der Karte bleiben unverbunden).
             Hat kein angezeigter Tauchgang Koordinaten, erscheint stattdessen ein Hinweis. Siehe
             auch <a href="#h-detail-karte">Kapitel 4.4</a> für die Karte eines einzelnen Tauchgangs.
           </Sub>
