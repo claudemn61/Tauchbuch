@@ -845,6 +845,55 @@ function buildAdvancedDiveQuery(rows, combine) {
 
 function newDiveSearchRow() { return { field: "ort", op: ":", value: "" }; }
 
+// Umkehrung von buildAdvancedDiveQuery: übersetzt eine direkt ins Suchfeld
+// eingetippte Kurzform-Query zurück in Baukasten-Zeilen, damit die
+// Auswahlfelder (Feld/Operator) immer die gerade aktive Funktion zeigen
+// statt eines davon losgelösten, stehengebliebenen Default-Zustands.
+// Liefert null, wenn die Query sich nicht verlustfrei als flache Zeilen-
+// liste darstellen lässt (gemischtes UND/ODER, Freitext-Wörter, +/-
+// Präfixe, unbekanntes Feld) — die Zeilen bleiben dann unverändert.
+function parseDiveQueryToRows(q) {
+  const trimmed = String(q || "").trim();
+  if (!trimmed) return { rows: [newDiveSearchRow()], combine: "AND" };
+
+  const normalized = trimmed
+    .replace(/\s+(UND|AND)\s+/gi, " && ")
+    .replace(/\s+(ODER|OR)\s+/gi, " || ");
+  const hasAnd = / && /.test(normalized);
+  const hasOr = / \|\| /.test(normalized);
+  if (hasAnd && hasOr) return null;
+
+  const combine = hasOr ? "OR" : "AND";
+  const parts = normalized.split(hasOr ? /\s*\|\|\s*/ : /\s*&&\s*/).map(p => p.trim()).filter(Boolean);
+  if (!parts.length) return null;
+
+  const termRe = /^([\wäöü\-]+)\s*(>=|<=|!:|!=|≠|>|<|=|:)\s*(.+)$/i;
+  const parsed = [];
+  for (const part of parts) {
+    const m = part.match(termRe);
+    if (!m) return null;
+    const field = FIELD_ALIASES[m[1].toLowerCase()];
+    if (!field || !DIVE_SEARCH_FIELDS.some(f => f.id === field)) return null;
+    const op = m[2] === "≠" ? "!=" : m[2];
+    parsed.push({ field, op, value: m[3].trim().replace(/^"|"$/g, "") });
+  }
+
+  // Zwei aufeinanderfolgende UND-Zeilen auf demselben Feld mit ">="/"<="
+  // stammen aus dem "zw."-Operator (siehe buildAdvancedDiveQuery) — zu
+  // einer Zeile zusammenfassen statt als zwei separate Zeilen zu zeigen.
+  const rows = [];
+  for (let i = 0; i < parsed.length; i++) {
+    const cur = parsed[i], next = parsed[i + 1];
+    if (combine === "AND" && next && cur.field === next.field && cur.op === ">=" && next.op === "<=") {
+      rows.push({ field: cur.field, op: "between", value: cur.value, value2: next.value });
+      i++;
+    } else {
+      rows.push(cur);
+    }
+  }
+  return { rows, combine };
+}
+
 // ── Editable summary tiles (3 badges, freely reassignable + editable) ──────
 // Feste Auswahlfelder — analog Flugbuch (Ausrüstung wird meist aus einem
 // kleinen, wiederkehrenden Set gewählt statt frei getippt).
@@ -1116,14 +1165,25 @@ function SearchBar({ filterText, setFilterText }) {
     const next = rows.filter((_,i)=>i!==idx);
     applyRows(next.length ? next : [newDiveSearchRow()]);
   };
+  // Direkt ins Suchfeld eingetippte Kurzform live in die Baukasten-Zeilen
+  // zurückübersetzen, damit die Auswahlfelder (z.B. "Koordinaten" / "!:
+  // enthält nicht") die tatsächlich aktive Funktion zeigen statt eines
+  // stehengebliebenen Defaults ("Ort" / ": enthält"). Bewusst nur hier und
+  // nicht generisch über filterText verdrahtet, damit sich das nicht mit
+  // applyRows' eigenem setFilterText-Aufruf zu einer Schleife aufschaukelt.
+  const setFilterTextFromInput = (v) => {
+    setFilterText(v);
+    const parsed = parseDiveQueryToRows(v);
+    if (parsed) { setRows(parsed.rows); setCombine(parsed.combine); }
+  };
 
   return (
     <div style={{position:"relative"}}>
       <div style={{position:"relative"}}>
-        <input value={filterText} onChange={e=>setFilterText(e.target.value)} onFocus={()=>setAdvOpen(true)} placeholder="🔍 Suchen (alle Felder)…"
+        <input value={filterText} onChange={e=>setFilterTextFromInput(e.target.value)} onFocus={()=>setAdvOpen(true)} placeholder="🔍 Suchen (alle Felder)…"
           style={{width:"100%",background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,padding:"8px 34px 8px 12px",color:"#e8f4fd",fontSize:13,boxSizing:"border-box"}} />
         {filterText && (
-          <button onClick={()=>setFilterText("")}
+          <button onClick={()=>setFilterTextFromInput("")}
             style={{position:"absolute",right:8,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",color:"rgba(232,244,253,0.4)",cursor:"pointer",fontSize:14}}>✕</button>
         )}
       </div>
