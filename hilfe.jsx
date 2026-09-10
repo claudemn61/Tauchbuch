@@ -284,16 +284,19 @@ function HilfeApp() {
             oder mehr benachbarte Zeilen markiert sind, entsteht eine echte Klammer-Gruppe (sichtbar
             an der violetten Linie links und im Suchfeld-Text als „(…)“), z.B. für „Land UND (Nitrox
             ODER Bewertung ≥ 4)“. Für Zahlen/Datum/Zeit steht zusätzlich der Operator „zw.“
-            (zwischen) mit zwei Eingabefeldern zur Verfügung. Wird die Kurzform direkt ins Suchfeld
-            getippt, übernehmen die Auswahlfelder darunter automatisch Feld, Operator, Wert sowie
-            UND/ODER/Klammerung jeder Zeile.
+            (zwischen) mit zwei Eingabefeldern zur Verfügung. Das Operator-Auswahlfeld zeigt die
+            gewählte Funktion immer als Klartext (z.B. „!: enthält nicht“), nicht nur als Kurzform
+            im Suchfeld-Text. Wird die Kurzform direkt ins Suchfeld getippt, übernehmen die
+            Auswahlfelder darunter automatisch Feld, Operator, Wert sowie UND/ODER/Klammerung jeder
+            Zeile.
           </Sub>
           <Sub id="h-tb-such-syntax" title="3.6 Suche: Freitext-Syntax für Profis">
             Dieselbe Logik lässt sich auch direkt eintippen:
             <T><Tr><Th>Syntax</Th><Th>Bedeutung</Th><Th>Beispiel</Th></Tr>
               <Tr><Td>feld:wert</Td><Td>enthält (Text) / gleich (Zahl)</Td><Td>ort:Malediven</Td></Tr>
+              <Tr><Td>feld!:wert</Td><Td>enthält nicht (Umkehrung von „:“) — z.B. um Tauchgänge ohne (gültige) Koordinaten zu finden</Td><Td>koordinaten!:.</Td></Tr>
               <Tr><Td>feld=wert</Td><Td>exakt gleich</Td><Td>land=Aegypten</Td></Tr>
-              <Tr><Td>feld!=wert</Td><Td>ungleich / enthält nicht</Td><Td>nitrox!=Nitrox</Td></Tr>
+              <Tr><Td>feld!=wert</Td><Td>ungleich (Umkehrung von „=“)</Td><Td>nitrox!=Nitrox</Td></Tr>
               <Tr><Td>feld&gt;wert / &lt; / &gt;= / &lt;=</Td><Td>Vergleich</Td><Td>tiefe&gt;30</Td></Tr>
               <Tr><Td>UND / &amp;&amp;</Td><Td>beide Bedingungen</Td><Td>land:Aegypten UND tiefe&gt;25</Td></Tr>
               <Tr><Td>ODER / ||</Td><Td>eine der Bedingungen</Td><Td>buddy:Claude ODER buddy:Mel</Td></Tr>
