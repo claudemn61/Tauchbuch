@@ -280,7 +280,10 @@ function HilfeApp() {
             Kombination (UND/ODER) wird über zwei Buttons oben rechts gewählt. Für Zahlen/Datum/Zeit
             steht zusätzlich der Operator „zw.“ (zwischen) mit zwei Eingabefeldern zur Verfügung.
             Das Operator-Auswahlfeld zeigt die gewählte Funktion immer als Klartext (z.B. „!:
-            enthält nicht“), nicht nur als Kurzform im Suchfeld-Text.
+            enthält nicht“), nicht nur als Kurzform im Suchfeld-Text. Wird stattdessen die Kurzform
+            direkt ins Suchfeld getippt, übernehmen die Auswahlfelder darunter automatisch Feld,
+            Operator und Wert — sofern sich die Eingabe eindeutig als einzelne Zeile bzw. mehrere
+            gleichartig (nur UND oder nur ODER) verknüpfte Zeilen darstellen lässt.
           </Sub>
           <Sub id="h-tb-such-syntax" title="3.6 Suche: Freitext-Syntax für Profis">
             Dieselbe Logik lässt sich auch direkt eintippen:
