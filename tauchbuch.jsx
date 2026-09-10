@@ -449,7 +449,11 @@ function parseCoords(str) {
 // aufgebaut wird.
 const MAPTILER_API_KEY = "HFElbKEufz9KOHI4w2jB";
 
-function MiniMap({ points, height }) {
+// Reine Karten-Zeichenfläche ohne Vollbild-Logik — von MiniMap (inline) und
+// deren Vollbild-Overlay gemeinsam verwendet (zwei unabhängige Karten-
+// Instanzen statt einer zwischen Containern verschobenen, da MapTiler/
+// MapLibre das Umhängen des Canvas-Elements nicht zuverlässig unterstützt).
+function MapCanvas({ points, height, radius, onDoubleClick }) {
   const elRef = useRef(null);
   const mapRef = useRef(null);
   const key = JSON.stringify(points);
@@ -509,7 +513,33 @@ function MiniMap({ points, height }) {
   return (
     <>
       <style>{`.dive-map-tt{background:#0a1628;color:#7dd3fc;border:1px solid rgba(125,211,252,0.5);font-weight:700;font-size:11px;padding:1px 6px;border-radius:6px;white-space:nowrap;}`}</style>
-      <div ref={elRef} style={{width:"100%",height:height||220,borderRadius:12,overflow:"hidden",background:"#0a1628"}} />
+      <div ref={elRef} onDoubleClick={onDoubleClick}
+        style={{width:"100%",height:height||220,borderRadius:radius!=null?radius:12,overflow:"hidden",background:"#0a1628"}} />
+    </>
+  );
+}
+// Doppelklick/-tap auf die Karte öffnet sie bildschirmfüllend (eigene,
+// zweite Kartenistanz statt Umhängen der ersten — siehe MapCanvas).
+function MiniMap({ points, height }) {
+  const [fullscreen, setFullscreen] = useState(false);
+  return (
+    <>
+      <MapCanvas points={points} height={height} onDoubleClick={()=>points.length>0 && setFullscreen(true)} />
+      {fullscreen && (
+        <div style={{position:"fixed",inset:0,zIndex:400,background:"#0a1628",display:"flex",flexDirection:"column"}}>
+          <div style={{padding:"calc(14px + env(safe-area-inset-top, 0px)) 16px 10px",flexShrink:0,borderBottom:"1px solid rgba(255,255,255,0.08)"}}>
+            <button onClick={()=>setFullscreen(false)}
+              style={{background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.15)",borderRadius:10,padding:"8px 16px",color:"#e8f4fd",fontSize:14,fontWeight:700,cursor:"pointer"}}>
+              ← Zurück
+            </button>
+          </div>
+          <div style={{flex:1,position:"relative"}}>
+            <div style={{position:"absolute",inset:0}}>
+              <MapCanvas points={points} height="100%" radius={0} />
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
