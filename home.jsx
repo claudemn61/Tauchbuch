@@ -12,7 +12,7 @@ function useIsWide() {
   return isWide;
 }
 
-const APP_VERSION = "2.8.2";
+const APP_VERSION = "2.8.3";
 
 // ── Startseite ───────────────────────────────────────────────────────────
 // Editierbares Titelbild (per Tap austauschbar, als Data-URL in Storage
@@ -29,6 +29,9 @@ const CHAPTERS = [
 // Änderungsverlauf — neuste zuerst. Wird beim Erhöhen der Version jeweils
 // von Hand ergänzt.
 const CHANGELOG = [
+  { version: "2.8.3", changes: [
+    "Statistik: jede Kennzahl, jeder Balken und jeder Rang ist antippbar und öffnet das Tauchbuch entsprechend gefiltert (bzw. bei einem einzelnen Tauchgang direkt dessen Detailansicht); Zurück führt an dieselbe Stelle in der Statistik",
+  ]},
   { version: "2.8.2", changes: [
     "Bugfix CSV-Import: Blei-Werte mit Einheit (z.B. \"4kg\") wurden nicht erkannt, weil die feste Blei-Auswahl nur reine Zahlen kennt — wird jetzt vor der Übernahme bereinigt; Auswahl um 2 kg ergänzt",
   ]},
