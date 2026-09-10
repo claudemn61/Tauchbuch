@@ -111,25 +111,6 @@ function MapCanvas({ points, height, radius }) {
       }
     });
 
-    // Tauchgänge derselben Reise chronologisch mit einer gestrichelten roten
-    // Linie verbinden (hier trivial: alle Punkte gehören derselben Reise an).
-    const byReise = new Map();
-    points.forEach(p => {
-      if (!p.reise) return;
-      if (!byReise.has(p.reise)) byReise.set(p.reise, []);
-      byReise.get(p.reise).push(p);
-    });
-    map.on("load", () => {
-      let i = 0;
-      byReise.forEach(pts => {
-        if (pts.length < 2) return;
-        const sorted = [...pts].sort((a, b) => (a.dateTs || 0) - (b.dateTs || 0));
-        const id = "reise-line-" + (i++);
-        map.addSource(id, { type: "geojson", data: { type: "Feature", geometry: { type: "LineString", coordinates: sorted.map(p => [p.lon, p.lat]) } } });
-        map.addLayer({ id, type: "line", source: id, layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": "#ef4444", "line-width": 3, "line-dasharray": [2, 1.6] } });
-      });
-    });
-
     if (points.length > 1) {
       const lons = points.map(p => p.lon), lats = points.map(p => p.lat);
       map.fitBounds([[Math.min(...lons), Math.min(...lats)], [Math.max(...lons), Math.max(...lats)]], { padding: 30 });
@@ -146,13 +127,12 @@ function MapCanvas({ points, height, radius }) {
 
 // Bildschirmfüllende Karte für eine Reise — öffnet sich per Tipp auf die
 // Titelzeile einer Reisen-Karte (siehe ReisenApp), zeigt alle Tauchgänge
-// dieser Reise mit Koordinaten, chronologisch per gestrichelter roter Linie
-// verbunden (analog zur Listen-Karte im Tauchbuch).
+// dieser Reise, die Koordinaten hinterlegt haben.
 function TripMapOverlay({ trip, onClose }) {
   const points = trip.dives
     .map(d => {
       const c = parseCoords(d.koordinaten);
-      return c ? { lat:c.lat, lon:c.lon, num:d.name, label:`${d.name}: ${d.tauchspot||d.ort||""}`, reise:trip.name, dateTs:parseDateToTs(d.date) } : null;
+      return c ? { lat:c.lat, lon:c.lon, num:d.name, label:`${d.name}: ${d.tauchspot||d.ort||""}` } : null;
     })
     .filter(Boolean);
   return (
