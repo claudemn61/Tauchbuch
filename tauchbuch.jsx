@@ -697,7 +697,7 @@ const DATE_QUERY_FIELDS = ["date"];
 const TIME_QUERY_FIELDS = ["time"];
 
 function evalDiveToken(d, tok) {
-  const m = tok.match(/^([\wäöü\-]+)\s*(>=|<=|!=|≠|>|<|=|:)\s*(.+)$/i);
+  const m = tok.match(/^([\wäöü\-]+)\s*(>=|<=|!:|!=|≠|>|<|=|:)\s*(.+)$/i);
   if (m) {
     const fieldRaw = m[1].toLowerCase();
     const op = (m[2] === "≠" ? "!=" : m[2]);
@@ -739,12 +739,14 @@ function evalDiveToken(d, tok) {
       if (op === "!=") return fvSec !== cmp;
       return fvSec === cmp;
     }
-    // Textfelder: ":" (Standard) = enthält; "=" exakt; "!=" enthält nicht;
-    // >/</>=/<= alphabetischer Vergleich.
+    // Textfelder: ":" (Standard) = enthält; "!:" = enthält nicht (Umkehrung
+    // von ":"); "=" exakt; "!=" ungleich (Umkehrung von "="); >/</>=/<=
+    // alphabetischer Vergleich.
     const fvStr = String(fv), rawStr = raw;
     if (op === ":") return fvStr.toLowerCase().includes(rawStr.toLowerCase());
+    if (op === "!:") return !fvStr.toLowerCase().includes(rawStr.toLowerCase());
     if (op === "=") return fvStr.toLowerCase() === rawStr.toLowerCase();
-    if (op === "!=") return !fvStr.toLowerCase().includes(rawStr.toLowerCase());
+    if (op === "!=") return fvStr.toLowerCase() !== rawStr.toLowerCase();
     const cmpAlpha = fvStr.localeCompare(rawStr, "de", { sensitivity: "base" });
     if (op === ">") return cmpAlpha > 0;
     if (op === "<") return cmpAlpha < 0;
@@ -771,7 +773,7 @@ function matchDives(dives, q) {
   return dives.filter(d => {
     return orGroups.some(group => {
       const andTerms = group.split(/\s*&&\s*/).flatMap(t => {
-        return t.match(/(?:[\wäöü\-]+(?:>=|<=|!=|≠|>|<|=|:)\S+|\+\S+|-\S+|"[^"]+"|\S+)/gi) || [];
+        return t.match(/(?:[\wäöü\-]+(?:>=|<=|!:|!=|≠|>|<|=|:)\S+|\+\S+|-\S+|"[^"]+"|\S+)/gi) || [];
       }).map(t => t.replace(/^"|"$/g, ""));
       if (!andTerms.length) return true;
       return andTerms.every(term => {
@@ -807,7 +809,22 @@ const DIVE_SEARCH_FIELDS = [
   { id: "bemerkung", label: "Bemerkung", type: "text" },
 ];
 const DIVE_ADV_OPS_NUM = [">=", "<=", "!=", ">", "<", "=", "between"];
-const DIVE_ADV_OPS_TEXT = [":", "=", "!=", ">", "<", ">=", "<="];
+const DIVE_ADV_OPS_TEXT = [":", "!:", "=", "!=", ">", "<", ">=", "<="];
+// Klartext-Label je Operator — bleibt im geschlossenen Auswahlfeld sichtbar
+// (nicht nur als Kurzform im Suchfeld-Text), damit z.B. "!:" nicht mit "!="
+// verwechselt wird. Vergleichsoperatoren bleiben als reines Symbol, da
+// selbsterklärend.
+const DIVE_OP_LABELS = {
+  ":": ": enthält",
+  "!:": "!: enthält nicht",
+  "=": "= exakt",
+  "!=": "!= ungleich",
+  ">": ">",
+  "<": "<",
+  ">=": "≥",
+  "<=": "≤",
+  "between": "zw.",
+};
 
 function buildAdvancedDiveQuery(rows, combine) {
   const parts = rows
@@ -1117,7 +1134,7 @@ function SearchBar({ filterText, setFilterText }) {
             {rows.map((row, idx) => {
               const fieldDef = DIVE_SEARCH_FIELDS.find(f=>f.id===row.field);
               return (
-                <div key={idx} style={{display:"flex",gap:6,alignItems:"center"}}>
+                <div key={idx} style={{display:"flex",flexWrap:"wrap",gap:6,alignItems:"center"}}>
                   <span style={{fontSize:10,fontWeight:700,color:"#7dd3fc",minWidth:34,textAlign:"center",flexShrink:0}}>
                     {idx===0 ? "" : (combine==="OR"?"ODER":"UND")}
                   </span>
@@ -1127,25 +1144,28 @@ function SearchBar({ filterText, setFilterText }) {
                       const isNum = nf?.type==="number"||nf?.type==="date"||nf?.type==="time";
                       updateRow(idx, { field: e.target.value, op: isNum ? "=" : ":", value2: undefined });
                     }}
-                    style={{background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:8,padding:"5px 4px",color:"#e8f4fd",fontSize:12,minWidth:0}}>
+                    style={{background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:8,padding:"5px 4px",color:"#e8f4fd",fontSize:12,minWidth:0,flex:"1 1 80px"}}>
                     {DIVE_SEARCH_FIELDS.map(f=><option key={f.id} value={f.id} style={{background:"#0a1628"}}>{f.label}</option>)}
                   </select>
                   {(() => {
                     const isNumeric = fieldDef?.type === "number" || fieldDef?.type === "date" || fieldDef?.type === "time";
                     const ops = isNumeric ? DIVE_ADV_OPS_NUM : DIVE_ADV_OPS_TEXT;
                     return (
+                      // Klartext-Label (DIVE_OP_LABELS) bleibt im geschlossenen Feld
+                      // sichtbar, damit die gewählte Funktion (z.B. "enthält nicht")
+                      // nicht nur als Kurzform im Suchfeld-Text erscheint.
                       <select value={row.op || (isNumeric ? "=" : ":")} onChange={e=>updateRow(idx,{op:e.target.value})}
-                        style={{background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:8,padding:"5px 2px",color:"#e8f4fd",fontSize:12,width:isNumeric?68:44,flexShrink:0}}>
-                        {ops.map(o=><option key={o} value={o} style={{background:"#0a1628"}}>{o==="between"?"zw.":o}</option>)}
+                        style={{background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:8,padding:"5px 4px",color:"#e8f4fd",fontSize:12,width:isNumeric?92:118,flexShrink:0}}>
+                        {ops.map(o=><option key={o} value={o} style={{background:"#0a1628"}}>{DIVE_OP_LABELS[o]||o}</option>)}
                       </select>
                     );
                   })()}
                   <input value={row.value||""} onChange={e=>updateRow(idx,{value:e.target.value})}
                     placeholder={row.op==="between" ? "von…" : "Wert…"}
-                    style={{flex:1,minWidth:0,background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:8,padding:"5px 8px",color:"#e8f4fd",fontSize:12}} />
+                    style={{flex:"1 1 90px",minWidth:90,background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:8,padding:"5px 8px",color:"#e8f4fd",fontSize:12}} />
                   {row.op==="between" && (
                     <input value={row.value2||""} onChange={e=>updateRow(idx,{value2:e.target.value})} placeholder="bis…"
-                      style={{flex:1,minWidth:0,background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:8,padding:"5px 8px",color:"#e8f4fd",fontSize:12}} />
+                      style={{flex:"1 1 90px",minWidth:90,background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:8,padding:"5px 8px",color:"#e8f4fd",fontSize:12}} />
                   )}
                   <button onClick={()=>removeRow(idx)} style={{background:"none",border:"none",color:"rgba(232,244,253,0.35)",cursor:"pointer",fontSize:14,padding:"0 2px",flexShrink:0}}>✕</button>
                 </div>
