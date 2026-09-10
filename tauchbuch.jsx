@@ -1454,6 +1454,12 @@ function TauchbuchApp() {
   const [selected, setSelected] = useState(null);
   const [view, setView] = useState("list"); // list | detail
   const [returnTo, setReturnTo] = useState(null);
+  // Angepinnter Zusatzfilter (z.B. aus einem Tipp in der Statistik) — wird
+  // per UND mit der Freitextsuche kombiniert, bis er per ✕ wieder entfernt
+  // wird. Exakter Vergleich über diveFieldValue statt der Freitext-Query-
+  // Sprache, damit Werte mit Leerzeichen (Tauchspot, Ort, Buddy…) sicher
+  // funktionieren (deren "feld=wert"-Syntax bricht bei Leerzeichen ab).
+  const [pinnedFilter, setPinnedFilter] = useState(null); // { field, label, value }
   const [filterText, setFilterText] = useState("");
   const [sortId, setSortId] = useState("number");
   const [sortDir, setSortDir] = useState("desc");
@@ -1573,10 +1579,17 @@ function TauchbuchApp() {
         const params = new URLSearchParams(window.location.search);
         const openId = params.get("openDiveId");
         const ret = params.get("returnTo");
+        const filterField = params.get("filterField");
+        const filterValue = params.get("filterValue");
+        const groupField = params.get("groupField");
+        if (ret) setReturnTo(ret);
         if (openId) {
           const target = sorted.find(d => String(d.id) === openId);
-          if (target) { setSelected(target); setView("detail"); if (ret) setReturnTo(ret); }
+          if (target) { setSelected(target); setView("detail"); }
+        } else if (filterField && filterValue != null) {
+          setPinnedFilter({ field: filterField, value: filterValue, label: params.get("filterLabel") || filterValue });
         }
+        if (groupField) { setGroupField1(groupField); setGroupOrder1("desc"); setGroup1SortField(groupField==="reise"?"date":""); }
       } catch {}
     })();
   }, [ensureReisen]);
@@ -1754,7 +1767,14 @@ function TauchbuchApp() {
     );
   }
 
-  const filtered = matchDives(dives, filterText);
+  let filtered = matchDives(dives, filterText);
+  if (pinnedFilter) {
+    filtered = filtered.filter(d => {
+      const fv = diveFieldValue(d, pinnedFilter.field);
+      if (typeof fv === "number") return fv === (parseFloat(String(pinnedFilter.value).replace(",", ".")) || 0);
+      return String(fv).toLowerCase() === String(pinnedFilter.value).toLowerCase();
+    });
+  }
 
   const toggleSelect = (id) => setSelectedIds(prev => { const n = new Set(prev); n.has(id)?n.delete(id):n.add(id); return n; });
 
@@ -1767,9 +1787,9 @@ function TauchbuchApp() {
       {/* Header */}
       <div style={{position:"sticky",top:0,zIndex:10,background:"#040e20"}}>
         <div style={{background:"rgba(255,255,255,0.03)",borderBottom:"1px solid rgba(255,255,255,0.06)",padding:"calc(28px + env(safe-area-inset-top, 0px)) 16px 12px",display:"flex",alignItems:"center",justifyContent:"space-between",backdropFilter:"blur(10px)"}}>
-          <button onClick={()=>{window.location.href="index.html";}} title="Zur Startseite"
+          <button onClick={()=>{window.location.href=returnTo||"index.html";}} title={returnTo?"Zurück":"Zur Startseite"}
             style={{background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,width:32,height:32,display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,color:"rgba(232,244,253,0.8)",cursor:"pointer",flexShrink:0}}>
-            🏠
+            {returnTo?"←":"🏠"}
           </button>
           <span style={{fontWeight:900,fontSize:18,letterSpacing:-0.5,flex:1,textAlign:"center",marginLeft:-8}}>
             🤿 Logbuch {dives.length > 0 && <span style={{fontSize:12,fontWeight:600,color:"rgba(232,244,253,0.4)"}}>({dives.length})</span>}
@@ -1812,6 +1832,18 @@ function TauchbuchApp() {
             🔍
           </button>
         </div>
+
+        {/* Zusatzfilter aus der Statistik (z.B. "Land: Ägypten") — bleibt
+            aktiv bis ✕, unabhängig vom 🔍-Panel */}
+        {pinnedFilter && (
+          <div style={{margin:"8px 16px 0",display:"flex"}}>
+            <div style={{display:"flex",alignItems:"center",gap:8,background:"rgba(56,189,248,0.12)",border:"1px solid rgba(56,189,248,0.3)",borderRadius:20,padding:"5px 6px 5px 12px",fontSize:12,color:"#7dd3fc"}}>
+              <span>{(GROUP_FIELDS.find(f=>f.id===pinnedFilter.field)?.label)||(DIVE_SEARCH_FIELDS.find(f=>f.id===pinnedFilter.field)?.label)||pinnedFilter.field}: {pinnedFilter.label}</span>
+              <button onClick={()=>setPinnedFilter(null)} title="Filter entfernen"
+                style={{background:"rgba(255,255,255,0.1)",border:"none",borderRadius:"50%",width:18,height:18,display:"flex",alignItems:"center",justifyContent:"center",color:"#7dd3fc",fontSize:11,cursor:"pointer",flexShrink:0}}>✕</button>
+            </div>
+          </div>
+        )}
 
         {/* Import-Menü */}
         {showImportMenu && (

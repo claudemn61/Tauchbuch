@@ -467,6 +467,12 @@ function HilfeApp() {
           </T>
           <p style={{fontSize:12.5,color:"rgba(232,244,253,0.85)"}}>Abschnitte erscheinen nur bei
           vorhandenen Daten.</p>
+          <Callout kind="tip">Jede Kennzahl, jeder Balken und jeder Rang ist antippbar und öffnet
+          das Tauchbuch entsprechend gefiltert (z.B. ein Jahres-Balken auf alle Tauchgänge dieses
+          Jahres, ein Tauchspot/Land/Buddy/Anzug/Flaschentyp-Balken auf dessen Tauchgänge, ein
+          Bewertungs-Balken auf diese Sterne-Zahl); ein einzelner Tauchgang (Max. Tiefe, Tiefste/
+          Längste Tauchgänge) öffnet direkt dessen Detailansicht. <Field>←</Field> oben links im
+          Tauchbuch führt an genau die Stelle in der Statistik zurück.</Callout>
         </Section>
 
         {/* 9. Brevet */}
