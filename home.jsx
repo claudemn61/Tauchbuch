@@ -12,7 +12,7 @@ function useIsWide() {
   return isWide;
 }
 
-const APP_VERSION = "2.8.4";
+const APP_VERSION = "2.8.5";
 
 // ── Startseite ───────────────────────────────────────────────────────────
 // Editierbares Titelbild (per Tap austauschbar, als Data-URL in Storage
@@ -29,6 +29,9 @@ const CHAPTERS = [
 // Änderungsverlauf — neuste zuerst. Wird beim Erhöhen der Version jeweils
 // von Hand ergänzt.
 const CHANGELOG = [
+  { version: "2.8.5", changes: [
+    "Tauchliste: bei aktiver Suche oder Filter zeigt eine graue Zeile oberhalb der Liste die Anzahl der Treffer",
+  ]},
   { version: "2.8.4", changes: [
     "Karte: Tauchgänge derselben Reise werden chronologisch mit einer gestrichelten roten Linie verbunden",
   ]},
