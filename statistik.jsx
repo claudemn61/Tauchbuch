@@ -62,17 +62,19 @@ function computeStats(dives) {
   const years = [...byYear.entries()].sort((a,b) => b[0]-a[0]);
   const maxYearCount = Math.max(1, ...years.map(([,v])=>v.count));
 
-  // Rankings
-  const topDepth = [...dives].filter(d=>d.maxDepth!=null).sort((a,b)=>b.maxDepth-a.maxDepth).slice(0,5);
-  const topDuration = [...dives].filter(d=>d.durationMin).sort((a,b)=>b.durationMin-a.durationMin).slice(0,5);
+  // Rankings — volle, sortierte Listen; die Anzeige zeigt standardmässig nur
+  // die Top-N (siehe TOP_LIMITS unten) und blendet den Rest über den Titel
+  // der jeweiligen Kachel ein/aus.
+  const topDepth = [...dives].filter(d=>d.maxDepth!=null).sort((a,b)=>b.maxDepth-a.maxDepth);
+  const topDuration = [...dives].filter(d=>d.durationMin).sort((a,b)=>b.durationMin-a.durationMin);
 
   const countBy = (getKey) => {
     const m = new Map();
     dives.forEach(d => { const k = getKey(d); if (!k) return; m.set(k, (m.get(k)||0)+1); });
     return [...m.entries()].sort((a,b)=>b[1]-a[1]);
   };
-  const topSpots = countBy(d => d.tauchspot).slice(0,6);
-  const topBuddies = countBy(d => d.buddy).slice(0,6);
+  const topSpots = countBy(d => d.tauchspot);
+  const topBuddies = countBy(d => d.buddy);
   const byLand = countBy(d => d.land);
   const maxLandCount = Math.max(1, ...byLand.map(([,c])=>c));
   const maxSpotCount = Math.max(1, ...topSpots.map(([,c])=>c));
@@ -83,7 +85,7 @@ function computeStats(dives) {
   const maxRatingCount = Math.max(1, ...ratingDist.map(r=>r.count));
 
   // Ausrüstung
-  const anzugCounts = countBy(d => d.anzug).slice(0,5);
+  const anzugCounts = countBy(d => d.anzug);
   const flascheCounts = countBy(d => d.flasche);
 
   return {
@@ -125,6 +127,11 @@ function diveListUrl({ openDiveId, filterField, filterValue, filterLabel, groupF
 }
 function goDiveList(opts) { window.location.href = diveListUrl(opts); }
 
+// Standard-Anzahl für die "Top-N"-Kacheln, bevor man auf den Titel tippt, um
+// alle Ergebnisse zu sehen (Pfeil zeigt den Zustand, Tipp erneut = wieder
+// einklappen).
+const TOP_LIMITS = { topDepth: 5, topDuration: 5, topSpots: 6, topBuddies: 6, anzug: 5 };
+
 // ── UI-Bausteine ─────────────────────────────────────────────────────────
 function StatTile({ label, value, sub, onClick }) {
   return (
@@ -136,10 +143,18 @@ function StatTile({ label, value, sub, onClick }) {
   );
 }
 
-function SectionCard({ title, children }) {
+// expandable+onToggle machen den Titel selbst antippbar (mehr Trefffläche
+// als nur ein kleiner Pfeil) — zeigt/verbirgt die Ergebnisse jenseits der
+// Standard-Top-N (siehe TOP_LIMITS). expanded steuert nur den Pfeil (▴/▾);
+// welche Zeilen tatsächlich angezeigt werden, entscheidet der Aufrufer.
+function SectionCard({ title, children, expandable, expanded, onToggle }) {
   return (
     <div style={{background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.06)",borderRadius:14,padding:"14px 16px",marginBottom:14}}>
-      <div style={{fontSize:11,fontWeight:700,color:"rgba(232,244,253,0.4)",textTransform:"uppercase",letterSpacing:1,marginBottom:12}}>{title}</div>
+      <div onClick={expandable?onToggle:undefined}
+        style={{display:"flex",alignItems:"center",justifyContent:"space-between",fontSize:11,fontWeight:700,color:"rgba(232,244,253,0.4)",textTransform:"uppercase",letterSpacing:1,marginBottom:12,cursor:expandable?"pointer":"default"}}>
+        <span>{title}</span>
+        {expandable && <span style={{fontSize:12,color:"rgba(232,244,253,0.5)"}}>{expanded?"▴":"▾"}</span>}
+      </div>
       {children}
     </div>
   );
@@ -177,6 +192,8 @@ function StatistikApp() {
   const isWide = useIsWide();
   const [dives, setDives] = useState([]);
   const [loaded, setLoaded] = useState(false);
+  const [expanded, setExpanded] = useState({}); // { [TOP_LIMITS-Schlüssel]: true } = alle Ergebnisse statt Top-N
+  const toggleExpand = (key) => setExpanded(e => ({ ...e, [key]: !e[key] }));
 
   useEffect(() => {
     (async () => {
@@ -267,8 +284,8 @@ function StatistikApp() {
 
           {/* Tiefste Tauchgänge */}
           {stats.topDepth.length > 0 && (
-            <SectionCard title="Tiefste Tauchgänge">
-              {stats.topDepth.map((d,i) => (
+            <SectionCard title="Tiefste Tauchgänge" expandable expanded={!!expanded.topDepth} onToggle={()=>toggleExpand("topDepth")}>
+              {(expanded.topDepth ? stats.topDepth : stats.topDepth.slice(0,TOP_LIMITS.topDepth)).map((d,i) => (
                 <RankRow key={d.id} rank={i+1} primary={d.tauchspot||d.ort||"—"} secondary={`TG ${d.name} · ${d.date}`} value={d.maxDepth+" m"}
                   onClick={()=>goDiveList({openDiveId:d.id})} />
               ))}
@@ -277,8 +294,8 @@ function StatistikApp() {
 
           {/* Längste Tauchgänge */}
           {stats.topDuration.length > 0 && (
-            <SectionCard title="Längste Tauchgänge">
-              {stats.topDuration.map((d,i) => (
+            <SectionCard title="Längste Tauchgänge" expandable expanded={!!expanded.topDuration} onToggle={()=>toggleExpand("topDuration")}>
+              {(expanded.topDuration ? stats.topDuration : stats.topDuration.slice(0,TOP_LIMITS.topDuration)).map((d,i) => (
                 <RankRow key={d.id} rank={i+1} primary={d.tauchspot||d.ort||"—"} secondary={`TG ${d.name} · ${d.date}`} value={fmtDuration(d.durationMin)}
                   onClick={()=>goDiveList({openDiveId:d.id})} />
               ))}
@@ -287,8 +304,8 @@ function StatistikApp() {
 
           {/* Beliebteste Tauchspots */}
           {stats.topSpots.length > 0 && (
-            <SectionCard title="Häufigste Tauchspots">
-              {stats.topSpots.map(([spot, count]) => (
+            <SectionCard title="Häufigste Tauchspots" expandable expanded={!!expanded.topSpots} onToggle={()=>toggleExpand("topSpots")}>
+              {(expanded.topSpots ? stats.topSpots : stats.topSpots.slice(0,TOP_LIMITS.topSpots)).map(([spot, count]) => (
                 <BarRow key={spot} label={spot} count={count} max={stats.maxSpotCount} color="#fb923c" suffix=" TG"
                   onClick={()=>goDiveList({filterField:"tauchspot",filterValue:spot})} />
               ))}
@@ -307,8 +324,8 @@ function StatistikApp() {
 
           {/* Buddys */}
           {stats.topBuddies.length > 0 && (
-            <SectionCard title="Häufigste Buddys">
-              {stats.topBuddies.map(([buddy, count]) => (
+            <SectionCard title="Häufigste Buddys" expandable expanded={!!expanded.topBuddies} onToggle={()=>toggleExpand("topBuddies")}>
+              {(expanded.topBuddies ? stats.topBuddies : stats.topBuddies.slice(0,TOP_LIMITS.topBuddies)).map(([buddy, count]) => (
                 <BarRow key={buddy} label={"👤 "+buddy} count={count} max={stats.maxBuddyCount} color="#4ade80" suffix=" TG"
                   onClick={()=>goDiveList({filterField:"buddy",filterValue:buddy})} />
               ))}
@@ -325,8 +342,8 @@ function StatistikApp() {
 
           {/* Ausrüstung */}
           {stats.anzugCounts.length > 0 && (
-            <SectionCard title="Anzüge im Einsatz">
-              {stats.anzugCounts.map(([anzug, count]) => (
+            <SectionCard title="Anzüge im Einsatz" expandable expanded={!!expanded.anzug} onToggle={()=>toggleExpand("anzug")}>
+              {(expanded.anzug ? stats.anzugCounts : stats.anzugCounts.slice(0,TOP_LIMITS.anzug)).map(([anzug, count]) => (
                 <BarRow key={anzug} label={anzug} count={count} max={Math.max(...stats.anzugCounts.map(a=>a[1]))} color="#a78bfa" suffix=" TG"
                   onClick={()=>goDiveList({filterField:"anzug",filterValue:anzug})} />
               ))}
