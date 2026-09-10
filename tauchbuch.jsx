@@ -2317,6 +2317,15 @@ function TauchbuchApp() {
         })()}
       </div>
 
+      {/* Trefferanzahl — nur bei aktiver Suche/Filter (Freitext oder aus der
+          Statistik angepinnt), damit klar ist, dass die Liste eingeschränkt
+          ist. Reine Gruppierung/Sortierung zählt nicht als Filter. */}
+      {(filterText || pinnedFilter) && (
+        <div style={{padding:"10px 16px 0",fontSize:12,color:"rgba(232,244,253,0.4)"}}>
+          {filtered.length} {filtered.length===1?"Ergebnis":"Ergebnisse"}
+        </div>
+      )}
+
       {/* Liste — generische zweistufige Gruppierung (Gr. 1° aussen, Gr. 2°
           verschachtelt), 1:1 nach Flugbuch-Vorbild. Beide Ebenen unabhängig
           optional ("Keine" = aus); ist nur Gr. 2° gesetzt während Gr. 1°

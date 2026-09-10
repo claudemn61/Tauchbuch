@@ -270,7 +270,9 @@ function HilfeApp() {
           </Sub>
           <Sub id="h-tb-such-einfach" title="3.4 Suche: einfache Volltextsuche">
             Das Suchfeld im 🔍-Panel durchsucht standardmässig alle Felder eines Tauchgangs
-            gleichzeitig. Ein Tipp auf ✕ im Suchfeld leert die Suche.
+            gleichzeitig. Ein Tipp auf ✕ im Suchfeld leert die Suche. Ist eine Suche oder ein aus
+            der Statistik angepinnter Filter aktiv, zeigt eine graue Zeile oberhalb der Liste die
+            Anzahl der Treffer.
           </Sub>
           <Sub id="h-tb-such-erweitert" title="3.5 Suche: erweiterte Suche">
             Ein Tipp ins Suchfeld öffnet einen Baukasten: pro Zeile ein Feld, ein Operator und ein
