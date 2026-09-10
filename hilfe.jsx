@@ -459,11 +459,12 @@ function HilfeApp() {
           <T><Tr><Th>Abschnitt</Th><Th>Inhalt</Th></Tr>
             <Tr><Td>Kennzahlen</Td><Td>Tauchgänge, Gesamtzeit, Ø Dauer, Ø/Max. Tiefe, Ø Wassertemp., Reisen, Länder, Orte, Nitrox-Anteil, Ø Bewertung</Td></Tr>
             <Tr><Td>Tauchgänge pro Jahr</Td><Td>Balkendiagramm</Td></Tr>
-            <Tr><Td>Tiefste / Längste Tauchgänge</Td><Td>Top 5</Td></Tr>
-            <Tr><Td>Häufigste Tauchspots / Buddys</Td><Td>Top 6</Td></Tr>
+            <Tr><Td>Tiefste / Längste Tauchgänge</Td><Td>Top 5 (Titel antippen = alle)</Td></Tr>
+            <Tr><Td>Häufigste Tauchspots / Buddys</Td><Td>Top 6 (Titel antippen = alle)</Td></Tr>
             <Tr><Td>Länder</Td><Td>Verteilung</Td></Tr>
             <Tr><Td>Bewertungsverteilung</Td><Td>Anzahl je Sterne-Stufe</Td></Tr>
-            <Tr><Td>Anzüge / Flaschentyp</Td><Td>Verteilung der Ausrüstung</Td></Tr>
+            <Tr><Td>Anzüge</Td><Td>Top 5 (Titel antippen = alle)</Td></Tr>
+            <Tr><Td>Flaschentyp</Td><Td>Verteilung der Ausrüstung</Td></Tr>
           </T>
           <p style={{fontSize:12.5,color:"rgba(232,244,253,0.85)"}}>Abschnitte erscheinen nur bei
           vorhandenen Daten.</p>
