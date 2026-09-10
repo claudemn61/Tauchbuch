@@ -1,4 +1,4 @@
-const { useState, useEffect, useCallback } = React;
+const { useState, useEffect, useCallback, useRef } = React;
 
 
 function parseDateToTs(d) {
@@ -57,6 +57,128 @@ function aggregateReisen(dives) {
   return trips;
 }
 
+// Koordinaten-Parsing und Karten-Zeichenfläche 1:1 aus tauchbuch.jsx
+// übernommen (keine Modul-Imports zwischen den Seiten in dieser Multi-Page-
+// App — jede Seite ist eigenständig). Details siehe dortige Kommentare.
+const COORD_TOKEN_RE = /(-?\d+(?:\.\d+)?)\s*[°º]?\s*(?:(\d+(?:\.\d+)?)\s*['′]\s*(?:(\d+(?:\.\d+)?)\s*(?:"|″)\s*)?)?\s*([NSEWnsew])?/g;
+function coordTokenToDecimal(m) {
+  const deg = parseFloat(m[1]);
+  const min = m[2] ? parseFloat(m[2]) : 0;
+  const sec = m[3] ? parseFloat(m[3]) : 0;
+  const hemi = m[4] ? m[4].toUpperCase() : null;
+  let value = Math.abs(deg) + min/60 + sec/3600;
+  if (hemi === "S" || hemi === "W") value = -value;
+  else if (!hemi && deg < 0) value = -value;
+  return value;
+}
+function parseCoords(str) {
+  if (!str) return null;
+  const s = String(str).trim();
+  const matches = [...s.matchAll(COORD_TOKEN_RE)].filter(m => /\d/.test(m[0]));
+  if (matches.length < 2) return null;
+  const lat = coordTokenToDecimal(matches[0]);
+  const lon = coordTokenToDecimal(matches[1]);
+  if (isNaN(lat) || isNaN(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) return null;
+  return { lat, lon };
+}
+const MAPTILER_API_KEY = "HFElbKEufz9KOHI4w2jB";
+function MapCanvas({ points, height, radius }) {
+  const elRef = useRef(null);
+  const mapRef = useRef(null);
+  const key = JSON.stringify(points);
+  useEffect(() => {
+    if (!elRef.current || !window.maptilersdk || !points.length) return;
+    const sdk = window.maptilersdk;
+    const map = new sdk.Map({
+      container: elRef.current,
+      apiKey: MAPTILER_API_KEY,
+      style: sdk.MapStyle.STREETS,
+      language: "de",
+      center: [points[0].lon, points[0].lat],
+      zoom: 10,
+    });
+    mapRef.current = map;
+
+    points.forEach(p => {
+      const marker = new sdk.Marker().setLngLat([p.lon, p.lat]);
+      if (p.label) marker.setPopup(new sdk.Popup({ offset: 20 }).setText(p.label));
+      marker.addTo(map);
+      if (p.num != null) {
+        const el = document.createElement("div");
+        el.className = "dive-map-tt";
+        el.textContent = String(p.num);
+        new sdk.Marker({ element: el, anchor: "bottom", offset: [0, -30] }).setLngLat([p.lon, p.lat]).addTo(map);
+      }
+    });
+
+    // Tauchgänge derselben Reise chronologisch mit einer gestrichelten roten
+    // Linie verbinden (hier trivial: alle Punkte gehören derselben Reise an).
+    const byReise = new Map();
+    points.forEach(p => {
+      if (!p.reise) return;
+      if (!byReise.has(p.reise)) byReise.set(p.reise, []);
+      byReise.get(p.reise).push(p);
+    });
+    map.on("load", () => {
+      let i = 0;
+      byReise.forEach(pts => {
+        if (pts.length < 2) return;
+        const sorted = [...pts].sort((a, b) => (a.dateTs || 0) - (b.dateTs || 0));
+        const id = "reise-line-" + (i++);
+        map.addSource(id, { type: "geojson", data: { type: "Feature", geometry: { type: "LineString", coordinates: sorted.map(p => [p.lon, p.lat]) } } });
+        map.addLayer({ id, type: "line", source: id, layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": "#ef4444", "line-width": 3, "line-dasharray": [2, 1.6] } });
+      });
+    });
+
+    if (points.length > 1) {
+      const lons = points.map(p => p.lon), lats = points.map(p => p.lat);
+      map.fitBounds([[Math.min(...lons), Math.min(...lats)], [Math.max(...lons), Math.max(...lats)]], { padding: 30 });
+    }
+    return () => { map.remove(); mapRef.current = null; };
+  }, [key]);
+  return (
+    <>
+      <style>{`.dive-map-tt{background:#0a1628;color:#7dd3fc;border:1px solid rgba(125,211,252,0.5);font-weight:700;font-size:11px;padding:1px 6px;border-radius:6px;white-space:nowrap;}`}</style>
+      <div ref={elRef} style={{width:"100%",height:height||220,borderRadius:radius!=null?radius:12,overflow:"hidden",background:"#0a1628"}} />
+    </>
+  );
+}
+
+// Bildschirmfüllende Karte für eine Reise — öffnet sich per Tipp auf die
+// Titelzeile einer Reisen-Karte (siehe ReisenApp), zeigt alle Tauchgänge
+// dieser Reise mit Koordinaten, chronologisch per gestrichelter roter Linie
+// verbunden (analog zur Listen-Karte im Tauchbuch).
+function TripMapOverlay({ trip, onClose }) {
+  const points = trip.dives
+    .map(d => {
+      const c = parseCoords(d.koordinaten);
+      return c ? { lat:c.lat, lon:c.lon, num:d.name, label:`${d.name}: ${d.tauchspot||d.ort||""}`, reise:trip.name, dateTs:parseDateToTs(d.date) } : null;
+    })
+    .filter(Boolean);
+  return (
+    <div style={{position:"fixed",inset:0,zIndex:400,background:"#0a1628",display:"flex",flexDirection:"column"}}>
+      <div style={{padding:"calc(14px + env(safe-area-inset-top, 0px)) 16px 10px",flexShrink:0,borderBottom:"1px solid rgba(255,255,255,0.08)",display:"flex",alignItems:"center",gap:10}}>
+        <button onClick={onClose}
+          style={{background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.15)",borderRadius:10,padding:"8px 16px",color:"#e8f4fd",fontSize:14,fontWeight:700,cursor:"pointer",flexShrink:0}}>
+          ← Zurück
+        </button>
+        <span style={{fontSize:14,fontWeight:700,color:"#e8f4fd",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{trip.name}</span>
+      </div>
+      {points.length ? (
+        <div style={{flex:1,position:"relative"}}>
+          <div style={{position:"absolute",inset:0}}>
+            <MapCanvas points={points} height="100%" radius={0} />
+          </div>
+        </div>
+      ) : (
+        <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",padding:24,textAlign:"center",color:"rgba(232,244,253,0.5)",fontSize:13}}>
+          Keine der Tauchgänge dieser Reise hat Koordinaten hinterlegt.
+        </div>
+      )}
+    </div>
+  );
+}
+
 function SummaryChip({ label, value }) {
   return (
     <span style={{display:"flex",flexDirection:"column",alignItems:"center",gap:1,background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.06)",borderRadius:10,padding:"5px 10px",whiteSpace:"nowrap",flexShrink:0}}>
@@ -74,6 +196,7 @@ function ReisenApp() {
   const [manageOpen, setManageOpen] = useState(false);
   const [sortMode, setSortMode] = useState("manual"); // "manual" | "date" | "abc"
   const [confirmDeleteName, setConfirmDeleteName] = useState(null);
+  const [mapTrip, setMapTrip] = useState(null);
 
   useEffect(() => {
     (async () => {
@@ -259,7 +382,8 @@ function ReisenApp() {
         )}
         {trips.map((trip, tripIdx) => (
           <div key={trip.name} style={{flexShrink:0,width:340,background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:14,overflow:"hidden"}}>
-            <div style={{padding:"14px 16px",display:"flex",alignItems:"center",gap:10,background:"rgba(245,166,35,0.08)",borderBottom:"1px solid rgba(245,166,35,0.15)"}}>
+            <div onClick={()=>setMapTrip(trip)} title="Karte dieser Reise öffnen"
+              style={{padding:"14px 16px",display:"flex",alignItems:"center",gap:10,background:"rgba(245,166,35,0.08)",borderBottom:"1px solid rgba(245,166,35,0.15)",cursor:"pointer"}}>
               <span style={{fontSize:12,fontWeight:700,color:"#f5a623",background:"rgba(245,166,35,0.18)",borderRadius:20,width:26,height:26,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
                 {trips.length - tripIdx}
               </span>
@@ -269,6 +393,7 @@ function ReisenApp() {
                   {fmtDateShort(trip.firstDate)} – {fmtDateShort(trip.lastDate)}
                 </div>
               </div>
+              <span style={{fontSize:16,color:"rgba(245,166,35,0.6)",flexShrink:0}}>🌐</span>
             </div>
 
             <div style={{padding:"12px 16px 16px"}}>
@@ -314,6 +439,8 @@ function ReisenApp() {
         ))}
         <div style={{flexShrink:0,width:8}} />
       </div>
+
+      {mapTrip && <TripMapOverlay trip={mapTrip} onClose={()=>setMapTrip(null)} />}
     </div>
   );
 }

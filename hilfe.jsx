@@ -308,6 +308,8 @@ function HilfeApp() {
             ihrer Reise auf der Karte bleiben unverbunden).
             Hat kein angezeigter Tauchgang Koordinaten, erscheint stattdessen ein Hinweis. Siehe
             auch <a href="#h-detail-karte">Kapitel 4.4</a> für die Karte eines einzelnen Tauchgangs.
+            Doppeltipp auf die Karte öffnet sie bildschirmfüllend; <Field>← Zurück</Field> oben
+            schliesst sie wieder.
           </Sub>
           <Sub id="h-tb-neu" title="3.8 Neuen Tauchgang anlegen">
             <Badge>+ Tauchgang</Badge> legt sofort einen neuen, weitgehend leeren Tauchgang an und
@@ -379,7 +381,8 @@ function HilfeApp() {
             Der 🌐-Button auf der Bewertungszeile öffnet bzw. schliesst eine Karte direkt unter den
             Bemerkungen, die den Spot anhand der eingetragenen Koordinaten anzeigt — der Marker
             zeigt dauerhaft die Tauchgang-Nummer über dem Pin. Sind keine (gültigen) Koordinaten
-            hinterlegt, erscheint stattdessen ein Hinweis mit Format-Beispiel.
+            hinterlegt, erscheint stattdessen ein Hinweis mit Format-Beispiel. Doppeltipp auf die
+            Karte öffnet sie bildschirmfüllend; <Field>← Zurück</Field> oben schliesst sie wieder.
           </Sub>
           <Sub id="h-detail-bemerkungen" title="4.5 Bemerkungen">
             Mehrzeiliges Freitextfeld für Beobachtungen — antippen öffnet die Bearbeitung.
@@ -432,7 +435,10 @@ function HilfeApp() {
           <Sub id="h-reisen-karten" title="6.1 Reisen-Karten">
             Horizontal wischbare Karten, fest sortiert nach dem Datum des letzten Tauchgangs jeder
             Reise (neuste links). Jede Karte zeigt Name, Zeitraum, alle zugehörigen Tauchgänge
-            sowie Kennzahlen (Anzahl, Gesamtzeit, max. Tiefe, Nummernspanne).
+            sowie Kennzahlen (Anzahl, Gesamtzeit, max. Tiefe, Nummernspanne). Ein Tipp auf die
+            Titelzeile (Nummer, Name, Zeitraum) öffnet eine bildschirmfüllende Karte mit allen
+            Tauchgängen dieser Reise, die Koordinaten hinterlegt haben, chronologisch mit einer
+            gestrichelten roten Linie verbunden; <Field>← Zurück</Field> oben schliesst sie wieder.
           </Sub>
           <Sub id="h-reisen-verwalten" title="6.2 Reisen verwalten">
             <T><Tr><Th>Element</Th><Th>Funktion</Th></Tr>
