@@ -275,29 +275,32 @@ function HilfeApp() {
             Anzahl der Treffer.
           </Sub>
           <Sub id="h-tb-such-erweitert" title="3.5 Suche: erweiterte Suche">
-            Ein Tipp ins Suchfeld öffnet einen Baukasten: pro Zeile ein Feld, ein Operator und ein
-            Wert. Über <Badge>+ Zeile</Badge> lassen sich beliebig viele Bedingungen hinzufügen; die
-            Kombination (UND/ODER) wird über zwei Buttons oben rechts gewählt. Für Zahlen/Datum/Zeit
-            steht zusätzlich der Operator „zw.“ (zwischen) mit zwei Eingabefeldern zur Verfügung.
-            Das Operator-Auswahlfeld zeigt die gewählte Funktion immer als Klartext (z.B. „!:
-            enthält nicht“), nicht nur als Kurzform im Suchfeld-Text. Wird stattdessen die Kurzform
-            direkt ins Suchfeld getippt, übernehmen die Auswahlfelder darunter automatisch Feld,
-            Operator und Wert — sofern sich die Eingabe eindeutig als einzelne Zeile bzw. mehrere
-            gleichartig (nur UND oder nur ODER) verknüpfte Zeilen darstellen lässt.
+            Ein Tipp ins Suchfeld öffnet einen Baukasten (identisch zum Flugbuch): pro Zeile ein
+            Feld, ein Operator und ein Wert. Über <Badge>+ Zeile</Badge> lassen sich beliebig viele
+            Zeilen hinzufügen. Jede Zeile (ausser der ersten) hat einen eigenen{" "}
+            <Field>UND</Field>/<Field>ODER</Field>-Button, der sie mit der vorherigen Zeile
+            verknüpft — Bedingungen lassen sich also frei mischen, nicht nur einheitlich UND oder
+            ODER. Der <Field>( )</Field>-Knopf klammert eine Zeile mit ihren Nachbarn: sobald zwei
+            oder mehr benachbarte Zeilen markiert sind, entsteht eine echte Klammer-Gruppe (sichtbar
+            an der violetten Linie links und im Suchfeld-Text als „(…)“), z.B. für „Land UND (Nitrox
+            ODER Bewertung ≥ 4)“. Für Zahlen/Datum/Zeit steht zusätzlich der Operator „zw.“
+            (zwischen) mit zwei Eingabefeldern zur Verfügung. Wird die Kurzform direkt ins Suchfeld
+            getippt, übernehmen die Auswahlfelder darunter automatisch Feld, Operator, Wert sowie
+            UND/ODER/Klammerung jeder Zeile.
           </Sub>
           <Sub id="h-tb-such-syntax" title="3.6 Suche: Freitext-Syntax für Profis">
             Dieselbe Logik lässt sich auch direkt eintippen:
             <T><Tr><Th>Syntax</Th><Th>Bedeutung</Th><Th>Beispiel</Th></Tr>
               <Tr><Td>feld:wert</Td><Td>enthält (Text) / gleich (Zahl)</Td><Td>ort:Malediven</Td></Tr>
-              <Tr><Td>feld!:wert</Td><Td>enthält nicht (Umkehrung von „:“)</Td><Td>buddy!:Peter</Td></Tr>
               <Tr><Td>feld=wert</Td><Td>exakt gleich</Td><Td>land=Aegypten</Td></Tr>
-              <Tr><Td>feld!=wert</Td><Td>ungleich (Umkehrung von „=“)</Td><Td>nitrox!=Nitrox</Td></Tr>
+              <Tr><Td>feld!=wert</Td><Td>ungleich / enthält nicht</Td><Td>nitrox!=Nitrox</Td></Tr>
               <Tr><Td>feld&gt;wert / &lt; / &gt;= / &lt;=</Td><Td>Vergleich</Td><Td>tiefe&gt;30</Td></Tr>
               <Tr><Td>UND / &amp;&amp;</Td><Td>beide Bedingungen</Td><Td>land:Aegypten UND tiefe&gt;25</Td></Tr>
               <Tr><Td>ODER / ||</Td><Td>eine der Bedingungen</Td><Td>buddy:Claude ODER buddy:Mel</Td></Tr>
+              <Tr><Td>( … )</Td><Td>Klammerung — bricht die sonst übliche „UND bindet stärker als ODER“-Regel gezielt auf</Td><Td>land:Aegypten UND (nitrox=Nitrox ODER rating&gt;=4)</Td></Tr>
               <Tr><Td>+wort</Td><Td>muss enthalten sein</Td><Td>+Muräne</Td></Tr>
               <Tr><Td>-wort</Td><Td>darf nicht enthalten sein</Td><Td>-Nachttauchgang</Td></Tr>
-              <Tr><Td>"mehrere wörter"</Td><Td>zusammenhängender Suchbegriff</Td><Td>"grosser Hai"</Td></Tr>
+              <Tr><Td>"mehrere wörter"</Td><Td>zusammenhängender Suchbegriff bzw. Wert mit Leerzeichen</Td><Td>tauchspot:"Blue Hole"</Td></Tr>
             </T>
             Gültige Feldnamen (auch Aliasse, z.B. nr/nummer, spot, vol): nr, datum, zeit, land,
             ort, tauchspot, koordinaten, tg-nr, dauer, tiefe, temp, anzug, blei, flasche, volumen,

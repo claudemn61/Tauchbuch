@@ -697,11 +697,11 @@ const DATE_QUERY_FIELDS = ["date"];
 const TIME_QUERY_FIELDS = ["time"];
 
 function evalDiveToken(d, tok) {
-  const m = tok.match(/^([\wäöü\-]+)\s*(>=|<=|!:|!=|≠|>|<|=|:)\s*(.+)$/i);
+  const m = tok.match(/^([\wäöü\-]+)\s*(>=|<=|!=|≠|>|<|=|:)\s*(.+)$/i);
   if (m) {
     const fieldRaw = m[1].toLowerCase();
     const op = (m[2] === "≠" ? "!=" : m[2]);
-    const raw = m[3].trim();
+    const raw = m[3].trim().replace(/^"(.*)"$/, "$1");
     const field = FIELD_ALIASES[fieldRaw] || fieldRaw;
     let fv = diveFieldValue(d, field);
 
@@ -739,14 +739,12 @@ function evalDiveToken(d, tok) {
       if (op === "!=") return fvSec !== cmp;
       return fvSec === cmp;
     }
-    // Textfelder: ":" (Standard) = enthält; "!:" = enthält nicht (Umkehrung
-    // von ":"); "=" exakt; "!=" ungleich (Umkehrung von "="); >/</>=/<=
-    // alphabetischer Vergleich.
+    // Textfelder: ":" (Standard) = enthält; "=" exakt; "!=" enthält nicht;
+    // >/</>=/<= alphabetischer Vergleich. 1:1 wie im Flugbuch.
     const fvStr = String(fv), rawStr = raw;
     if (op === ":") return fvStr.toLowerCase().includes(rawStr.toLowerCase());
-    if (op === "!:") return !fvStr.toLowerCase().includes(rawStr.toLowerCase());
     if (op === "=") return fvStr.toLowerCase() === rawStr.toLowerCase();
-    if (op === "!=") return fvStr.toLowerCase() !== rawStr.toLowerCase();
+    if (op === "!=") return !fvStr.toLowerCase().includes(rawStr.toLowerCase());
     const cmpAlpha = fvStr.localeCompare(rawStr, "de", { sensitivity: "base" });
     if (op === ">") return cmpAlpha > 0;
     if (op === "<") return cmpAlpha < 0;
@@ -763,26 +761,72 @@ function evalDiveToken(d, tok) {
   return hay.includes(tok.toLowerCase());
 }
 
-function matchDives(dives, q) {
-  if (!q || !q.trim()) return dives;
+// Zerlegt eine Suchquery in Tokens — inkl. "(", ")" für echte Klammerung
+// und "feld:op\"mehrere wörter\"" für Werte mit Leerzeichen. 1:1 aus dem
+// Flugbuch übernommen (dort tokenizeQuery).
+function tokenizeDiveQuery(q) {
   const s = q.trim()
     .replace(/\s+(UND|AND)\s+/gi, " && ")
     .replace(/\s+(ODER|OR)\s+/gi, " || ")
     .replace(/&&/g, " && ").replace(/\|\|/g, " || ");
-  const orGroups = s.split(/\s*\|\|\s*/);
-  return dives.filter(d => {
-    return orGroups.some(group => {
-      const andTerms = group.split(/\s*&&\s*/).flatMap(t => {
-        return t.match(/(?:[\wäöü\-]+(?:>=|<=|!:|!=|≠|>|<|=|:)\S+|\+\S+|-\S+|"[^"]+"|\S+)/gi) || [];
-      }).map(t => t.replace(/^"|"$/g, ""));
-      if (!andTerms.length) return true;
-      return andTerms.every(term => {
-        if (term.startsWith("+")) return evalDiveToken(d, term.slice(1));
-        if (term.startsWith("-")) return !evalDiveToken(d, term.slice(1));
-        return evalDiveToken(d, term);
-      });
-    });
-  });
+  const re = /\(|\)|&&|\|\||[\wäöü\-]+(?:>=|<=|!=|≠|>|<|=|:)"[^"]*"|[\wäöü\-]+(?:>=|<=|!=|≠|>|<|=|:)\S+|\+\S+|-\S+|"[^"]*"|\S+/gi;
+  const tokens = [];
+  let m;
+  while ((m = re.exec(s))) {
+    let t = m[0];
+    if (t !== "(" && t !== ")" && t !== "&&" && t !== "||") t = t.replace(/^"(.*)"$/, "$1");
+    tokens.push(t);
+  }
+  return tokens;
+}
+
+// Echter rekursiver Abstiegs-Parser (baut einen UND/ODER-Baum statt nur
+// flach nach ODER, dann nach UND zu splitten), damit explizite "(...)"-
+// Klammerung möglich ist. UND bindet ausserhalb von Klammern weiterhin
+// stärker als ODER. 1:1 aus dem Flugbuch (dort parseQueryTokens/evalAst).
+function parseDiveQueryTokens(tokens) {
+  let pos = 0;
+  const peek = () => tokens[pos];
+  const next = () => tokens[pos++];
+  function parseExpr() {
+    let node = parseAndTerm();
+    while (peek() === "||") { next(); node = { type: "or", left: node, right: parseAndTerm() }; }
+    return node;
+  }
+  function parseAndTerm() {
+    let node = parseAtom();
+    while (peek() === "&&") { next(); node = { type: "and", left: node, right: parseAtom() }; }
+    return node;
+  }
+  function parseAtom() {
+    if (peek() === "(") {
+      next();
+      const node = parseExpr();
+      if (peek() === ")") next();
+      return node;
+    }
+    const tok = next();
+    if (tok === undefined) return { type: "true" };
+    if (tok.startsWith("+")) return { type: "leaf", term: tok.slice(1), negate: false };
+    if (tok.startsWith("-")) return { type: "leaf", term: tok.slice(1), negate: true };
+    return { type: "leaf", term: tok, negate: false };
+  }
+  return parseExpr();
+}
+function evalDiveAst(d, node) {
+  switch (node.type) {
+    case "or": return evalDiveAst(d, node.left) || evalDiveAst(d, node.right);
+    case "and": return evalDiveAst(d, node.left) && evalDiveAst(d, node.right);
+    case "leaf": { const r = evalDiveToken(d, node.term); return node.negate ? !r : r; }
+    default: return true;
+  }
+}
+function matchDives(dives, q) {
+  if (!q || !q.trim()) return dives;
+  const tokens = tokenizeDiveQuery(q);
+  if (!tokens.length) return dives;
+  const ast = parseDiveQueryTokens(tokens);
+  return dives.filter(d => evalDiveAst(d, ast));
 }
 
 // ── Erweiterte Suche (mehrzeilig, Feld/Operator/Wert, analog Flugbuch) ─────
@@ -809,89 +853,105 @@ const DIVE_SEARCH_FIELDS = [
   { id: "bemerkung", label: "Bemerkung", type: "text" },
 ];
 const DIVE_ADV_OPS_NUM = [">=", "<=", "!=", ">", "<", "=", "between"];
-const DIVE_ADV_OPS_TEXT = [":", "!:", "=", "!=", ">", "<", ">=", "<="];
-// Klartext-Label je Operator — bleibt im geschlossenen Auswahlfeld sichtbar
-// (nicht nur als Kurzform im Suchfeld-Text), damit z.B. "!:" nicht mit "!="
-// verwechselt wird. Vergleichsoperatoren bleiben als reines Symbol, da
-// selbsterklärend.
-const DIVE_OP_LABELS = {
-  ":": ": enthält",
-  "!:": "!: enthält nicht",
-  "=": "= exakt",
-  "!=": "!= ungleich",
-  ">": ">",
-  "<": "<",
-  ">=": "≥",
-  "<=": "≤",
-  "between": "zw.",
-};
+const DIVE_ADV_OPS_TEXT = [":", "=", "!=", ">", "<", ">=", "<="];
 
-function buildAdvancedDiveQuery(rows, combine) {
-  const parts = rows
-    .filter(r => r.value !== "" && r.value != null)
-    .map(r => {
-      const fieldDef = DIVE_SEARCH_FIELDS.find(f => f.id === r.field);
-      const isNumeric = fieldDef?.type === "number" || fieldDef?.type === "date" || fieldDef?.type === "time";
-      const op = r.op || (isNumeric ? "=" : ":");
-      if (op === "between") {
-        if (r.value2 === "" || r.value2 == null) return `${r.field}>=${String(r.value).trim()}`;
-        return `${r.field}>=${String(r.value).trim()} && ${r.field}<=${String(r.value2).trim()}`;
-      }
-      return `${r.field}${op}${String(r.value).trim()}`;
-    });
-  if (!parts.length) return "";
-  return parts.join(combine === "OR" ? " || " : " && ");
+// Findet zusammenhängende Läufe von >=2 benachbarten "grouped"-Zeilen — die
+// werden mit runder Klammer umschlossen (im Text UND als sichtbare Klammer-
+// Linie im Baukasten). 1:1 aus dem Flugbuch (computeGroupRuns).
+function computeDiveGroupRuns(rows) {
+  const startSet = new Set(), endSet = new Set(), inSet = new Set();
+  let runStart = null;
+  const closeRun = (end) => {
+    if (runStart !== null && end - runStart >= 1) {
+      startSet.add(runStart); endSet.add(end);
+      for (let k = runStart; k <= end; k++) inSet.add(k);
+    }
+    runStart = null;
+  };
+  rows.forEach((r, i) => {
+    if (r.grouped) { if (runStart === null) runStart = i; }
+    else { closeRun(i-1); }
+  });
+  closeRun(rows.length - 1);
+  return { startSet, endSet, inSet };
 }
 
-function newDiveSearchRow() { return { field: "ort", op: ":", value: "" }; }
+// Werte mit Leerzeichen müssen in Anführungszeichen, da tokenizeDiveQuery
+// ausserhalb von Anführungszeichen auf Leerzeichen splittet.
+function quoteDiveValueIfNeeded(v) { return /\s/.test(v) ? `"${v}"` : v; }
 
-// Umkehrung von buildAdvancedDiveQuery: übersetzt eine direkt ins Suchfeld
-// eingetippte Kurzform-Query zurück in Baukasten-Zeilen, damit die
-// Auswahlfelder (Feld/Operator) immer die gerade aktive Funktion zeigen
-// statt eines davon losgelösten, stehengebliebenen Default-Zustands.
-// Liefert null, wenn die Query sich nicht verlustfrei als flache Zeilen-
-// liste darstellen lässt (gemischtes UND/ODER, Freitext-Wörter, +/-
-// Präfixe, unbekanntes Feld) — die Zeilen bleiben dann unverändert.
-function parseDiveQueryToRows(q) {
-  const trimmed = String(q || "").trim();
-  if (!trimmed) return { rows: [newDiveSearchRow()], combine: "AND" };
-
-  const normalized = trimmed
-    .replace(/\s+(UND|AND)\s+/gi, " && ")
-    .replace(/\s+(ODER|OR)\s+/gi, " || ");
-  const hasAnd = / && /.test(normalized);
-  const hasOr = / \|\| /.test(normalized);
-  if (hasAnd && hasOr) return null;
-
-  const combine = hasOr ? "OR" : "AND";
-  const parts = normalized.split(hasOr ? /\s*\|\|\s*/ : /\s*&&\s*/).map(p => p.trim()).filter(Boolean);
-  if (!parts.length) return null;
-
-  const termRe = /^([\wäöü\-]+)\s*(>=|<=|!:|!=|≠|>|<|=|:)\s*(.+)$/i;
-  const parsed = [];
-  for (const part of parts) {
-    const m = part.match(termRe);
-    if (!m) return null;
-    const field = FIELD_ALIASES[m[1].toLowerCase()];
-    if (!field || !DIVE_SEARCH_FIELDS.some(f => f.id === field)) return null;
-    const op = m[2] === "≠" ? "!=" : m[2];
-    parsed.push({ field, op, value: m[3].trim().replace(/^"|"$/g, "") });
-  }
-
-  // Zwei aufeinanderfolgende UND-Zeilen auf demselben Feld mit ">="/"<="
-  // stammen aus dem "zw."-Operator (siehe buildAdvancedDiveQuery) — zu
-  // einer Zeile zusammenfassen statt als zwei separate Zeilen zu zeigen.
-  const rows = [];
-  for (let i = 0; i < parsed.length; i++) {
-    const cur = parsed[i], next = parsed[i + 1];
-    if (combine === "AND" && next && cur.field === next.field && cur.op === ">=" && next.op === "<=") {
-      rows.push({ field: cur.field, op: "between", value: cur.value, value2: next.value });
-      i++;
-    } else {
-      rows.push(cur);
+function buildAdvancedDiveQuery(rows) {
+  const rowToStr = (r) => {
+    const fieldDef = DIVE_SEARCH_FIELDS.find(f => f.id === r.field);
+    const isNumeric = fieldDef?.type === "number" || fieldDef?.type === "date" || fieldDef?.type === "time";
+    const op = r.op || (isNumeric ? "=" : ":");
+    if (op === "between") {
+      if (r.value2 === "" || r.value2 == null) return `${r.field}>=${String(r.value).trim()}`;
+      return `${r.field}>=${String(r.value).trim()} && ${r.field}<=${String(r.value2).trim()}`;
     }
+    return `${r.field}${op}${quoteDiveValueIfNeeded(String(r.value).trim())}`;
+  };
+  const validRows = rows.filter(r => r.value !== "" && r.value != null);
+  if (!validRows.length) return "";
+  const { startSet, endSet } = computeDiveGroupRuns(validRows);
+  let out = "";
+  validRows.forEach((r, i) => {
+    if (i > 0) out += r.combinator === "OR" ? " || " : " && ";
+    if (startSet.has(i)) out += "( ";
+    out += rowToStr(r);
+    if (endSet.has(i)) out += " )";
+  });
+  return out;
+}
+
+function newDiveSearchRow() { return { field: "ort", op: ":", value: "", combinator: "AND", grouped: false }; }
+
+function parseDiveTermToken(tok) {
+  const m = tok.match(/^([\wäöü\-]+)\s*(>=|<=|!=|≠|>|<|=|:)\s*(.+)$/i);
+  if (!m) return null;
+  const field = FIELD_ALIASES[m[1].toLowerCase()] || m[1].toLowerCase();
+  if (!DIVE_SEARCH_FIELDS.some(f => f.id === field)) return null;
+  const op = m[2] === "≠" ? "!=" : m[2];
+  const value = m[3].trim().replace(/^"(.*)"$/, "$1");
+  return { field, op, value };
+}
+
+// Rekonstruiert die Baukasten-Zeilen aus einer Query — genutzt, wenn direkt
+// ins Suchfeld getippt wird, damit Feld/Operator/Wert (und UND/ODER/
+// Klammerung pro Zeile) synchron bleiben statt eines stehengebliebenen
+// Defaults. Nur einstufige Klammerung rundet exakt — wie im Flugbuch auch
+// nur das, was der Baukasten selbst erzeugen kann. 1:1 aus dem Flugbuch
+// (parseQueryToRows).
+function parseDiveQueryToRows(query) {
+  if (!query || !query.trim()) return [newDiveSearchRow()];
+  const tokens = tokenizeDiveQuery(query);
+  if (!tokens.length) return [newDiveSearchRow()];
+  const rows = [];
+  let pendingCombinator = "AND";
+  let depth = 0;
+  let i = 0;
+  while (i < tokens.length) {
+    const tok = tokens[i];
+    if (tok === "&&") { pendingCombinator = "AND"; i++; continue; }
+    if (tok === "||") { pendingCombinator = "OR"; i++; continue; }
+    if (tok === "(") { depth++; i++; continue; }
+    if (tok === ")") { depth = Math.max(0, depth-1); i++; continue; }
+    const parsed = parseDiveTermToken(tok);
+    if (!parsed) return [newDiveSearchRow()];
+    const combinator = rows.length ? pendingCombinator : "AND";
+    const grouped = depth > 0;
+    if (parsed.op === ">=" && tokens[i+1] === "&&") {
+      const next2 = parseDiveTermToken(tokens[i+2]);
+      if (next2 && next2.field === parsed.field && next2.op === "<=") {
+        rows.push({ field: parsed.field, op: "between", value: parsed.value, value2: next2.value, combinator, grouped });
+        i += 3;
+        continue;
+      }
+    }
+    rows.push({ ...parsed, combinator, grouped });
+    i++;
   }
-  return { rows, combine };
+  return rows.length ? rows : [newDiveSearchRow()];
 }
 
 // ── Editable summary tiles (3 badges, freely reassignable + editable) ──────
@@ -1143,21 +1203,21 @@ function GroupHeader({ label, count, totalMin, collapsed, onToggle, selectMode, 
   );
 }
 
-// ── Search bar (simplified, text-only across all fields) ──────────────────
-// Eingeklappt: einzeilige Suche (bisheriges Verhalten). Aufklappen zeigt
-// einen Zeilen-Baukasten (Feld/Operator/Wert, beliebig viele Zeilen, UND/
-// ODER kombinierbar) — live übersetzt in denselben Query-String, den auch
-// das einfache Textfeld benutzt, sodass beide Wege identische Treffer liefern.
+// ── Search bar — 1:1 aus dem Flugbuch portiert ──────────────────────────
+// Eingeklappt: einzeilige Suche. Aufklappen (Fokus aufs Feld) zeigt einen
+// macOS-Finder-artigen Zeilen-Baukasten: pro Zeile ein eigener UND/ODER-
+// Verknüpfungs-Button (relativ zur Vorzeile) und ein "( )"-Knopf, der die
+// Zeile mit ihren Nachbarn klammert (ab zwei benachbart markierten Zeilen
+// entsteht eine echte Klammer-Gruppe, sichtbar an der Klammer-Linie links
+// und im Query-Text). Bleibt unabhängig vom Suchfeld-Text offen (schliesst
+// nur über ✓), damit es beim Tippen nicht flackert.
 function SearchBar({ filterText, setFilterText }) {
   const [advOpen, setAdvOpen] = useState(false);
-  const [rows, setRows] = useState([newDiveSearchRow()]);
-  const [combine, setCombine] = useState("AND");
+  const [rows, setRows] = useState(() => parseDiveQueryToRows(filterText));
 
-  const applyRows = (nextRows, nextCombine) => {
+  const applyRows = (nextRows) => {
     setRows(nextRows);
-    const useCombine = nextCombine || combine;
-    if (nextCombine) setCombine(nextCombine);
-    setFilterText(buildAdvancedDiveQuery(nextRows, useCombine));
+    setFilterText(buildAdvancedDiveQuery(nextRows));
   };
   const updateRow = (idx, patch) => applyRows(rows.map((r,i)=> i===idx ? {...r, ...patch} : r));
   const addRow = () => applyRows([...rows, newDiveSearchRow()]);
@@ -1166,15 +1226,14 @@ function SearchBar({ filterText, setFilterText }) {
     applyRows(next.length ? next : [newDiveSearchRow()]);
   };
   // Direkt ins Suchfeld eingetippte Kurzform live in die Baukasten-Zeilen
-  // zurückübersetzen, damit die Auswahlfelder (z.B. "Koordinaten" / "!:
-  // enthält nicht") die tatsächlich aktive Funktion zeigen statt eines
-  // stehengebliebenen Defaults ("Ort" / ": enthält"). Bewusst nur hier und
-  // nicht generisch über filterText verdrahtet, damit sich das nicht mit
-  // applyRows' eigenem setFilterText-Aufruf zu einer Schleife aufschaukelt.
+  // zurückübersetzen, damit die Auswahlfelder immer die tatsächlich aktive
+  // Funktion zeigen statt eines stehengebliebenen Defaults. Bewusst nur
+  // hier und nicht generisch über filterText verdrahtet, damit sich das
+  // nicht mit applyRows' eigenem setFilterText-Aufruf zu einer Schleife
+  // aufschaukelt.
   const setFilterTextFromInput = (v) => {
     setFilterText(v);
-    const parsed = parseDiveQueryToRows(v);
-    if (parsed) { setRows(parsed.rows); setCombine(parsed.combine); }
+    setRows(parseDiveQueryToRows(v));
   };
 
   return (
@@ -1191,59 +1250,69 @@ function SearchBar({ filterText, setFilterText }) {
       {advOpen && (
         <div style={{position:"absolute",top:"calc(100% + 8px)",left:0,width:"min(92vw, 420px)",zIndex:50,background:"#0f1f36",boxShadow:"0 12px 32px rgba(0,0,0,0.5)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:12,padding:10}}>
           <div style={{display:"flex",flexDirection:"column",gap:6}}>
-            {rows.map((row, idx) => {
+            {(() => {
+              const { startSet, endSet, inSet } = computeDiveGroupRuns(rows);
+              return rows.map((row, idx) => {
               const fieldDef = DIVE_SEARCH_FIELDS.find(f=>f.id===row.field);
+              const grouped = inSet.has(idx);
               return (
-                <div key={idx} style={{display:"flex",flexWrap:"wrap",gap:6,alignItems:"center"}}>
-                  <span style={{fontSize:10,fontWeight:700,color:"#7dd3fc",minWidth:34,textAlign:"center",flexShrink:0}}>
-                    {idx===0 ? "" : (combine==="OR"?"ODER":"UND")}
-                  </span>
+                <div key={idx} style={{
+                  display:"flex",gap:6,alignItems:"center",
+                  borderLeft: grouped ? "2px solid rgba(167,139,250,0.6)" : "2px solid transparent",
+                  borderTopLeftRadius: startSet.has(idx) ? 6 : 0,
+                  borderBottomLeftRadius: endSet.has(idx) ? 6 : 0,
+                  paddingLeft: 4, marginLeft: -2,
+                }}>
+                  {idx===0 ? (
+                    <span style={{minWidth:34,flexShrink:0}} />
+                  ) : (
+                    <button onClick={()=>updateRow(idx,{combinator: row.combinator==="OR"?"AND":"OR"})}
+                      title="Verknüpfung zur vorherigen Zeile umschalten"
+                      style={{fontSize:10,fontWeight:700,minWidth:34,textAlign:"center",flexShrink:0,background:row.combinator==="OR"?"rgba(251,191,36,0.18)":"rgba(125,211,252,0.15)",border:`1px solid ${row.combinator==="OR"?"rgba(251,191,36,0.4)":"rgba(125,211,252,0.35)"}`,borderRadius:6,padding:"3px 2px",color:row.combinator==="OR"?"#fbbf24":"#7dd3fc",cursor:"pointer"}}>
+                      {row.combinator==="OR"?"ODER":"UND"}
+                    </button>
+                  )}
+                  <button onClick={()=>updateRow(idx,{grouped: !row.grouped})}
+                    title="Mit Nachbar-Zeile(n) klammern — ab 2 benachbart markierten Zeilen entsteht eine Klammer-Gruppe"
+                    style={{fontSize:12,fontWeight:900,width:20,flexShrink:0,background:row.grouped?"rgba(167,139,250,0.22)":"rgba(255,255,255,0.05)",border:`1px solid ${row.grouped?"rgba(167,139,250,0.5)":"rgba(255,255,255,0.12)"}`,borderRadius:6,padding:"3px 0",color:row.grouped?"#a78bfa":"rgba(232,244,253,0.35)",cursor:"pointer"}}>
+                    ( )
+                  </button>
                   <select value={row.field}
                     onChange={e=>{
                       const nf = DIVE_SEARCH_FIELDS.find(f=>f.id===e.target.value);
                       const isNum = nf?.type==="number"||nf?.type==="date"||nf?.type==="time";
                       updateRow(idx, { field: e.target.value, op: isNum ? "=" : ":", value2: undefined });
                     }}
-                    style={{background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:8,padding:"5px 4px",color:"#e8f4fd",fontSize:12,minWidth:0,flex:"1 1 80px"}}>
+                    style={{background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:8,padding:"5px 2px",color:"#e8f4fd",fontSize:12,width:84,flexShrink:0}}>
                     {DIVE_SEARCH_FIELDS.map(f=><option key={f.id} value={f.id} style={{background:"#0a1628"}}>{f.label}</option>)}
                   </select>
                   {(() => {
                     const isNumeric = fieldDef?.type === "number" || fieldDef?.type === "date" || fieldDef?.type === "time";
                     const ops = isNumeric ? DIVE_ADV_OPS_NUM : DIVE_ADV_OPS_TEXT;
                     return (
-                      // Klartext-Label (DIVE_OP_LABELS) bleibt im geschlossenen Feld
-                      // sichtbar, damit die gewählte Funktion (z.B. "enthält nicht")
-                      // nicht nur als Kurzform im Suchfeld-Text erscheint.
                       <select value={row.op || (isNumeric ? "=" : ":")} onChange={e=>updateRow(idx,{op:e.target.value})}
-                        style={{background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:8,padding:"5px 4px",color:"#e8f4fd",fontSize:12,width:isNumeric?92:118,flexShrink:0}}>
-                        {ops.map(o=><option key={o} value={o} style={{background:"#0a1628"}}>{DIVE_OP_LABELS[o]||o}</option>)}
+                        style={{background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:8,padding:"5px 2px",color:"#e8f4fd",fontSize:12,width:isNumeric?68:44,flexShrink:0}}>
+                        {ops.map(o=><option key={o} value={o} style={{background:"#0a1628"}}>{o==="between"?"zw.":o}</option>)}
                       </select>
                     );
                   })()}
                   <input value={row.value||""} onChange={e=>updateRow(idx,{value:e.target.value})}
                     placeholder={row.op==="between" ? "von…" : "Wert…"}
-                    style={{flex:"1 1 90px",minWidth:90,background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:8,padding:"5px 8px",color:"#e8f4fd",fontSize:12}} />
+                    style={{flex:1,minWidth:0,background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:8,padding:"5px 8px",color:"#e8f4fd",fontSize:12}} />
                   {row.op==="between" && (
                     <input value={row.value2||""} onChange={e=>updateRow(idx,{value2:e.target.value})} placeholder="bis…"
-                      style={{flex:"1 1 90px",minWidth:90,background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:8,padding:"5px 8px",color:"#e8f4fd",fontSize:12}} />
+                      style={{flex:1,minWidth:0,background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:8,padding:"5px 8px",color:"#e8f4fd",fontSize:12}} />
                   )}
                   <button onClick={()=>removeRow(idx)} style={{background:"none",border:"none",color:"rgba(232,244,253,0.35)",cursor:"pointer",fontSize:14,padding:"0 2px",flexShrink:0}}>✕</button>
                 </div>
               );
-            })}
+              });
+            })()}
           </div>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:8}}>
             <button onClick={addRow} style={{background:"rgba(125,211,252,0.12)",border:"1px solid rgba(125,211,252,0.3)",borderRadius:8,padding:"5px 10px",color:"#7dd3fc",fontSize:11,fontWeight:700,cursor:"pointer"}}>+ Zeile</button>
-            <div style={{display:"flex",gap:8,alignItems:"center"}}>
-              {rows.length>1 && (
-                <div style={{display:"flex",background:"rgba(255,255,255,0.06)",borderRadius:8,padding:2}}>
-                  <button onClick={()=>applyRows(rows,"AND")} style={{background:combine==="AND"?"rgba(125,211,252,0.25)":"transparent",border:"none",borderRadius:6,padding:"4px 10px",color:combine==="AND"?"#7dd3fc":"rgba(232,244,253,0.5)",fontSize:11,fontWeight:700,cursor:"pointer"}}>UND</button>
-                  <button onClick={()=>applyRows(rows,"OR")} style={{background:combine==="OR"?"rgba(125,211,252,0.25)":"transparent",border:"none",borderRadius:6,padding:"4px 10px",color:combine==="OR"?"#7dd3fc":"rgba(232,244,253,0.5)",fontSize:11,fontWeight:700,cursor:"pointer"}}>ODER</button>
-                </div>
-              )}
-              <button onClick={()=>setAdvOpen(false)} title="Schliessen"
-                style={{background:"rgba(34,197,94,0.18)",border:"1px solid rgba(34,197,94,0.4)",borderRadius:8,width:30,height:30,color:"#4ade80",fontSize:14,fontWeight:900,cursor:"pointer",flexShrink:0}}>✓</button>
-            </div>
+            <button onClick={()=>setAdvOpen(false)} title="Schliessen"
+              style={{background:"rgba(34,197,94,0.18)",border:"1px solid rgba(34,197,94,0.4)",borderRadius:8,width:30,height:30,color:"#4ade80",fontSize:14,fontWeight:900,cursor:"pointer",flexShrink:0}}>✓</button>
           </div>
         </div>
       )}
