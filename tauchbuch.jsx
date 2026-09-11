@@ -767,14 +767,17 @@ function evalDiveToken(d, tok) {
 
 // Zerlegt eine Suchquery in Tokens — inkl. "(", ")" für echte Klammerung
 // und "feld:op\"mehrere wörter\"" für Werte mit Leerzeichen. Aus dem
-// Flugbuch übernommen (dort tokenizeQuery), Operator-Alternation um "!:"
-// (enthält nicht) erweitert.
+// aktuellen Flugbuch übernommen (dort tokenizeQuery), Operator-Alternation
+// um "!:" (enthält nicht) erweitert. Unquotierte Terme dürfen nicht bis an
+// ein "(" / ")" heranreichen, sonst verschluckt z.B. "(a b)" die
+// schliessende Klammer als Teil von "b)" statt sie als eigenes Token zu
+// erkennen.
 function tokenizeDiveQuery(q) {
   const s = q.trim()
     .replace(/\s+(UND|AND)\s+/gi, " && ")
     .replace(/\s+(ODER|OR)\s+/gi, " || ")
     .replace(/&&/g, " && ").replace(/\|\|/g, " || ");
-  const re = /\(|\)|&&|\|\||[\wäöü\-]+(?:>=|<=|!:|!=|≠|>|<|=|:)"[^"]*"|[\wäöü\-]+(?:>=|<=|!:|!=|≠|>|<|=|:)\S+|\+\S+|-\S+|"[^"]*"|\S+/gi;
+  const re = /\(|\)|&&|\|\||[\wäöü\-]+(?:>=|<=|!:|!=|≠|>|<|=|:)"[^"]*"|[\wäöü\-]+(?:>=|<=|!:|!=|≠|>|<|=|:)[^\s()]+|\+[^\s()]+|-[^\s()]+|"[^"]*"|[^\s()]+/gi;
   const tokens = [];
   let m;
   while ((m = re.exec(s))) {
@@ -800,7 +803,15 @@ function parseDiveQueryTokens(tokens) {
   }
   function parseAndTerm() {
     let node = parseAtom();
-    while (peek() === "&&") { next(); node = { type: "and", left: node, right: parseAtom() }; }
+    // Zwei Terme direkt hintereinander (ohne explizites "UND"/"&&") galten
+    // bisher nur als UND, wenn ein "&&"-Token dazwischenstand — bei reinem
+    // Leerzeichen wurde der zweite Term stillschweigend verschluckt (z.B.
+    // "monat>=1 monat<=6" wurde zu nur "monat>=1"). Jetzt zählt auch die
+    // reine Aneinanderreihung als UND, solange kein "||" oder ")" folgt.
+    while (peek() !== undefined && peek() !== "||" && peek() !== ")") {
+      if (peek() === "&&") next();
+      node = { type: "and", left: node, right: parseAtom() };
+    }
     return node;
   }
   function parseAtom() {
@@ -1234,10 +1245,24 @@ function GroupHeader({ label, count, totalMin, collapsed, onToggle, selectMode, 
 function SearchBar({ filterText, setFilterText }) {
   const [advOpen, setAdvOpen] = useState(false);
   const [rows, setRows] = useState(() => parseDiveQueryToRows(filterText));
+  // Verfolgt, welchen filterText "rows" gerade widerspiegelt, damit externe
+  // Änderungen (gespeicherte Darstellung anwenden, Freitext-Eingabe, ✕
+  // löschen) erkannt und in Zeilen zurückübersetzt werden — ohne den lazy
+  // useState-Init wäre rows sonst dauerhaft auf dem allerersten Mount-Wert
+  // eingefroren. 1:1 aus dem Flugbuch.
+  const rowsFilterTextRef = useRef(filterText);
+  useEffect(() => {
+    if (filterText !== rowsFilterTextRef.current) {
+      setRows(parseDiveQueryToRows(filterText));
+      rowsFilterTextRef.current = filterText;
+    }
+  }, [filterText]);
 
   const applyRows = (nextRows) => {
     setRows(nextRows);
-    setFilterText(buildAdvancedDiveQuery(nextRows));
+    const next = buildAdvancedDiveQuery(nextRows);
+    rowsFilterTextRef.current = next;
+    setFilterText(next);
   };
   const updateRow = (idx, patch) => applyRows(rows.map((r,i)=> i===idx ? {...r, ...patch} : r));
   const addRow = () => applyRows([...rows, newDiveSearchRow()]);
@@ -1245,24 +1270,14 @@ function SearchBar({ filterText, setFilterText }) {
     const next = rows.filter((_,i)=>i!==idx);
     applyRows(next.length ? next : [newDiveSearchRow()]);
   };
-  // Direkt ins Suchfeld eingetippte Kurzform live in die Baukasten-Zeilen
-  // zurückübersetzen, damit die Auswahlfelder immer die tatsächlich aktive
-  // Funktion zeigen statt eines stehengebliebenen Defaults. Bewusst nur
-  // hier und nicht generisch über filterText verdrahtet, damit sich das
-  // nicht mit applyRows' eigenem setFilterText-Aufruf zu einer Schleife
-  // aufschaukelt.
-  const setFilterTextFromInput = (v) => {
-    setFilterText(v);
-    setRows(parseDiveQueryToRows(v));
-  };
 
   return (
     <div style={{position:"relative"}}>
       <div style={{position:"relative"}}>
-        <input value={filterText} onChange={e=>setFilterTextFromInput(e.target.value)} onFocus={()=>setAdvOpen(true)} placeholder="🔍 Suchen (alle Felder)…"
+        <input value={filterText} onChange={e=>setFilterText(e.target.value)} onFocus={()=>setAdvOpen(true)} placeholder="🔍 Suchen (alle Felder)…"
           style={{width:"100%",background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,padding:"8px 34px 8px 12px",color:"#e8f4fd",fontSize:13,boxSizing:"border-box"}} />
         {filterText && (
-          <button onClick={()=>setFilterTextFromInput("")}
+          <button onClick={()=>setFilterText("")}
             style={{position:"absolute",right:8,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",color:"rgba(232,244,253,0.4)",cursor:"pointer",fontSize:14}}>✕</button>
         )}
       </div>
@@ -1659,9 +1674,9 @@ function TauchbuchApp() {
   // Sprache, damit Werte mit Leerzeichen (Tauchspot, Ort, Buddy…) sicher
   // funktionieren (deren "feld=wert"-Syntax bricht bei Leerzeichen ab).
   const [pinnedFilter, setPinnedFilter] = useState(null); // { field, label, value }
-  const [filterText, setFilterText] = useState("");
-  const [sortId, setSortId] = useState("number");
-  const [sortDir, setSortDir] = useState("desc");
+  const [filterText, setFilterTextRaw] = useState("");
+  const [sortId, setSortIdRaw] = useState("number");
+  const [sortDir, setSortDirRaw] = useState("desc");
   const [showSortMenu, setShowSortMenu] = useState(false);
   const [showSearchMenu, setShowSearchMenu] = useState(false);
   const [listMapOpen, setListMapOpen] = useState(false);
@@ -1670,18 +1685,123 @@ function TauchbuchApp() {
   // (Ebene aus). Jede Ebene hat zusätzlich ein eigenes, unabhängiges
   // "Gruppen sortieren nach…"-Feld (Standard "" = nach dem Gruppierfeld
   // selbst) — analog Flugbuch.
-  const [groupField1, setGroupField1] = useState("year");
-  const [groupOrder1, setGroupOrder1] = useState("desc");
-  const [group1SortField, setGroup1SortField] = useState("");
+  const [groupField1, setGroupField1Raw] = useState("year");
+  const [groupOrder1, setGroupOrder1Raw] = useState("desc");
+  const [group1SortField, setGroup1SortFieldRaw] = useState("");
   const [showGroup1Menu, setShowGroup1Menu] = useState(false);
   const [showGroup1SortMenu, setShowGroup1SortMenu] = useState(false);
   const [collapsed1, setCollapsed1] = useState(new Set());
-  const [groupField2, setGroupField2] = useState("");
-  const [groupOrder2, setGroupOrder2] = useState("desc");
-  const [group2SortField, setGroup2SortField] = useState("");
+  const [groupField2, setGroupField2Raw] = useState("");
+  const [groupOrder2, setGroupOrder2Raw] = useState("desc");
+  const [group2SortField, setGroup2SortFieldRaw] = useState("");
   const [showGroup2Menu, setShowGroup2Menu] = useState(false);
   const [showGroup2SortMenu, setShowGroup2SortMenu] = useState(false);
   const [collapsed2, setCollapsed2] = useState(new Set());
+  // 💡 Gespeicherte Darstellungen: benannte Schnappschüsse der kompletten
+  // Suchen/Sortieren/Gruppieren-Konfiguration (Suchtext, Sortierfeld+
+  // -richtung, beide Gruppierungs-Ebenen inkl. eigenem Sortierfeld+
+  // -richtung), damit man direkt zu einer bestimmten Sicht auf die
+  // Tauchliste zurückspringen kann statt sie jedes Mal neu aufzubauen.
+  // Getrennt von den "zuletzt benutzten" Einstellungen in
+  // tauchbuchListSettings persistiert. 1:1 aus dem Flugbuch übernommen.
+  const [savedViews, setSavedViewsRaw] = useState([]);
+  const [showViewsMenu, setShowViewsMenu] = useState(false);
+  const [viewsMode, setViewsMode] = useState("none"); // "none" | "move" | "delete"
+  const [savingViewName, setSavingViewName] = useState(null); // string während "Speichern als…" offen ist, sonst null
+  // Name der zuletzt per applyView angewendeten Darstellung, neben der
+  // Trefferanzahl angezeigt. Wird gelöscht, sobald Suchen/Sortieren/
+  // Gruppieren manuell verändert wird (über die gewrappten Setter unten,
+  // nicht über applyViews eigene rohe Setter), da die Liste dann nicht
+  // mehr exakt der gespeicherten Konfiguration entspricht.
+  const [activeViewName, setActiveViewNameRaw] = useState(null);
+  useEffect(() => {
+    (async () => {
+      try {
+        const r = await window.storage.get("tauchbuchSavedViews");
+        if (r && r.value) { const v = JSON.parse(r.value); if (Array.isArray(v)) setSavedViewsRaw(v); }
+      } catch (e) {}
+    })();
+  }, []);
+  const setSavedViews = (updater) => {
+    setSavedViewsRaw(prev => {
+      const next = typeof updater === "function" ? updater(prev) : updater;
+      try { window.storage.set("tauchbuchSavedViews", JSON.stringify(next)); } catch (e) {}
+      return next;
+    });
+  };
+  const applyView = (v) => {
+    const c = v.config || {};
+    setFilterTextRaw(c.filterText || "");
+    setSortIdRaw(c.sortId || "number");
+    setSortDirRaw(c.sortDir || "desc");
+    setGroupField1Raw(c.groupField1 || "");
+    setGroupOrder1Raw(c.groupOrder1 || "desc");
+    setGroup1SortFieldRaw(c.group1SortField || "");
+    setGroupField2Raw(c.groupField2 || "");
+    setGroupOrder2Raw(c.groupOrder2 || "desc");
+    setGroup2SortFieldRaw(c.group2SortField || "");
+    setActiveViewNameRaw(v.name);
+    persistListSettings({
+      filterText: c.filterText||"", sortId: c.sortId||"number", sortDir: c.sortDir||"desc",
+      groupField1: c.groupField1||"", groupOrder1: c.groupOrder1||"desc", group1SortField: c.group1SortField||"",
+      groupField2: c.groupField2||"", groupOrder2: c.groupOrder2||"desc", group2SortField: c.group2SortField||"",
+      activeViewName: v.name,
+    });
+    setShowViewsMenu(false);
+    setShowSearchMenu(false);
+  };
+  const saveCurrentAsView = (name) => {
+    const trimmed = (name||"").trim();
+    if (!trimmed) return;
+    const config = { filterText, sortId, sortDir, groupField1, groupOrder1, group1SortField, groupField2, groupOrder2, group2SortField };
+    setSavedViews(prev => [...prev, { id: "view_"+Date.now(), name: trimmed, config }]);
+    setSavingViewName(null);
+  };
+  // Stellt die zuletzt benutzten Suchen/Sortieren/Gruppieren-Einstellungen
+  // beim Laden wieder her — tauchbuch.html ist eine eigenständige Seite
+  // (echter Seitenwechsel, kein Client-Router), React-State setzt sich also
+  // sonst bei jedem Aufruf auf die Defaults zurück.
+  useEffect(() => {
+    (async () => {
+      try {
+        const r = await window.storage.get("tauchbuchListSettings");
+        if (r && r.value) {
+          const s = JSON.parse(r.value);
+          if (typeof s.filterText === "string") setFilterTextRaw(s.filterText);
+          if (s.sortId) setSortIdRaw(s.sortId);
+          if (s.sortDir) setSortDirRaw(s.sortDir);
+          if (typeof s.groupField1 === "string") setGroupField1Raw(s.groupField1);
+          if (s.groupOrder1) setGroupOrder1Raw(s.groupOrder1);
+          if (typeof s.group1SortField === "string") setGroup1SortFieldRaw(s.group1SortField);
+          if (typeof s.groupField2 === "string") setGroupField2Raw(s.groupField2);
+          if (s.groupOrder2) setGroupOrder2Raw(s.groupOrder2);
+          if (typeof s.group2SortField === "string") setGroup2SortFieldRaw(s.group2SortField);
+          if (typeof s.activeViewName === "string") setActiveViewNameRaw(s.activeViewName);
+        }
+      } catch (e) {}
+    })();
+  }, []);
+  const persistListSettings = (patch) => {
+    try {
+      window.storage.set("tauchbuchListSettings", JSON.stringify({
+        filterText, sortId, sortDir, groupField1, groupOrder1, group1SortField, groupField2, groupOrder2, group2SortField, activeViewName, ...patch,
+      }));
+    } catch (e) {}
+  };
+  // Jede manuelle Suchen/Sortieren/Gruppieren-Änderung macht das "aktive
+  // Darstellung"-Label ungültig (applyView setzt es über seine eigenen
+  // rohen Setter zurück, die laufen nicht hier durch) — sonst würde
+  // weiterhin eine Darstellung als aktiv behauptet, die nicht mehr zu dem
+  // passt, was tatsächlich angezeigt wird.
+  const setFilterText = (v) => { setFilterTextRaw(v); setActiveViewNameRaw(null); persistListSettings({ filterText: v, activeViewName: null }); };
+  const setSortId = (v) => { setSortIdRaw(v); setActiveViewNameRaw(null); persistListSettings({ sortId: v, activeViewName: null }); };
+  const setSortDir = (updater) => { setSortDirRaw(prev => { const next = typeof updater==="function"?updater(prev):updater; setActiveViewNameRaw(null); persistListSettings({ sortDir: next, activeViewName: null }); return next; }); };
+  const setGroupField1 = (v) => { setGroupField1Raw(v); setActiveViewNameRaw(null); persistListSettings({ groupField1: v, activeViewName: null }); };
+  const setGroupOrder1 = (updater) => { setGroupOrder1Raw(prev => { const next = typeof updater==="function"?updater(prev):updater; setActiveViewNameRaw(null); persistListSettings({ groupOrder1: next, activeViewName: null }); return next; }); };
+  const setGroup1SortField = (v) => { setGroup1SortFieldRaw(v); setActiveViewNameRaw(null); persistListSettings({ group1SortField: v, activeViewName: null }); };
+  const setGroupField2 = (v) => { setGroupField2Raw(v); setActiveViewNameRaw(null); persistListSettings({ groupField2: v, activeViewName: null }); };
+  const setGroupOrder2 = (updater) => { setGroupOrder2Raw(prev => { const next = typeof updater==="function"?updater(prev):updater; setActiveViewNameRaw(null); persistListSettings({ groupOrder2: next, activeViewName: null }); return next; }); };
+  const setGroup2SortField = (v) => { setGroup2SortFieldRaw(v); setActiveViewNameRaw(null); persistListSettings({ group2SortField: v, activeViewName: null }); };
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [showImportMenu, setShowImportMenu] = useState(false);
   const [showBackupMenu, setShowBackupMenu] = useState(false);
@@ -2000,37 +2120,100 @@ function TauchbuchApp() {
           </div>
         </div>
 
-        {/* Icon-Buttons: Import / Backup / Auswahl / Karte / Gruppierung / Suche+Sortierung
-            — Sortierrichtung und Alle-reduzieren/erweitern stecken im 🔍-Panel darunter */}
+        {/* Icon-Buttons: Import / Backup / Auswahl / Karte / Gruppierung /
+            Darstellungen / Suche+Sortierung — quadratisch-breite Kacheln
+            (aspectRatio 2/1), 1:1 im Format wie im Flugbuch. Sortierrichtung
+            und Alle-reduzieren/erweitern stecken im 🔍-Panel darunter. */}
         <div style={{padding:"10px 16px 0",display:"flex",gap:6}}>
           <button onClick={()=>{ setShowImportMenu(m=>!m); setShowBackupMenu(false); }} title="CSV Import"
-            style={{flex:"1 1 0",minWidth:0,aspectRatio:"1",boxSizing:"border-box",display:"flex",alignItems:"center",justifyContent:"center",background:showImportMenu?"rgba(56,189,248,0.15)":"rgba(255,255,255,0.05)",border:`1px solid ${showImportMenu?"rgba(56,189,248,0.35)":"rgba(255,255,255,0.1)"}`,borderRadius:10,color:"#fff",fontSize:19,cursor:"pointer"}}>
+            style={{flex:"1 1 0",minWidth:0,aspectRatio:"2/1",boxSizing:"border-box",display:"flex",alignItems:"center",justifyContent:"center",background:showImportMenu?"rgba(56,189,248,0.15)":"rgba(255,255,255,0.05)",border:`${showImportMenu?2:1}px solid ${showImportMenu?"rgba(56,189,248,0.4)":"rgba(255,255,255,0.1)"}`,borderRadius:10,color:"#fff",fontSize:26,cursor:"pointer"}}>
             📥
           </button>
           <button onClick={()=>{ setShowBackupMenu(m=>!m); setShowImportMenu(false); }} title="Backup"
-            style={{flex:"1 1 0",minWidth:0,aspectRatio:"1",boxSizing:"border-box",display:"flex",alignItems:"center",justifyContent:"center",background:showBackupMenu?"rgba(56,189,248,0.15)":"rgba(255,255,255,0.05)",border:`1px solid ${showBackupMenu?"rgba(56,189,248,0.35)":"rgba(255,255,255,0.1)"}`,borderRadius:10,color:"#fff",fontSize:19,cursor:"pointer"}}>
+            style={{flex:"1 1 0",minWidth:0,aspectRatio:"2/1",boxSizing:"border-box",display:"flex",alignItems:"center",justifyContent:"center",background:showBackupMenu?"rgba(56,189,248,0.15)":"rgba(255,255,255,0.05)",border:`${showBackupMenu?2:1}px solid ${showBackupMenu?"rgba(56,189,248,0.4)":"rgba(255,255,255,0.1)"}`,borderRadius:10,color:"#fff",fontSize:26,cursor:"pointer"}}>
             💾
           </button>
           <button onClick={()=>{ setSelectMode(m=>!m); setSelectedIds(new Set()); setCopyMsg(""); }} title="Auswahl"
-            style={{flex:"1 1 0",minWidth:0,aspectRatio:"1",boxSizing:"border-box",display:"flex",alignItems:"center",justifyContent:"center",background:selectMode?"rgba(14,165,233,0.18)":"rgba(255,255,255,0.05)",border:`1px solid ${selectMode?"rgba(14,165,233,0.4)":"rgba(255,255,255,0.1)"}`,borderRadius:10,color:"#fff",fontSize:23,cursor:"pointer"}}>
+            style={{flex:"1 1 0",minWidth:0,aspectRatio:"2/1",boxSizing:"border-box",display:"flex",alignItems:"center",justifyContent:"center",background:selectMode?"rgba(14,165,233,0.18)":"rgba(255,255,255,0.05)",border:`${selectMode?2:1}px solid ${selectMode?"rgba(14,165,233,0.4)":"rgba(255,255,255,0.1)"}`,borderRadius:10,color:"#fff",fontSize:30,cursor:"pointer"}}>
             {selectMode?"✕":"☑"}
           </button>
           <button onClick={()=>setListMapOpen(o=>!o)} title="Karte anzeigen"
-            style={{flex:"1 1 0",minWidth:0,height:44,boxSizing:"border-box",display:"flex",alignItems:"center",justifyContent:"center",background:listMapOpen?"rgba(56,189,248,0.15)":"rgba(255,255,255,0.05)",border:`1px solid ${listMapOpen?"rgba(56,189,248,0.35)":"rgba(255,255,255,0.1)"}`,borderRadius:10,color:"#fff",fontSize:20,cursor:"pointer"}}>
+            style={{flex:"1 1 0",minWidth:0,aspectRatio:"2/1",boxSizing:"border-box",display:"flex",alignItems:"center",justifyContent:"center",background:listMapOpen?"rgba(56,189,248,0.15)":"rgba(255,255,255,0.05)",border:`${listMapOpen?2:1}px solid ${listMapOpen?"rgba(56,189,248,0.4)":"rgba(255,255,255,0.1)"}`,borderRadius:10,color:"#fff",fontSize:26,cursor:"pointer"}}>
             🌐
           </button>
           <button onClick={()=>{
               if (groupField1==="year") { setGroupField1("reise"); setGroupOrder1("desc"); setGroup1SortField("date"); }
               else { setGroupField1("year"); setGroupOrder1("desc"); setGroup1SortField(""); }
             }} title={groupField1==="year"?"Gruppiert nach Jahr (zu Reise wechseln)":"Gruppiert nach Reise (zu Jahr wechseln)"}
-            style={{flex:"1 1 0",minWidth:0,height:44,boxSizing:"border-box",display:"flex",alignItems:"center",justifyContent:"center",background:groupField1==="reise"?"rgba(245,166,35,0.18)":"rgba(255,255,255,0.05)",border:`1px solid ${groupField1==="reise"?"rgba(245,166,35,0.4)":"rgba(255,255,255,0.1)"}`,borderRadius:10,color:groupField1==="reise"?"#f5a623":"#fff",fontSize:20,cursor:"pointer"}}>
+            style={{flex:"1 1 0",minWidth:0,aspectRatio:"2/1",boxSizing:"border-box",display:"flex",alignItems:"center",justifyContent:"center",background:groupField1==="reise"?"rgba(245,166,35,0.18)":"rgba(255,255,255,0.05)",border:`${groupField1==="reise"?2:1}px solid ${groupField1==="reise"?"rgba(245,166,35,0.4)":"rgba(255,255,255,0.1)"}`,borderRadius:10,color:groupField1==="reise"?"#f5a623":"#fff",fontSize:26,cursor:"pointer"}}>
             {groupField1==="year" ? "📅" : "🧭"}
           </button>
+          <button onClick={()=>{ setShowViewsMenu(m=>!m); setShowImportMenu(false); setShowBackupMenu(false); setViewsMode("none"); setSavingViewName(null); }} title="Gespeicherte Darstellungen"
+            style={{flex:"1 1 0",minWidth:0,aspectRatio:"2/1",boxSizing:"border-box",display:"flex",alignItems:"center",justifyContent:"center",background:showViewsMenu?"rgba(56,189,248,0.15)":"rgba(255,255,255,0.05)",border:`${showViewsMenu?2:1}px solid ${showViewsMenu?"rgba(56,189,248,0.4)":"rgba(255,255,255,0.1)"}`,borderRadius:10,color:"#fff",fontSize:22,cursor:"pointer"}}>
+            💡
+          </button>
           <button onClick={()=>setShowSearchMenu(m=>!m)} title="Suche / Sortierung"
-            style={{flex:"1 1 0",minWidth:0,height:44,boxSizing:"border-box",display:"flex",alignItems:"center",justifyContent:"center",background:(showSearchMenu||filterText)?"rgba(56,189,248,0.15)":"rgba(255,255,255,0.05)",border:`1px solid ${(showSearchMenu||filterText)?"rgba(56,189,248,0.35)":"rgba(255,255,255,0.1)"}`,borderRadius:10,color:"#fff",fontSize:20,cursor:"pointer"}}>
+            style={{flex:"1 1 0",minWidth:0,aspectRatio:"2/1",boxSizing:"border-box",display:"flex",alignItems:"center",justifyContent:"center",background:(showSearchMenu||filterText)?"rgba(56,189,248,0.15)":"rgba(255,255,255,0.05)",border:`${(showSearchMenu||filterText)?2:1}px solid ${(showSearchMenu||filterText)?"rgba(56,189,248,0.4)":"rgba(255,255,255,0.1)"}`,borderRadius:10,color:"#fff",fontSize:22,cursor:"pointer"}}>
             🔍
           </button>
         </div>
+
+        {/* 💡 Gespeicherte Darstellungen: speichern/verschieben/löschen/
+            anwenden — 1:1 aus dem Flugbuch übernommen. */}
+        {showViewsMenu && (
+          <div style={{margin:"8px 16px 0",background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:10,padding:10,maxHeight:340,overflowY:"auto"}}>
+            <div style={{display:"flex",gap:6}}>
+              <button onClick={()=>{ setSavingViewName(s=>s===null?"":null); setViewsMode("none"); }}
+                title="Speichern als…"
+                style={{flex:1,padding:"9px 0",borderRadius:8,fontSize:16,cursor:"pointer",background:savingViewName!==null?"rgba(74,222,128,0.15)":"rgba(255,255,255,0.05)",border:`1px solid ${savingViewName!==null?"rgba(74,222,128,0.4)":"rgba(255,255,255,0.1)"}`}}>
+                💾
+              </button>
+              <button onClick={()=>{ setViewsMode(m=>m==="move"?"none":"move"); setSavingViewName(null); }}
+                title="Verschieben"
+                style={{flex:1,padding:"9px 0",borderRadius:8,fontSize:16,cursor:"pointer",background:viewsMode==="move"?"rgba(14,165,233,0.15)":"rgba(255,255,255,0.05)",border:`1px solid ${viewsMode==="move"?"rgba(14,165,233,0.4)":"rgba(255,255,255,0.1)"}`}}>
+                🔀
+              </button>
+              <button onClick={()=>{ setViewsMode(m=>m==="delete"?"none":"delete"); setSavingViewName(null); }}
+                title="Löschen"
+                style={{flex:1,padding:"9px 0",borderRadius:8,fontSize:16,cursor:"pointer",background:viewsMode==="delete"?"rgba(239,68,68,0.15)":"rgba(255,255,255,0.05)",border:`1px solid ${viewsMode==="delete"?"rgba(239,68,68,0.4)":"rgba(255,255,255,0.1)"}`}}>
+                🗑
+              </button>
+            </div>
+            {savingViewName !== null && (
+              <div style={{display:"flex",gap:6,padding:"8px 0 2px"}}>
+                <input autoFocus value={savingViewName} onChange={e=>setSavingViewName(e.target.value)}
+                  onKeyDown={e=>{ if(e.key==="Enter") saveCurrentAsView(savingViewName); if(e.key==="Escape") setSavingViewName(null); }}
+                  placeholder="Name der Darstellung…"
+                  style={{flex:1,minWidth:0,background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.15)",borderRadius:8,padding:"7px 10px",color:"#e8f4fd",fontSize:13}} />
+                <button onClick={()=>saveCurrentAsView(savingViewName)}
+                  style={{flexShrink:0,background:"rgba(74,222,128,0.2)",border:"1px solid rgba(74,222,128,0.4)",borderRadius:8,padding:"0 12px",color:"#4ade80",fontWeight:700,cursor:"pointer"}}>✓</button>
+              </div>
+            )}
+            {savedViews.length > 0 && <div style={{borderTop:"1px solid rgba(255,255,255,0.08)",margin:"6px 0 4px"}} />}
+            {savedViews.length === 0 && (
+              <div style={{padding:"10px 12px",fontSize:12,color:"rgba(232,244,253,0.35)",fontStyle:"italic"}}>Noch keine gespeicherten Darstellungen</div>
+            )}
+            {savedViews.map((v, idx) => (
+              <div key={v.id}
+                onClick={()=>{ if (viewsMode==="none") applyView(v); }}
+                style={{display:"flex",alignItems:"center",gap:6,padding:"9px 12px",borderRadius:8,fontSize:13,cursor:viewsMode==="none"?"pointer":"default",color:"rgba(232,244,253,0.85)"}}>
+                <span style={{flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{v.name}</span>
+                {viewsMode==="move" && (
+                  <>
+                    <button disabled={idx===0} onClick={e=>{ e.stopPropagation(); setSavedViews(prev=>{ const n=[...prev]; [n[idx-1],n[idx]]=[n[idx],n[idx-1]]; return n; }); }}
+                      style={{opacity:idx===0?0.3:1,background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:6,width:26,height:26,color:"#e8f4fd",cursor:idx===0?"default":"pointer"}}>↑</button>
+                    <button disabled={idx===savedViews.length-1} onClick={e=>{ e.stopPropagation(); setSavedViews(prev=>{ const n=[...prev]; [n[idx+1],n[idx]]=[n[idx],n[idx+1]]; return n; }); }}
+                      style={{opacity:idx===savedViews.length-1?0.3:1,background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:6,width:26,height:26,color:"#e8f4fd",cursor:idx===savedViews.length-1?"default":"pointer"}}>↓</button>
+                  </>
+                )}
+                {viewsMode==="delete" && (
+                  <button onClick={e=>{ e.stopPropagation(); setSavedViews(prev=>prev.filter(x=>x.id!==v.id)); }}
+                    style={{background:"rgba(239,68,68,0.2)",border:"1px solid rgba(239,68,68,0.4)",borderRadius:6,width:26,height:26,color:"#f87171",cursor:"pointer"}}>✕</button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Zusatzfilter aus der Statistik (z.B. "Land: Ägypten") — bleibt
             aktiv bis ✕, unabhängig vom 🔍-Panel */}
@@ -2486,11 +2669,14 @@ function TauchbuchApp() {
         })()}
       </div>
 
-      {/* Trefferanzahl — nur bei aktiver Suche/Filter (Freitext oder aus der
-          Statistik angepinnt), damit klar ist, dass die Liste eingeschränkt
-          ist. Reine Gruppierung/Sortierung zählt nicht als Filter. */}
-      {(filterText || pinnedFilter) && (
+      {/* Trefferanzahl — nur bei aktiver Suche/Filter (Freitext, angewendete
+          Darstellung oder aus der Statistik angepinnt), damit klar ist, dass
+          die Liste eingeschränkt ist. Reine Gruppierung/Sortierung zählt
+          nicht als Filter. Name der aktiven Darstellung wird orange voran-
+          gestellt (analog Flugbuch), sobald eine angewendet ist. */}
+      {(filterText.trim() || pinnedFilter || activeViewName) && (
         <div style={{padding:"10px 16px 0",fontSize:12,color:"rgba(232,244,253,0.4)"}}>
+          {activeViewName && activeViewName.trim().toLowerCase()!=="standard" && <span style={{color:"#f5a623"}}>{activeViewName}, </span>}
           {filtered.length} {filtered.length===1?"Ergebnis":"Ergebnisse"}
         </div>
       )}

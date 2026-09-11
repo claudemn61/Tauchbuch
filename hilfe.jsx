@@ -61,11 +61,12 @@ const TOC = [
     ["h-tb-such-einfach","3.4 Suche: einfache Volltextsuche"],
     ["h-tb-such-erweitert","3.5 Suche: erweiterte Suche"],
     ["h-tb-such-syntax","3.6 Suche: Freitext-Syntax für Profis"],
-    ["h-tb-karte","3.7 Karte aller angezeigten Spots"],
-    ["h-tb-neu","3.8 Neuen Tauchgang anlegen"],
-    ["h-tb-import","3.9 CSV-Import"],
-    ["h-tb-backup","3.10 Backup: Sichern & Wiederherstellen"],
-    ["h-tb-auswahl","3.11 Mehrfachauswahl"],
+    ["h-tb-darstellungen","3.7 Gespeicherte Darstellungen"],
+    ["h-tb-karte","3.8 Karte aller angezeigten Spots"],
+    ["h-tb-neu","3.9 Neuen Tauchgang anlegen"],
+    ["h-tb-import","3.10 CSV-Import"],
+    ["h-tb-backup","3.11 Backup: Sichern & Wiederherstellen"],
+    ["h-tb-auswahl","3.12 Mehrfachauswahl"],
   ]},
   { id:"h-detail", label:"4. Tauchgang-Detailseite", subs:[
     ["h-detail-kopf","4.1 Kopfzeile"],
@@ -163,7 +164,7 @@ function HilfeApp() {
           <Sub id="h-ueberblick-daten" title="1.4 Wo werden die Daten gespeichert?">
             Alle Einträge werden in einem app-eigenen Speicher abgelegt, der an das jeweilige
             Gerät bzw. den jeweiligen Browser gebunden ist. Es gibt keine Cloud-Synchronisation
-            zwischen mehreren Geräten — dafür dient die Backup-Funktion (Kapitel 3.9).
+            zwischen mehreren Geräten — dafür dient die Backup-Funktion (Kapitel 3.11).
             <Callout kind="warn">Werden Browser-Cache/Website-Daten des Geräts geleert, gehen die
             gespeicherten Tauchgänge ohne vorheriges Backup verloren.</Callout>
           </Sub>
@@ -223,8 +224,9 @@ function HilfeApp() {
             <Tr><Td>📥</Td><Td>CSV-Import öffnen/schliessen</Td></Tr>
             <Tr><Td>💾</Td><Td>Backup-Menü öffnen/schliessen</Td></Tr>
             <Tr><Td>☑ / ✕</Td><Td>Mehrfachauswahl-Modus ein-/ausschalten</Td></Tr>
-            <Tr><Td>🌐</Td><Td>Karte aller angezeigten Spots öffnen (Kapitel 3.7)</Td></Tr>
+            <Tr><Td>🌐</Td><Td>Karte aller angezeigten Spots öffnen (Kapitel 3.8)</Td></Tr>
             <Tr><Td>📅 / 🧭</Td><Td>Schnellumschalter Gruppierungs-Ebene 1: Jahr (📅) oder Reise (🧭)</Td></Tr>
+            <Tr><Td>💡</Td><Td>Gespeicherte Darstellungen öffnen/schliessen (Kapitel 3.7)</Td></Tr>
             <Tr><Td>🔍</Td><Td>Suche, Sortierung und Gruppierung (bis zu zwei Ebenen) öffnen/schliessen</Td></Tr>
           </T>
 
@@ -311,7 +313,26 @@ function HilfeApp() {
             <Callout>Beispiel: <code>land:Aegypten UND tiefe&gt;=30 UND -Nachttauchgang</code> findet
             alle Tauchgänge in Ägypten ab 30 m, die keine Nachttauchgänge sind.</Callout>
           </Sub>
-          <Sub id="h-tb-karte" title="3.7 Karte aller angezeigten Spots">
+          <Sub id="h-tb-darstellungen" title="3.7 Gespeicherte Darstellungen">
+            Der 💡-Button speichert die komplette aktuelle Suchen/Sortieren/Gruppieren-Konfiguration
+            (Suchtext, Sortierfeld und -richtung, beide Gruppierungs-Ebenen samt ihrem eigenen
+            Sortierfeld) unter einem frei wählbaren Namen, um jederzeit direkt zu dieser Sicht auf
+            die Tauchliste zurückzuspringen, statt sie jedes Mal neu zusammenzustellen.
+            <T><Tr><Th>Element</Th><Th>Funktion</Th></Tr>
+              <Tr><Td>💾</Td><Td>Aktuelle Konfiguration unter einem Namen speichern</Td></Tr>
+              <Tr><Td>🔀</Td><Td>Reihenfolge der gespeicherten Darstellungen ändern (↑/↓ je Zeile)</Td></Tr>
+              <Tr><Td>🗑</Td><Td>Darstellung löschen</Td></Tr>
+              <Tr><Td>Tipp auf eine Darstellung</Td><Td>Wendet sie an — Suche, Sortierung und beide Gruppierungs-Ebenen springen auf den gespeicherten Stand</Td></Tr>
+            </T>
+            Der Name der zuletzt angewendeten Darstellung erscheint orange vor der Trefferanzahl
+            oberhalb der Liste. Jede manuelle Änderung an Suche, Sortierung oder Gruppierung löscht
+            diese Markierung wieder, da die Liste dann nicht mehr exakt der gespeicherten
+            Konfiguration entspricht — die gespeicherte Darstellung selbst bleibt davon unberührt.
+            <Callout kind="tip">Die zuletzt benutzten Suchen/Sortieren/Gruppieren-Einstellungen
+            bleiben unabhängig von gespeicherten Darstellungen automatisch erhalten und werden beim
+            nächsten Öffnen der Liste wiederhergestellt.</Callout>
+          </Sub>
+          <Sub id="h-tb-karte" title="3.8 Karte aller angezeigten Spots">
             Der 🌐-Button in der Symbolleiste (4. Symbol, neben ☑ Auswahl) öffnet eine Karte mit allen aktuell
             angezeigten Tauchgängen (also nach Suche/Filter), die im Feld „Koordinaten“ einen
             gültigen Wert hinterlegt haben — die Karte passt sich automatisch so ein, dass alle
@@ -322,13 +343,13 @@ function HilfeApp() {
             Doppeltipp auf die Karte öffnet sie bildschirmfüllend; <Field>← Zurück</Field> oben
             schliesst sie wieder.
           </Sub>
-          <Sub id="h-tb-neu" title="3.8 Neuen Tauchgang anlegen">
+          <Sub id="h-tb-neu" title="3.9 Neuen Tauchgang anlegen">
             <Badge>+ Tauchgang</Badge> legt sofort einen neuen, weitgehend leeren Tauchgang an und
             öffnet dessen Detailseite. Die Nummer wird automatisch auf die nächsthöhere freie
             Nummer gesetzt; Ausrüstungsfelder übernehmen die Werte des zuletzt angelegten
             Tauchgangs.
           </Sub>
-          <Sub id="h-tb-import" title="3.9 CSV-Import">
+          <Sub id="h-tb-import" title="3.10 CSV-Import">
             Über 📥 öffnet sich eine Import-Fläche: CSV-Datei per Klick auswählen oder per Drag &amp;
             Drop hineinziehen. Ein Fortschrittsbalken zeigt den Import-Status.
             Erkannt werden sowohl der bekannte Logbuch-Export als auch andere CSV-Strukturen
@@ -338,7 +359,7 @@ function HilfeApp() {
             <Callout>Jeder in der CSV vorkommende Ort wird automatisch als eigene Reise angelegt,
             sofern er noch nicht existiert.</Callout>
           </Sub>
-          <Sub id="h-tb-backup" title="3.10 Backup: Sichern & Wiederherstellen">
+          <Sub id="h-tb-backup" title="3.11 Backup: Sichern & Wiederherstellen">
             Über 💾 öffnet sich das Backup-Menü: <b>☁️ Backup sichern</b> erstellt eine
             Sicherungsdatei (JSON) zum Speichern an einem beliebigen Ort; <b>⬆ Backup importieren</b>
             spielt eine zuvor erstellte Sicherungsdatei zurück ein. Die Sicherung umfasst alle
@@ -347,7 +368,7 @@ function HilfeApp() {
             <Callout kind="warn">Vor grösseren Aktionen (Mehrfachlöschung, neuer CSV-Import) lohnt
             sich vorab ein frisches Backup.</Callout>
           </Sub>
-          <Sub id="h-tb-auswahl" title="3.11 Mehrfachauswahl">
+          <Sub id="h-tb-auswahl" title="3.12 Mehrfachauswahl">
             ☑ aktiviert den Auswahl-Modus. Danach lassen sich einzelne Zeilen oder ganze
             Gruppenköpfe markieren:
             <T><Tr><Th>Button</Th><Th>Funktion</Th></Tr>
@@ -521,7 +542,7 @@ function HilfeApp() {
         {/* 11. Tipps */}
         <Section id="h-tipps" title="11. Tipps, Grenzen & häufige Fragen">
           <Sub title="Wie bekomme ich Papier-Logbuch-Einträge in die App?">
-            Über den CSV-Import (Kapitel 3.8), z.B. vorbereitet in Excel/Numbers/Google Sheets.
+            Über den CSV-Import (Kapitel 3.10), z.B. vorbereitet in Excel/Numbers/Google Sheets.
           </Sub>
           <Sub title="Mehrere Geräte synchron nutzen?">
             Nicht automatisch — jedes Gerät speichert eigenständig. Für den Abgleich: Backup-Export
