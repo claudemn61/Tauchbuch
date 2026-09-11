@@ -365,10 +365,12 @@ function HilfeApp() {
           </Sub>
           <Sub id="h-tb-backup" title="3.11 Backup: Sichern & Wiederherstellen">
             Über 💾 öffnet sich das Backup-Menü: <b>☁️ Backup sichern</b> erstellt eine
-            Sicherungsdatei (JSON) zum Speichern an einem beliebigen Ort; <b>⬆ Backup importieren</b>
-            spielt eine zuvor erstellte Sicherungsdatei zurück ein. Die Sicherung umfasst alle
-            Tauchgänge, Reisen-Namen, Material-Angaben, alle Brevet-Einträge samt Fotos sowie
-            Startseiten-Titelbild und -Titel.
+            komprimierte Sicherungsdatei (<Field>.json.gz</Field>) zum Speichern an einem beliebigen
+            Ort — die Kompression spart vor allem wegen der eingebetteten Fotos (Titelbild,
+            Brevet-Scans) deutlich Platz; <b>⬆ Backup importieren</b> spielt eine zuvor erstellte
+            Sicherungsdatei zurück ein, auch ältere, unkomprimierte <Field>.json</Field>-Backups
+            bleiben dabei importierbar. Die Sicherung umfasst alle Tauchgänge, Reisen-Namen,
+            Material-Angaben, alle Brevet-Einträge samt Fotos sowie Startseiten-Titelbild und -Titel.
             <Callout kind="warn">Vor grösseren Aktionen (Mehrfachlöschung, neuer CSV-Import) lohnt
             sich vorab ein frisches Backup.</Callout>
           </Sub>
