@@ -1718,6 +1718,34 @@ function DetailContent({ d, dives, setDives, setSelected, setView, saveDive, con
   );
 }
 
+// Backups werden gzip-komprimiert gespeichert (.json.gz) — v.a. wegen der
+// Base64-kodierten Fotos (Titelbild, Brevet-Scans) macht das einen grossen
+// Unterschied bei der Dateigrösse. Native CompressionStream/
+// DecompressionStream-APIs statt einer externen Bibliothek (Safari ab
+// 16.4, Chrome/Firefox seit Jahren unterstützt — kein CDN-Script nötig).
+async function gzipString(str) {
+  const bytes = new TextEncoder().encode(str);
+  const cs = new CompressionStream("gzip");
+  const writer = cs.writable.getWriter();
+  writer.write(bytes);
+  writer.close();
+  const compressed = await new Response(cs.readable).arrayBuffer();
+  return new Blob([compressed], { type: "application/gzip" });
+}
+async function gunzipToString(arrayBuffer) {
+  const ds = new DecompressionStream("gzip");
+  const decompressed = await new Response(new Response(arrayBuffer).body.pipeThrough(ds)).arrayBuffer();
+  return new TextDecoder().decode(decompressed);
+}
+// Erkennt gzip-Dateien an ihrer Magic Number (0x1f 0x8b) statt an der
+// Dateiendung, damit ältere, unkomprimierte .json-Backups weiterhin
+// importierbar bleiben (und auch, falls eine .json.gz-Datei umbenannt oder
+// die Endung vom Betriebssystem verschluckt wurde).
+async function isGzip(file) {
+  const head = new Uint8Array(await file.slice(0, 2).arrayBuffer());
+  return head[0] === 0x1f && head[1] === 0x8b;
+}
+
 // ── Main App ─────────────────────────────────────────────────────────────
 function TauchbuchApp() {
   const isWide = useIsWide();
@@ -2084,11 +2112,12 @@ function TauchbuchApp() {
     const payload = { exportedAt: new Date().toISOString(), dives, extra };
     const json = JSON.stringify(payload);
     const dateStamp = new Date().toISOString().slice(0,10);
-    const filename = `tauchbuch-backup-${dateStamp}.json`;
+    const filename = `tauchbuch-backup-${dateStamp}.json.gz`;
+    const blob = await gzipString(json);
 
     if (navigator.share && navigator.canShare) {
       try {
-        const file = new File([json], filename, { type: "application/json" });
+        const file = new File([blob], filename, { type: "application/gzip" });
         if (navigator.canShare({ files: [file] })) {
           await navigator.share({ files: [file] });
           setBackupMsg("✓ Backup geteilt.");
@@ -2098,15 +2127,16 @@ function TauchbuchApp() {
         if (e && e.name === "AbortError") return;
       }
     }
-    const encoded = "data:application/json;charset=utf-8," + encodeURIComponent(json);
+    const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = encoded; a.download = filename;
+    a.href = url; a.download = filename;
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   }, [dives]);
 
   const importBackup = useCallback(async (file) => {
     try {
-      const text = await file.text();
+      const text = (await isGzip(file)) ? await gunzipToString(await file.arrayBuffer()) : await file.text();
       const data = JSON.parse(text);
       if (!Array.isArray(data.dives)) throw new Error("Ungültiges Backup-Format (kein 'dives'-Array).");
       for (const d of data.dives) await window.storage.set(`dive:${d.id}`, JSON.stringify(d));
@@ -2170,7 +2200,7 @@ function TauchbuchApp() {
   return (
     <div style={{maxWidth:isWide?1400:480,margin:"0 auto",minHeight:"100vh",background:"#040e20",color:"#e8f4fd",fontFamily:"-apple-system,BlinkMacSystemFont,sans-serif"}}>
       <input ref={fileRef} type="file" accept=".csv" style={{display:"none"}} onChange={e=>e.target.files[0]&&importCsvFile(e.target.files[0])} />
-      <input ref={backupFileRef} type="file" accept=".json" style={{display:"none"}}
+      <input ref={backupFileRef} type="file" accept=".json,.json.gz,.gz,application/gzip" style={{display:"none"}}
         onChange={e=>{ if(e.target.files[0]) importBackup(e.target.files[0]); e.target.value=""; }} />
 
       {/* Header */}
