@@ -12,7 +12,7 @@ function useIsWide() {
   return isWide;
 }
 
-const APP_VERSION = "2.10.0";
+const APP_VERSION = "2.9.0";
 
 // ── Startseite ───────────────────────────────────────────────────────────
 // Editierbares Titelbild (per Tap austauschbar, als Data-URL in Storage
@@ -29,9 +29,6 @@ const CHAPTERS = [
 // Änderungsverlauf — neuste zuerst. Wird beim Erhöhen der Version jeweils
 // von Hand ergänzt.
 const CHANGELOG = [
-  { version: "2.10.0", changes: [
-    "Neu: fehlt bei einem Tauchgang das Feld Koordinaten, erscheint daneben ein \"🔍 Suchen\"-Button — sucht Tauchspot/Ort/Land über OpenStreetMap (Nominatim) und zeigt Treffer zur Übernahme an; findet die Suche nichts, lässt sich der Punkt über \"🗺 Manuell auf Karte setzen\" per Antippen direkt auf einer Karte platzieren",
-  ]},
   { version: "2.9.0", changes: [
     "Neu: Gespeicherte Darstellungen (💡, 7. Badge) — komplette Suchen/Sortieren/Gruppieren-Konfiguration unter einem Namen speichern und jederzeit wieder anwenden, inkl. automatischer Wiederherstellung der zuletzt benutzten Einstellungen beim Öffnen der Liste",
     "Icon-Leiste (Import/Backup/Auswahl/Karte/Gruppierung/Darstellungen/Suche) jetzt im selben Kachel-Format wie im Flugbuch",
