@@ -325,7 +325,7 @@ function HilfeApp() {
               <Tr><Td>🗑</Td><Td>Darstellung löschen</Td></Tr>
               <Tr><Td>Tipp auf eine Darstellung</Td><Td>Wendet sie an — Suche, Sortierung und beide Gruppierungs-Ebenen springen auf den gespeicherten Stand</Td></Tr>
             </T>
-            Der Name der zuletzt angewendeten Darstellung erscheint orange vor der Trefferanzahl
+            Der Name der zuletzt angewendeten Darstellung erscheint blau vor der Trefferanzahl
             oberhalb der Liste. Jede manuelle Änderung an Suche, Sortierung oder Gruppierung löscht
             diese Markierung wieder, da die Liste dann nicht mehr exakt der gespeicherten
             Konfiguration entspricht — die gespeicherte Darstellung selbst bleibt davon unberührt.

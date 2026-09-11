@@ -2732,11 +2732,11 @@ function TauchbuchApp() {
       {/* Trefferanzahl — nur bei aktiver Suche/Filter (Freitext, angewendete
           Darstellung oder aus der Statistik angepinnt), damit klar ist, dass
           die Liste eingeschränkt ist. Reine Gruppierung/Sortierung zählt
-          nicht als Filter. Name der aktiven Darstellung wird orange voran-
-          gestellt (analog Flugbuch), sobald eine angewendet ist. */}
+          nicht als Filter. Name der aktiven Darstellung wird blau voran-
+          gestellt, sobald eine angewendet ist. */}
       {(filterText.trim() || pinnedFilter || activeViewName) && (
         <div style={{padding:"10px 16px 0",fontSize:12,color:"rgba(232,244,253,0.4)"}}>
-          {activeViewName && activeViewName.trim().toLowerCase()!=="standard" && <span style={{color:"#f5a623"}}>{activeViewName}, </span>}
+          {activeViewName && activeViewName.trim().toLowerCase()!=="standard" && <span style={{color:"#7dd3fc"}}>{activeViewName}, </span>}
           {filtered.length} {filtered.length===1?"Ergebnis":"Ergebnisse"}
         </div>
       )}
