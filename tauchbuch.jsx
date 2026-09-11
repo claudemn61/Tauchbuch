@@ -1249,6 +1249,16 @@ function GroupHeader({ label, count, totalMin, collapsed, onToggle, selectMode, 
 // nicht symmetrisch"-Problem, das im Flugbuch lange bestand). 1:1 aus dem
 // aktuellen Flugbuch (dort PANEL_TILE_HEIGHT).
 const PANEL_TILE_HEIGHT = 34;
+// Gemeinsame Breiten-Formel fürs Suchen/Sortieren/Gruppieren-Panel: das
+// Suchfeld (Zeile 1) und die Gr. 1°/2°-Hauptschalter (Zeile 2/3, bei
+// aktiver Gruppe) sollen exakt gleich breit sein, ebenso das Sortierfeld
+// (Zeile 1) und die "Gruppen sortieren nach…"-Schalter (Zeile 2/3) —
+// 1:1 aus dem aktuellen Flugbuch übernommenes Schema (dort schon lange
+// dasselbe Symmetrie-Problem gelöst), Pixel-Korrektur an PANEL_TILE_HEIGHT
+// (34 statt Flugbuchs 32) angepasst, damit beide Zeilen ohne Leerraum
+// exakt bis zum rechten Rand reichen.
+const SEARCH_SORT_PRIMARY_BASIS = "calc(85% - 93px)";
+const GROUP_SORT_FIELD_BASIS = "0 0 calc(15% + 47px)";
 function SearchBar({ filterText, setFilterText }) {
   const [advOpen, setAdvOpen] = useState(false);
   const [rows, setRows] = useState(() => parseDiveQueryToRows(filterText));
@@ -1299,7 +1309,7 @@ function SearchBar({ filterText, setFilterText }) {
               const grouped = inSet.has(idx);
               return (
                 <div key={idx} style={{
-                  display:"flex",flexWrap:"wrap",gap:6,alignItems:"center",
+                  display:"flex",gap:6,alignItems:"center",
                   borderLeft: grouped ? "2px solid rgba(167,139,250,0.6)" : "2px solid transparent",
                   borderTopLeftRadius: startSet.has(idx) ? 6 : 0,
                   borderBottomLeftRadius: endSet.has(idx) ? 6 : 0,
@@ -1340,10 +1350,10 @@ function SearchBar({ filterText, setFilterText }) {
                   })()}
                   <input value={row.value||""} onChange={e=>updateRow(idx,{value:e.target.value})}
                     placeholder={row.op==="between" ? "von…" : "Wert…"}
-                    style={{flex:"1 1 90px",minWidth:90,background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:8,padding:"5px 8px",color:"#e8f4fd",fontSize:12}} />
+                    style={{flex:1,minWidth:0,background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:8,padding:"5px 8px",color:"#e8f4fd",fontSize:12}} />
                   {row.op==="between" && (
                     <input value={row.value2||""} onChange={e=>updateRow(idx,{value2:e.target.value})} placeholder="bis…"
-                      style={{flex:"1 1 90px",minWidth:90,background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:8,padding:"5px 8px",color:"#e8f4fd",fontSize:12}} />
+                      style={{flex:1,minWidth:0,background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:8,padding:"5px 8px",color:"#e8f4fd",fontSize:12}} />
                   )}
                   <button onClick={()=>removeRow(idx)} style={{background:"none",border:"none",color:"rgba(232,244,253,0.35)",cursor:"pointer",fontSize:14,padding:"0 2px",flexShrink:0}}>✕</button>
                 </div>
@@ -2515,8 +2525,8 @@ function TauchbuchApp() {
         {/* Suche / Sortierung / Gruppierung — gebündelt hinter dem 🔍-Badge, analog Flugbuch */}
         {showSearchMenu && (
           <div style={{padding:"12px 16px 6px",position:"relative"}}>
-            <div style={{display:"flex",gap:8,alignItems:"flex-start"}}>
-              <div style={{flex:"1 1 0",minWidth:0,position:"relative"}}>
+            <div style={{display:"flex",gap:6,alignItems:"flex-start"}}>
+              <div style={{flex:`0 0 ${SEARCH_SORT_PRIMARY_BASIS}`,minWidth:0,position:"relative"}}>
                 <SearchBar filterText={filterText} setFilterText={setFilterText} />
               </div>
               <button onClick={()=>setShowSortMenu(s=>!s)}
@@ -2564,14 +2574,14 @@ function TauchbuchApp() {
               return (
                 <div key={level} style={{marginTop:8,position:"relative",display:"flex",gap:6}}>
                   <button onClick={()=>setShowMenu(s=>!s)}
-                    style={{flex:"1 1 0",minWidth:0,height:PANEL_TILE_HEIGHT,boxSizing:"border-box",display:"flex",justifyContent:"space-between",alignItems:"center",background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:10,padding:"0 8px",color:groupId?"#fff":"rgba(232,244,253,0.5)",fontSize:12,cursor:"pointer"}}>
+                    style={{flex:groupId?`0 0 ${SEARCH_SORT_PRIMARY_BASIS}`:"1 1 0",minWidth:0,height:PANEL_TILE_HEIGHT,boxSizing:"border-box",display:"flex",justifyContent:"space-between",alignItems:"center",background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:10,padding:"0 8px",color:groupId?"#fff":"rgba(232,244,253,0.5)",fontSize:12,cursor:"pointer"}}>
                     <span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>⇅ Gr. {level}°: {groupId ? (GROUP_FIELDS.find(o=>o.id===groupId)?.label||"—") : "Keine"}</span>
                     <span style={{flexShrink:0,marginLeft:4}}>{showMenu?"▾":"▸"}</span>
                   </button>
                   {groupId && (
                     <button onClick={()=>setShowSortM(s=>!s)}
                       title="Gruppen sortieren nach…"
-                      style={{flex:"0 0 auto",maxWidth:110,minWidth:0,height:PANEL_TILE_HEIGHT,boxSizing:"border-box",display:"flex",justifyContent:"space-between",alignItems:"center",gap:3,background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:10,padding:"0 7px",color:"rgba(232,244,253,0.7)",fontSize:11,cursor:"pointer"}}>
+                      style={{flex:GROUP_SORT_FIELD_BASIS,minWidth:0,height:PANEL_TILE_HEIGHT,boxSizing:"border-box",display:"flex",justifyContent:"space-between",alignItems:"center",gap:3,background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:10,padding:"0 7px",color:"rgba(232,244,253,0.7)",fontSize:11,cursor:"pointer"}}>
                       <span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>⇅ {!rawSortField ? "Name" : rawSortField==="anzahl" ? "Anzahl" : (GROUP_SORT_FIELDS.find(o=>o.id===rawSortField)?.label||"Name")}</span>
                       <span style={{flexShrink:0,fontWeight:700}}>{groupDir==="asc"?"↑":"↓"}</span>
                     </button>
