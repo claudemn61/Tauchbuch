@@ -1723,8 +1723,12 @@ function TauchbuchApp() {
   // tauchbuchListSettings persistiert. 1:1 aus dem Flugbuch übernommen.
   const [savedViews, setSavedViewsRaw] = useState([]);
   const [showViewsMenu, setShowViewsMenu] = useState(false);
-  const [viewsMode, setViewsMode] = useState("none"); // "none" | "move" | "delete"
+  const [viewsMode, setViewsMode] = useState("none"); // "none" | "move" | "delete" | "edit"
   const [savingViewName, setSavingViewName] = useState(null); // string während "Speichern als…" offen ist, sonst null
+  // Bearbeiten einer bestehenden Darstellung (Name + Filter) im "edit"-Modus.
+  const [editingViewId, setEditingViewId] = useState(null);
+  const [editName, setEditName] = useState("");
+  const [editFilter, setEditFilter] = useState("");
   // Name der zuletzt per applyView angewendeten Darstellung, neben der
   // Trefferanzahl angezeigt. Wird gelöscht, sobald Suchen/Sortieren/
   // Gruppieren manuell verändert wird (über die gewrappten Setter unten,
@@ -1773,6 +1777,14 @@ function TauchbuchApp() {
     const config = { filterText, sortId, sortDir, groupField1, groupOrder1, group1SortField, groupField2, groupOrder2, group2SortField };
     setSavedViews(prev => [...prev, { id: "view_"+Date.now(), name: trimmed, config }]);
     setSavingViewName(null);
+  };
+  // Name und Filter einer bestehenden Darstellung nachträglich ändern —
+  // die übrige Konfiguration (Sortierung/Gruppierung) bleibt unangetastet.
+  const saveViewEdit = () => {
+    const trimmed = (editName||"").trim();
+    if (!trimmed) return;
+    setSavedViews(prev => prev.map(x => x.id===editingViewId ? { ...x, name: trimmed, config: { ...x.config, filterText: editFilter } } : x));
+    setEditingViewId(null);
   };
   // Stellt die zuletzt benutzten Suchen/Sortieren/Gruppieren-Einstellungen
   // beim Laden wieder her — tauchbuch.html ist eine eigenständige Seite
@@ -2180,17 +2192,22 @@ function TauchbuchApp() {
         {showViewsMenu && (
           <div style={{margin:"8px 16px 0",background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:10,padding:10,maxHeight:340,overflowY:"auto"}}>
             <div style={{display:"flex",gap:6}}>
-              <button onClick={()=>{ setSavingViewName(s=>s===null?"":null); setViewsMode("none"); }}
+              <button onClick={()=>{ setSavingViewName(s=>s===null?"":null); setViewsMode("none"); setEditingViewId(null); }}
                 title="Speichern als…"
                 style={{flex:1,padding:"9px 0",borderRadius:8,fontSize:16,cursor:"pointer",background:savingViewName!==null?"rgba(74,222,128,0.15)":"rgba(255,255,255,0.05)",border:`1px solid ${savingViewName!==null?"rgba(74,222,128,0.4)":"rgba(255,255,255,0.1)"}`}}>
                 💾
               </button>
-              <button onClick={()=>{ setViewsMode(m=>m==="move"?"none":"move"); setSavingViewName(null); }}
+              <button onClick={()=>{ setViewsMode(m=>m==="edit"?"none":"edit"); setSavingViewName(null); setEditingViewId(null); }}
+                title="Bearbeiten (Name & Filter)"
+                style={{flex:1,padding:"9px 0",borderRadius:8,fontSize:16,cursor:"pointer",background:viewsMode==="edit"?"rgba(167,139,250,0.15)":"rgba(255,255,255,0.05)",border:`1px solid ${viewsMode==="edit"?"rgba(167,139,250,0.4)":"rgba(255,255,255,0.1)"}`}}>
+                ✏️
+              </button>
+              <button onClick={()=>{ setViewsMode(m=>m==="move"?"none":"move"); setSavingViewName(null); setEditingViewId(null); }}
                 title="Verschieben"
                 style={{flex:1,padding:"9px 0",borderRadius:8,fontSize:16,cursor:"pointer",background:viewsMode==="move"?"rgba(14,165,233,0.15)":"rgba(255,255,255,0.05)",border:`1px solid ${viewsMode==="move"?"rgba(14,165,233,0.4)":"rgba(255,255,255,0.1)"}`}}>
                 🔀
               </button>
-              <button onClick={()=>{ setViewsMode(m=>m==="delete"?"none":"delete"); setSavingViewName(null); }}
+              <button onClick={()=>{ setViewsMode(m=>m==="delete"?"none":"delete"); setSavingViewName(null); setEditingViewId(null); }}
                 title="Löschen"
                 style={{flex:1,padding:"9px 0",borderRadius:8,fontSize:16,cursor:"pointer",background:viewsMode==="delete"?"rgba(239,68,68,0.15)":"rgba(255,255,255,0.05)",border:`1px solid ${viewsMode==="delete"?"rgba(239,68,68,0.4)":"rgba(255,255,255,0.1)"}`}}>
                 🗑
@@ -2214,7 +2231,33 @@ function TauchbuchApp() {
               <div key={v.id}
                 onClick={()=>{ if (viewsMode==="none") applyView(v); }}
                 style={{display:"flex",alignItems:"center",gap:6,padding:"9px 12px",borderRadius:8,fontSize:13,cursor:viewsMode==="none"?"pointer":"default",color:"rgba(232,244,253,0.85)"}}>
-                <span style={{flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{v.name}</span>
+                {viewsMode==="edit" && editingViewId===v.id ? (
+                  <div onClick={e=>e.stopPropagation()} style={{display:"flex",flexDirection:"column",gap:4,flex:1,minWidth:0}}>
+                    <input autoFocus value={editName} onChange={e=>setEditName(e.target.value)}
+                      onKeyDown={e=>{ if(e.key==="Enter") saveViewEdit(); if(e.key==="Escape") setEditingViewId(null); }}
+                      placeholder="Name der Darstellung…"
+                      style={{width:"100%",boxSizing:"border-box",background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.15)",borderRadius:6,padding:"5px 8px",color:"#e8f4fd",fontSize:12}} />
+                    <input value={editFilter} onChange={e=>setEditFilter(e.target.value)}
+                      onKeyDown={e=>{ if(e.key==="Enter") saveViewEdit(); if(e.key==="Escape") setEditingViewId(null); }}
+                      placeholder="Suchbegriff / Filter…"
+                      style={{width:"100%",boxSizing:"border-box",background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.15)",borderRadius:6,padding:"5px 8px",color:"rgba(232,244,253,0.6)",fontSize:11}} />
+                  </div>
+                ) : (
+                  <span style={{flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{v.name}</span>
+                )}
+                {viewsMode==="edit" && (
+                  editingViewId===v.id ? (
+                    <>
+                      <button onClick={e=>{ e.stopPropagation(); saveViewEdit(); }} title="Speichern"
+                        style={{flexShrink:0,background:"rgba(74,222,128,0.2)",border:"1px solid rgba(74,222,128,0.4)",borderRadius:6,width:26,height:26,color:"#4ade80",cursor:"pointer"}}>✓</button>
+                      <button onClick={e=>{ e.stopPropagation(); setEditingViewId(null); }} title="Abbrechen"
+                        style={{flexShrink:0,background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:6,width:26,height:26,color:"#e8f4fd",cursor:"pointer"}}>✕</button>
+                    </>
+                  ) : (
+                    <button onClick={e=>{ e.stopPropagation(); setEditingViewId(v.id); setEditName(v.name); setEditFilter(v.config?.filterText||""); }} title="Bearbeiten"
+                      style={{flexShrink:0,background:"rgba(167,139,250,0.15)",border:"1px solid rgba(167,139,250,0.35)",borderRadius:6,width:26,height:26,color:"#a78bfa",cursor:"pointer"}}>✏️</button>
+                  )
+                )}
                 {viewsMode==="move" && (
                   <>
                     <button disabled={idx===0} onClick={e=>{ e.stopPropagation(); setSavedViews(prev=>{ const n=[...prev]; [n[idx-1],n[idx]]=[n[idx],n[idx-1]]; return n; }); }}
