@@ -2135,7 +2135,7 @@ function TauchbuchApp() {
           </button>
           <button onClick={()=>{ setSelectMode(m=>!m); setSelectedIds(new Set()); setCopyMsg(""); }} title="Auswahl"
             style={{flex:"1 1 0",minWidth:0,aspectRatio:"2/1",boxSizing:"border-box",display:"flex",alignItems:"center",justifyContent:"center",background:selectMode?"rgba(14,165,233,0.18)":"rgba(255,255,255,0.05)",border:`${selectMode?2:1}px solid ${selectMode?"rgba(14,165,233,0.4)":"rgba(255,255,255,0.1)"}`,borderRadius:10,color:"#fff",fontSize:30,cursor:"pointer"}}>
-            {selectMode?"✕":"☑"}
+            {selectMode?"✕":"☑️"}
           </button>
           <button onClick={()=>setListMapOpen(o=>!o)} title="Karte anzeigen"
             style={{flex:"1 1 0",minWidth:0,aspectRatio:"2/1",boxSizing:"border-box",display:"flex",alignItems:"center",justifyContent:"center",background:listMapOpen?"rgba(56,189,248,0.15)":"rgba(255,255,255,0.05)",border:`${listMapOpen?2:1}px solid ${listMapOpen?"rgba(56,189,248,0.4)":"rgba(255,255,255,0.1)"}`,borderRadius:10,color:"#fff",fontSize:26,cursor:"pointer"}}>
