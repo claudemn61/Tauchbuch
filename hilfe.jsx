@@ -415,14 +415,6 @@ function HilfeApp() {
             zeigt dauerhaft die Tauchgang-Nummer über dem Pin. Sind keine (gültigen) Koordinaten
             hinterlegt, erscheint stattdessen ein Hinweis mit Format-Beispiel. Doppeltipp auf die
             Karte öffnet sie bildschirmfüllend; <Field>← Zurück</Field> oben schliesst sie wieder.
-            <br/><br/>
-            Ist das Feld <Field>Koordinaten</Field> leer, erscheint daneben ein Button
-            <Field>🔍 Suchen</Field>: er sucht Tauchspot, Ort und Land über die freie
-            OpenStreetMap-Ortsdatenbank (Nominatim) und zeigt bis zu 5 Treffer zur Übernahme an —
-            der Suchbegriff lässt sich im Panel frei anpassen. Findet die Suche nichts (viele
-            kleine oder unbenannte Tauchspots fehlen in OSM), lässt sich der Punkt über
-            <Field>🗺 Manuell auf Karte setzen</Field> stattdessen per Antippen direkt auf einer
-            Karte platzieren.
           </Sub>
           <Sub id="h-detail-bemerkungen" title="4.5 Bemerkungen">
             Mehrzeiliges Freitextfeld für Beobachtungen — antippen öffnet die Bearbeitung.
