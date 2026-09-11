@@ -1076,26 +1076,50 @@ function EditableTitle({ value, onSave }) {
   );
 }
 
-function InlineField({label, value, onSave, multiline, unit}) {
+// Kleiner Kopieren-Button für Feldwerte, die man oft anderswo einfügen
+// möchte (z.B. Koordinaten in Google Maps) — kurzes ✓-Feedback statt
+// stillem Erfolg, damit der Tipp auch ohne sichtbaren Clipboard-Inhalt
+// bestätigt wird.
+function CopyButton({ text }) {
+  const [copied, setCopied] = useState(false);
+  const copy = async (e) => {
+    e.stopPropagation();
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(()=>setCopied(false), 1500);
+    } catch {}
+  };
+  return (
+    <button onClick={copy} title="Kopieren"
+      style={{flexShrink:0,background:copied?"rgba(74,222,128,0.2)":"rgba(255,255,255,0.08)",border:`1px solid ${copied?"rgba(74,222,128,0.4)":"rgba(255,255,255,0.12)"}`,borderRadius:6,width:26,height:26,color:copied?"#4ade80":"rgba(232,244,253,0.6)",fontSize:12,cursor:"pointer"}}>
+      {copied?"✓":"📋"}
+    </button>
+  );
+}
+function InlineField({label, value, onSave, multiline, unit, extra}) {
   const [editing, setEditing] = useState(false);
   const [val, setVal] = useState(value||"");
   const commit = () => { setEditing(false); if(val!==(value||"")) onSave(val); };
   return (
     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 0",borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
       <span style={{fontSize:13,color:"rgba(232,244,253,0.45)",minWidth:90}}>{label}</span>
-      {editing ? (
-        multiline
-          ? <textarea value={val} onChange={e=>setVal(e.target.value)} onBlur={commit} autoFocus
-              style={{flex:1,background:"rgba(255,255,255,0.08)",border:"1px solid rgba(56,189,248,0.4)",borderRadius:8,padding:"4px 8px",color:"#e8f4fd",fontSize:13,resize:"vertical",minHeight:48}} />
-          : <input value={val} onChange={e=>setVal(e.target.value)} onBlur={commit} autoFocus
-              onKeyDown={e=>{ if(e.key==="Enter"){e.preventDefault();commit();} }}
-              style={{flex:1,background:"rgba(255,255,255,0.08)",border:"1px solid rgba(56,189,248,0.4)",borderRadius:8,padding:"4px 8px",color:"#e8f4fd",fontSize:13,textAlign:"right"}} />
-      ) : (
-        <span onClick={()=>{setVal(value||"");setEditing(true);}}
-          style={{fontSize:13,fontWeight:500,color:value?"#e8f4fd":"rgba(232,244,253,0.25)",cursor:"pointer",minWidth:60,textAlign:"right"}}>
-          {value?(value+(unit?" "+unit:"")):(unit?"— "+unit:"—")}
-        </span>
-      )}
+      <div style={{display:"flex",alignItems:"center",justifyContent:"flex-end",gap:8,flex:1,minWidth:0}}>
+        {editing ? (
+          multiline
+            ? <textarea value={val} onChange={e=>setVal(e.target.value)} onBlur={commit} autoFocus
+                style={{flex:1,background:"rgba(255,255,255,0.08)",border:"1px solid rgba(56,189,248,0.4)",borderRadius:8,padding:"4px 8px",color:"#e8f4fd",fontSize:13,resize:"vertical",minHeight:48}} />
+            : <input value={val} onChange={e=>setVal(e.target.value)} onBlur={commit} autoFocus
+                onKeyDown={e=>{ if(e.key==="Enter"){e.preventDefault();commit();} }}
+                style={{flex:1,background:"rgba(255,255,255,0.08)",border:"1px solid rgba(56,189,248,0.4)",borderRadius:8,padding:"4px 8px",color:"#e8f4fd",fontSize:13,textAlign:"right"}} />
+        ) : (
+          <span onClick={()=>{setVal(value||"");setEditing(true);}}
+            style={{fontSize:13,fontWeight:500,color:value?"#e8f4fd":"rgba(232,244,253,0.25)",cursor:"pointer",minWidth:60,textAlign:"right"}}>
+            {value?(value+(unit?" "+unit:"")):(unit?"— "+unit:"—")}
+          </span>
+        )}
+        {!editing && extra}
+      </div>
     </div>
   );
 }
@@ -1655,7 +1679,8 @@ function DetailContent({ d, dives, setDives, setSelected, setView, saveDive, con
           <ReiseSelect label="Ort, Reise" value={d.customFields?.reise || d.ort} onSave={saveOrtReiseField} />
           <InlineField label="TG-Nr." value={d.tgNr} onSave={v=>saveField({tgNr:v})} />
           <InlineField label="Tauchspot" value={d.tauchspot} onSave={v=>saveField({tauchspot:v})} />
-          <InlineField label="Koordinaten" value={d.koordinaten} onSave={v=>saveField({koordinaten:v})} />
+          <InlineField label="Koordinaten" value={d.koordinaten} onSave={v=>saveField({koordinaten:v})}
+            extra={d.koordinaten ? <CopyButton text={d.koordinaten} /> : null} />
           <InlineField label="Anzug" value={d.anzug} onSave={v=>saveField({anzug:v})} />
           <SelectField label="Blei" value={d.blei} options={BLEI_OPTIONS} unit="kg" onSave={v=>saveField({blei:v})} />
           <SelectField label="Flasche" value={d.flasche} options={FLASCHE_OPTIONS} onSave={v=>saveField({flasche:v})} />

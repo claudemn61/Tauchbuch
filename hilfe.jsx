@@ -419,6 +419,9 @@ function HilfeApp() {
             zeigt dauerhaft die Tauchgang-Nummer über dem Pin. Sind keine (gültigen) Koordinaten
             hinterlegt, erscheint stattdessen ein Hinweis mit Format-Beispiel. Doppeltipp auf die
             Karte öffnet sie bildschirmfüllend; <Field>← Zurück</Field> oben schliesst sie wieder.
+            Ist ein Wert eingetragen, erscheint neben dem Feld <Field>Koordinaten</Field> ein
+            📋-Button, der den Wert in die Zwischenablage kopiert (z.B. zum Einfügen in Google
+            Maps).
           </Sub>
           <Sub id="h-detail-bemerkungen" title="4.5 Bemerkungen">
             Mehrzeiliges Freitextfeld für Beobachtungen — antippen öffnet die Bearbeitung.
