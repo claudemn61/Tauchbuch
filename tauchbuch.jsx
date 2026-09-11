@@ -441,27 +441,6 @@ function parseCoords(str) {
   return { lat, lon };
 }
 
-// Sucht Koordinaten für einen Ortsnamen über die Nominatim-API (OpenStreetMap,
-// kostenlos, kein API-Key nötig) — für Tauchspots ohne hinterlegte
-// Koordinaten (siehe CoordSearchButton). Nur auf explizite Aktion
-// (Panel öffnen / Enter / "Suchen"-Klick) aufgerufen, nie als Autocomplete
-// beim Tippen, gemäss Nominatim-Nutzungsrichtlinie. Liefert bis zu 5 Treffer
-// (lat/lon + Anzeigename); liefert [] bei keinem Treffer oder Netzwerkfehler
-// (z.B. offline), statt zu werfen.
-async function nominatimSearch(query) {
-  const q = (query || "").trim();
-  if (!q) return [];
-  try {
-    const url = `https://nominatim.openstreetmap.org/search?format=json&limit=5&accept-language=de&q=${encodeURIComponent(q)}`;
-    const res = await fetch(url, { headers: { "Accept": "application/json" } });
-    if (!res.ok) return [];
-    const data = await res.json();
-    return (data || [])
-      .map(r => ({ lat: parseFloat(r.lat), lon: parseFloat(r.lon), label: r.display_name }))
-      .filter(r => Number.isFinite(r.lat) && Number.isFinite(r.lon));
-  } catch { return []; }
-}
-
 // Leichtgewichtige Karte (MapTiler SDK direkt, ohne Leaflet-Adapter —
 // deutsche Beschriftung) für einen oder mehrere Punkte. Bei einem Punkt
 // wird regional gezoomt (Umgebung des Spots), bei mehreren automatisch
@@ -543,151 +522,6 @@ function MiniMap({ points, height }) {
     </>
   );
 }
-
-// Vollbild-Karte zum manuellen Setzen von Koordinaten per Klick/Tap —
-// Fallback für CoordSearchButton, falls die Nominatim-Suche keinen
-// brauchbaren Treffer liefert (viele kleine/unbenannte Tauchspots fehlen
-// in OSM). Zeigt bei einem Klick/Tap auf die Karte einen (verschiebbaren)
-// Marker; "✓ Übernehmen" erst aktiv, sobald ein Punkt gesetzt wurde.
-function CoordPickerMap({ initialCenter, onPick, onClose }) {
-  const elRef = useRef(null);
-  const mapRef = useRef(null);
-  const markerRef = useRef(null);
-  const [picked, setPicked] = useState(null);
-  useEffect(() => {
-    if (!elRef.current || !window.maptilersdk) return;
-    const sdk = window.maptilersdk;
-    const map = new sdk.Map({
-      container: elRef.current,
-      apiKey: MAPTILER_API_KEY,
-      style: sdk.MapStyle.STREETS,
-      language: "de",
-      center: initialCenter ? [initialCenter.lon, initialCenter.lat] : [10, 20],
-      zoom: initialCenter ? 9 : 2,
-    });
-    mapRef.current = map;
-    map.on("click", e => {
-      const { lng, lat } = e.lngLat;
-      setPicked({ lat, lon: lng });
-      if (markerRef.current) markerRef.current.setLngLat([lng, lat]);
-      else markerRef.current = new sdk.Marker().setLngLat([lng, lat]).addTo(map);
-    });
-    return () => { map.remove(); mapRef.current = null; markerRef.current = null; };
-  }, []);
-  return (
-    <div style={{position:"fixed",inset:0,zIndex:500,background:"#0a1628",display:"flex",flexDirection:"column"}}>
-      <div style={{padding:"calc(14px + env(safe-area-inset-top, 0px)) 16px 10px",flexShrink:0,borderBottom:"1px solid rgba(255,255,255,0.08)",display:"flex",alignItems:"center",gap:10}}>
-        <button onClick={onClose}
-          style={{background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.15)",borderRadius:10,padding:"8px 16px",color:"#e8f4fd",fontSize:14,fontWeight:700,cursor:"pointer",flexShrink:0}}>
-          ← Zurück
-        </button>
-        <span style={{flex:1,fontSize:12,color:"rgba(232,244,253,0.5)",textAlign:"center"}}>Tippen zum Setzen des Punkts</span>
-        <button onClick={()=>picked && onPick(picked)} disabled={!picked}
-          style={{background:picked?"rgba(34,197,94,0.18)":"rgba(255,255,255,0.05)",border:`1px solid ${picked?"rgba(34,197,94,0.4)":"rgba(255,255,255,0.1)"}`,borderRadius:10,padding:"8px 16px",color:picked?"#4ade80":"rgba(232,244,253,0.3)",fontSize:14,fontWeight:700,cursor:picked?"pointer":"default",flexShrink:0}}>
-          ✓ Übernehmen
-        </button>
-      </div>
-      <div style={{flex:1,position:"relative"}}>
-        <div ref={elRef} style={{position:"absolute",inset:0}} />
-      </div>
-    </div>
-  );
-}
-
-// Button neben dem Koordinaten-Feld im TG-Bearbeiten-Formular, solange
-// dieses leer ist (siehe InlineField extra-Prop) — sucht via Nominatim
-// (Tauchspot/Ort/Land) nach passenden Koordinaten und zeigt bis zu 5
-// Treffer zur Übernahme an; frei editierbares Suchfeld für abweichende
-// Suchbegriffe. Findet die Suche nichts, lässt sich der Punkt stattdessen
-// manuell auf der Karte setzen (CoordPickerMap).
-function CoordSearchButton({ d, onSave }) {
-  const [open, setOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [results, setResults] = useState(null);
-  const [query, setQuery] = useState("");
-  const [pickerOpen, setPickerOpen] = useState(false);
-
-  const defaultQuery = () => [d.tauchspot, d.ort, d.land].filter(Boolean).join(", ");
-
-  const runSearch = async (q) => {
-    setLoading(true);
-    setResults(null);
-    const r = await nominatimSearch(q);
-    setResults(r);
-    setLoading(false);
-  };
-
-  const openPanel = () => {
-    const q = defaultQuery();
-    setQuery(q);
-    setOpen(true);
-    runSearch(q);
-  };
-
-  const accept = (r) => {
-    onSave(`${r.lat.toFixed(5)}, ${r.lon.toFixed(5)}`);
-    setOpen(false);
-  };
-
-  return (
-    <>
-      <button onClick={openPanel} title="Koordinaten suchen"
-        style={{background:"rgba(56,189,248,0.12)",border:"1px solid rgba(56,189,248,0.3)",borderRadius:8,padding:"4px 8px",color:"#7dd3fc",fontSize:12,fontWeight:700,cursor:"pointer",flexShrink:0}}>
-        🔍 Suchen
-      </button>
-      {open && (
-        <div onClick={()=>setOpen(false)}
-          style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",zIndex:250,display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
-          <div onClick={e=>e.stopPropagation()}
-            style={{background:"#14253a",borderTopLeftRadius:18,borderTopRightRadius:18,padding:"16px 18px calc(20px + env(safe-area-inset-bottom, 0px))",maxWidth:480,width:"100%",maxHeight:"75vh",overflowY:"auto",border:"1px solid rgba(255,255,255,0.1)"}}>
-            <div style={{fontSize:14,fontWeight:700,marginBottom:10}}>Koordinaten suchen</div>
-            <div style={{display:"flex",gap:8,marginBottom:12}}>
-              <input value={query} onChange={e=>setQuery(e.target.value)}
-                onKeyDown={e=>{ if(e.key==="Enter"){ e.preventDefault(); runSearch(query); } }}
-                placeholder="Tauchspot, Ort, Land…"
-                style={{flex:1,minWidth:0,background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:8,padding:"7px 10px",color:"#e8f4fd",fontSize:13,boxSizing:"border-box"}} />
-              <button onClick={()=>runSearch(query)}
-                style={{background:"rgba(56,189,248,0.15)",border:"1px solid rgba(56,189,248,0.35)",borderRadius:8,padding:"7px 14px",color:"#7dd3fc",fontSize:13,fontWeight:700,cursor:"pointer",flexShrink:0}}>
-                Suchen
-              </button>
-            </div>
-            {loading && (
-              <div style={{fontSize:13,color:"rgba(232,244,253,0.5)",textAlign:"center",padding:"12px 0"}}>Suche läuft…</div>
-            )}
-            {!loading && results && results.length === 0 && (
-              <div style={{fontSize:13,color:"rgba(232,244,253,0.5)",textAlign:"center",padding:"12px 0"}}>
-                Keine Treffer. Anderen Suchbegriff versuchen oder Punkt manuell auf der Karte setzen.
-              </div>
-            )}
-            {!loading && results && results.length > 0 && (
-              <div style={{display:"flex",flexDirection:"column",gap:4,marginBottom:12}}>
-                {results.map((r, i) => (
-                  <button key={i} onClick={()=>accept(r)}
-                    style={{display:"flex",flexDirection:"column",alignItems:"flex-start",textAlign:"left",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,padding:"9px 12px",color:"#e8f4fd",fontSize:13,cursor:"pointer"}}>
-                    <span>{r.label}</span>
-                    <span style={{fontSize:11,color:"rgba(125,211,252,0.7)",marginTop:2}}>{r.lat.toFixed(5)}, {r.lon.toFixed(5)}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-            <button onClick={()=>setPickerOpen(true)}
-              style={{width:"100%",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:10,padding:"10px 12px",color:"rgba(232,244,253,0.75)",fontSize:13,fontWeight:600,cursor:"pointer",boxSizing:"border-box"}}>
-              🗺 Manuell auf Karte setzen
-            </button>
-          </div>
-        </div>
-      )}
-      {pickerOpen && (
-        <CoordPickerMap
-          initialCenter={results && results[0] ? results[0] : null}
-          onPick={(p)=>{ onSave(`${p.lat.toFixed(5)}, ${p.lon.toFixed(5)}`); setPickerOpen(false); setOpen(false); }}
-          onClose={()=>setPickerOpen(false)}
-        />
-      )}
-    </>
-  );
-}
-
 // Kleiner runder Globus-Button, wie er sowohl auf der Detailseite als auch
 // in der Listen-Werkzeugleiste verwendet wird.
 function MapToggleButton({ active, onClick, size }) {
@@ -1226,29 +1060,26 @@ function EditableTitle({ value, onSave }) {
   );
 }
 
-function InlineField({label, value, onSave, multiline, unit, extra}) {
+function InlineField({label, value, onSave, multiline, unit}) {
   const [editing, setEditing] = useState(false);
   const [val, setVal] = useState(value||"");
   const commit = () => { setEditing(false); if(val!==(value||"")) onSave(val); };
   return (
     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 0",borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
       <span style={{fontSize:13,color:"rgba(232,244,253,0.45)",minWidth:90}}>{label}</span>
-      <div style={{display:"flex",alignItems:"center",justifyContent:"flex-end",gap:8,flex:1,minWidth:0}}>
-        {editing ? (
-          multiline
-            ? <textarea value={val} onChange={e=>setVal(e.target.value)} onBlur={commit} autoFocus
-                style={{flex:1,background:"rgba(255,255,255,0.08)",border:"1px solid rgba(56,189,248,0.4)",borderRadius:8,padding:"4px 8px",color:"#e8f4fd",fontSize:13,resize:"vertical",minHeight:48}} />
-            : <input value={val} onChange={e=>setVal(e.target.value)} onBlur={commit} autoFocus
-                onKeyDown={e=>{ if(e.key==="Enter"){e.preventDefault();commit();} }}
-                style={{flex:1,background:"rgba(255,255,255,0.08)",border:"1px solid rgba(56,189,248,0.4)",borderRadius:8,padding:"4px 8px",color:"#e8f4fd",fontSize:13,textAlign:"right"}} />
-        ) : (
-          <span onClick={()=>{setVal(value||"");setEditing(true);}}
-            style={{fontSize:13,fontWeight:500,color:value?"#e8f4fd":"rgba(232,244,253,0.25)",cursor:"pointer",minWidth:60,textAlign:"right"}}>
-            {value?(value+(unit?" "+unit:"")):(unit?"— "+unit:"—")}
-          </span>
-        )}
-        {!editing && extra}
-      </div>
+      {editing ? (
+        multiline
+          ? <textarea value={val} onChange={e=>setVal(e.target.value)} onBlur={commit} autoFocus
+              style={{flex:1,background:"rgba(255,255,255,0.08)",border:"1px solid rgba(56,189,248,0.4)",borderRadius:8,padding:"4px 8px",color:"#e8f4fd",fontSize:13,resize:"vertical",minHeight:48}} />
+          : <input value={val} onChange={e=>setVal(e.target.value)} onBlur={commit} autoFocus
+              onKeyDown={e=>{ if(e.key==="Enter"){e.preventDefault();commit();} }}
+              style={{flex:1,background:"rgba(255,255,255,0.08)",border:"1px solid rgba(56,189,248,0.4)",borderRadius:8,padding:"4px 8px",color:"#e8f4fd",fontSize:13,textAlign:"right"}} />
+      ) : (
+        <span onClick={()=>{setVal(value||"");setEditing(true);}}
+          style={{fontSize:13,fontWeight:500,color:value?"#e8f4fd":"rgba(232,244,253,0.25)",cursor:"pointer",minWidth:60,textAlign:"right"}}>
+          {value?(value+(unit?" "+unit:"")):(unit?"— "+unit:"—")}
+        </span>
+      )}
     </div>
   );
 }
@@ -1808,8 +1639,7 @@ function DetailContent({ d, dives, setDives, setSelected, setView, saveDive, con
           <ReiseSelect label="Ort, Reise" value={d.customFields?.reise || d.ort} onSave={saveOrtReiseField} />
           <InlineField label="TG-Nr." value={d.tgNr} onSave={v=>saveField({tgNr:v})} />
           <InlineField label="Tauchspot" value={d.tauchspot} onSave={v=>saveField({tauchspot:v})} />
-          <InlineField label="Koordinaten" value={d.koordinaten} onSave={v=>saveField({koordinaten:v})}
-            extra={!d.koordinaten ? <CoordSearchButton d={d} onSave={v=>saveField({koordinaten:v})} /> : null} />
+          <InlineField label="Koordinaten" value={d.koordinaten} onSave={v=>saveField({koordinaten:v})} />
           <InlineField label="Anzug" value={d.anzug} onSave={v=>saveField({anzug:v})} />
           <SelectField label="Blei" value={d.blei} options={BLEI_OPTIONS} unit="kg" onSave={v=>saveField({blei:v})} />
           <SelectField label="Flasche" value={d.flasche} options={FLASCHE_OPTIONS} onSave={v=>saveField({flasche:v})} />
