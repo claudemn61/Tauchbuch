@@ -449,6 +449,22 @@ function parseCoords(str) {
 // aufgebaut wird.
 const MAPTILER_API_KEY = "HFElbKEufz9KOHI4w2jB";
 
+// Fasst Punkte mit (praktisch) identischen Koordinaten zu einem einzigen
+// Marker zusammen — mehrere Tauchgänge am selben Tauchplatz hätten sonst
+// exakt übereinanderliegende Pins/Nummern-Tooltips, von denen nur der
+// zuletzt gezeichnete sichtbar bzw. anwählbar wäre. 5 Nachkommastellen
+// (~1m Genauigkeit) reichen, um "derselbe Punkt" zuverlässig zu erkennen.
+function groupMapPoints(points) {
+  const groups = new Map();
+  points.forEach(p => {
+    const key = p.lat.toFixed(5) + "," + p.lon.toFixed(5);
+    let g = groups.get(key);
+    if (!g) { g = { lat: p.lat, lon: p.lon, nums: [], labels: [] }; groups.set(key, g); }
+    if (p.num != null) g.nums.push(p.num);
+    if (p.label) g.labels.push(p.label);
+  });
+  return [...groups.values()];
+}
 // Reine Karten-Zeichenfläche ohne Vollbild-Logik — von MiniMap (inline) und
 // deren Vollbild-Overlay gemeinsam verwendet (zwei unabhängige Karten-
 // Instanzen statt einer zwischen Containern verschobenen, da MapTiler/
@@ -470,16 +486,16 @@ function MapCanvas({ points, height, radius, onDoubleClick }) {
     });
     mapRef.current = map;
 
-    points.forEach(p => {
-      const marker = new sdk.Marker().setLngLat([p.lon, p.lat]);
-      if (p.label) marker.setPopup(new sdk.Popup({ offset: 20 }).setText(p.label));
+    groupMapPoints(points).forEach(g => {
+      const marker = new sdk.Marker().setLngLat([g.lon, g.lat]);
+      if (g.labels.length) marker.setPopup(new sdk.Popup({ offset: 20 }).setText(g.labels.join(" · ")));
       marker.addTo(map);
-      // TG-Nummer ständig sichtbar über dem Marker, nicht erst beim Antippen
-      if (p.num != null) {
+      // TG-Nummer(n) ständig sichtbar über dem Marker, nicht erst beim Antippen
+      if (g.nums.length) {
         const el = document.createElement("div");
         el.className = "dive-map-tt";
-        el.textContent = String(p.num);
-        new sdk.Marker({ element: el, anchor: "bottom", offset: [0, -30] }).setLngLat([p.lon, p.lat]).addTo(map);
+        el.textContent = g.nums.join(", ");
+        new sdk.Marker({ element: el, anchor: "bottom", offset: [0, -30] }).setLngLat([g.lon, g.lat]).addTo(map);
       }
     });
 
