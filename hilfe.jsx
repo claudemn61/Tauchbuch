@@ -337,9 +337,12 @@ function HilfeApp() {
             Der 🌐-Button in der Symbolleiste (4. Symbol, neben ☑ Auswahl) öffnet eine Karte mit allen aktuell
             angezeigten Tauchgängen (also nach Suche/Filter), die im Feld „Koordinaten“ einen
             gültigen Wert hinterlegt haben — die Karte passt sich automatisch so ein, dass alle
-            Punkte sichtbar sind. Jeder Marker zeigt dauerhaft seine Tauchgang-Nummer über dem Pin;
-            ein Tipp auf den Marker öffnet zusätzlich ein Sprechblasen-Popup mit dem Tauchspot-Namen.
-            Hat kein angezeigter Tauchgang Koordinaten, erscheint stattdessen ein Hinweis. Siehe
+            Punkte sichtbar sind. Jeder Marker zeigt dauerhaft die Tauchgang-Nummer(n) über dem Pin;
+            teilen sich mehrere Tauchgänge denselben Tauchplatz (identische Koordinaten), werden sie
+            zu einem einzigen Marker mit allen Nummern zusammengefasst (z.B. „12, 15, 18“), statt
+            sich exakt zu überlagern. Ein Tipp auf den Marker öffnet zusätzlich ein Sprechblasen-Popup
+            mit dem/den Tauchspot-Namen. Hat kein angezeigter Tauchgang Koordinaten, erscheint
+            stattdessen ein Hinweis. Siehe
             auch <a href="#h-detail-karte">Kapitel 4.4</a> für die Karte eines einzelnen Tauchgangs.
             Doppeltipp auf die Karte öffnet sie bildschirmfüllend; <Field>← Zurück</Field> oben
             schliesst sie wieder.
