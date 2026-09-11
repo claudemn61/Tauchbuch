@@ -320,6 +320,7 @@ function HilfeApp() {
             die Tauchliste zurückzuspringen, statt sie jedes Mal neu zusammenzustellen.
             <T><Tr><Th>Element</Th><Th>Funktion</Th></Tr>
               <Tr><Td>💾</Td><Td>Aktuelle Konfiguration unter einem Namen speichern</Td></Tr>
+              <Tr><Td>✏️</Td><Td>Name und Suchtext/Filter einer bestehenden Darstellung nachträglich ändern (✏️ je Zeile öffnet die Bearbeitung, ✓ speichert, ✕ verwirft) — Sortierung und Gruppierung bleiben dabei unverändert</Td></Tr>
               <Tr><Td>🔀</Td><Td>Reihenfolge der gespeicherten Darstellungen ändern (↑/↓ je Zeile)</Td></Tr>
               <Tr><Td>🗑</Td><Td>Darstellung löschen</Td></Tr>
               <Tr><Td>Tipp auf eine Darstellung</Td><Td>Wendet sie an — Suche, Sortierung und beide Gruppierungs-Ebenen springen auf den gespeicherten Stand</Td></Tr>

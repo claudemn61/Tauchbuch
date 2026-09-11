@@ -12,7 +12,14 @@ function useIsWide() {
   return isWide;
 }
 
-const APP_VERSION = "2.9.0";
+const APP_VERSION = "2.9.1";
+// Zeigt "2.9" statt "2.9.0", wenn die Patch-Stelle 0 ist (Bugfix-Stelle
+// nur anzeigen, wenn tatsächlich ein Patch-Release vorliegt).
+function formatVersion(v) {
+  const parts = String(v).split(".");
+  if (parts.length === 3 && parts[2] === "0") return parts[0] + "." + parts[1];
+  return v;
+}
 
 // ── Startseite ───────────────────────────────────────────────────────────
 // Editierbares Titelbild (per Tap austauschbar, als Data-URL in Storage
@@ -29,6 +36,10 @@ const CHAPTERS = [
 // Änderungsverlauf — neuste zuerst. Wird beim Erhöhen der Version jeweils
 // von Hand ergänzt.
 const CHANGELOG = [
+  { version: "2.9.1", changes: [
+    "Startseite: Versionsnummer sitzt jetzt ganz rechts neben dem Titel (wie im Flugbuch) statt in der Fusszeile; eine Patch-Stelle von 0 wird nicht mehr angezeigt (z.B. „2.9“ statt „2.9.0“)",
+    "Gespeicherte Darstellungen: neuer ✏️-Modus erlaubt, Name und Suchtext/Filter einer bestehenden Darstellung nachträglich zu ändern, ohne sie neu speichern zu müssen",
+  ]},
   { version: "2.9.0", changes: [
     "Neu: Gespeicherte Darstellungen (💡, 7. Badge) — komplette Suchen/Sortieren/Gruppieren-Konfiguration unter einem Namen speichern und jederzeit wieder anwenden, inkl. automatischer Wiederherstellung der zuletzt benutzten Einstellungen beim Öffnen der Liste",
     "Icon-Leiste (Import/Backup/Auswahl/Karte/Gruppierung/Darstellungen/Suche) jetzt im selben Kachel-Format wie im Flugbuch",
@@ -490,6 +501,12 @@ function HomeApp() {
                 fontSize:titleCfg?titleCfg.fontSize:DEFAULT_TITLE_CFG.fontSize, fontFamily:titleCfg?titleCfg.fontFamily:undefined}}>
               {(titleCfg||DEFAULT_TITLE_CFG).segments.map((seg,i) => <span key={i} style={{color:seg.color}}>{seg.text}</span>)}
             </div>
+            {/* Versionsnummer ganz rechts neben dem Titel, wie im Flugbuch —
+                vertikal auf Titelhöhe zentriert, damit sie bei jeder frei
+                wählbaren Titel-Schriftgrösse gut sitzt. */}
+            <span style={{position:"absolute",right:0,top:"50%",transform:"translateY(-50%)",fontSize:11,fontWeight:700,color:"#ffffff",textShadow:"0 2px 6px rgba(0,0,0,0.85)"}}>
+              v{formatVersion(APP_VERSION)}
+            </span>
           </div>
         </div>
       </div>
@@ -550,7 +567,7 @@ function HomeApp() {
         </button>
       </div>
 
-      <div style={{flex:"0 0 auto",textAlign:"center",padding:"6px 16px 2px",fontSize:9,color:"rgba(232,244,253,0.25)"}}>claudemn61.github.io/Tauchbuch v{APP_VERSION}</div>
+      <div style={{flex:"0 0 auto",textAlign:"center",padding:"6px 16px 2px",fontSize:9,color:"rgba(232,244,253,0.25)"}}>claudemn61.github.io/Tauchbuch</div>
       <div style={{flex:"0 0 auto",textAlign:"center",padding:"0 16px calc(6px + env(safe-area-inset-bottom, 0px))",fontSize:9,color:"rgba(232,244,253,0.2)"}}>© Claude Mair-Noack</div>
 
       </div>
