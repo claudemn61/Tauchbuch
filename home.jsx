@@ -12,7 +12,7 @@ function useIsWide() {
   return isWide;
 }
 
-const APP_VERSION = "2.8.5";
+const APP_VERSION = "2.9.0";
 
 // ── Startseite ───────────────────────────────────────────────────────────
 // Editierbares Titelbild (per Tap austauschbar, als Data-URL in Storage
@@ -29,6 +29,12 @@ const CHAPTERS = [
 // Änderungsverlauf — neuste zuerst. Wird beim Erhöhen der Version jeweils
 // von Hand ergänzt.
 const CHANGELOG = [
+  { version: "2.9.0", changes: [
+    "Neu: Gespeicherte Darstellungen (💡, 7. Badge) — komplette Suchen/Sortieren/Gruppieren-Konfiguration unter einem Namen speichern und jederzeit wieder anwenden, inkl. automatischer Wiederherstellung der zuletzt benutzten Einstellungen beim Öffnen der Liste",
+    "Icon-Leiste (Import/Backup/Auswahl/Karte/Gruppierung/Darstellungen/Suche) jetzt im selben Kachel-Format wie im Flugbuch",
+    "Bugfix Suche: zwei Bedingungen ohne explizites UND/ODER dazwischen (z.B. \"tiefe>=10 tiefe<=30\") wurden bisher stillschweigend auf die erste reduziert; zählt jetzt korrekt als UND-Verknüpfung",
+    "Bugfix Suche: eine Freitext-Bedingung direkt vor einer Klammer (z.B. \"(a b)\") konnte die schliessende Klammer verschlucken",
+  ]},
   { version: "2.8.5", changes: [
     "Tauchliste: bei aktiver Suche oder Filter zeigt eine graue Zeile oberhalb der Liste die Anzahl der Treffer",
   ]},
