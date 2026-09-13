@@ -496,17 +496,24 @@ function HomeApp() {
             onError={e=>{ e.target.style.display="none"; }} />
           <div style={{position:"absolute",inset:0,background:"linear-gradient(to bottom, rgba(4,14,32,0) 55%, rgba(4,14,32,0.85) 100%)"}} />
           <div style={{position:"absolute",bottom:16,left:20,right:20,textAlign:"center"}}>
-            <div onClick={e=>{e.stopPropagation();setEditingTitle(true);}}
-              style={{display:"inline-block",fontWeight:900,letterSpacing:-0.5,textShadow:"0 2px 8px rgba(0,0,0,0.5)",whiteSpace:"nowrap",cursor:"pointer",
-                fontSize:titleCfg?titleCfg.fontSize:DEFAULT_TITLE_CFG.fontSize, fontFamily:titleCfg?titleCfg.fontFamily:undefined}}>
-              {(titleCfg||DEFAULT_TITLE_CFG).segments.map((seg,i) => <span key={i} style={{color:seg.color}}>{seg.text}</span>)}
+            <div style={{position:"relative"}}>
+              <div onClick={e=>{e.stopPropagation();setEditingTitle(true);}}
+                style={{display:"inline-block",fontWeight:900,letterSpacing:-0.5,textShadow:"0 2px 8px rgba(0,0,0,0.5)",whiteSpace:"nowrap",cursor:"pointer",
+                  fontSize:titleCfg?titleCfg.fontSize:DEFAULT_TITLE_CFG.fontSize, fontFamily:titleCfg?titleCfg.fontFamily:undefined}}>
+                {(titleCfg||DEFAULT_TITLE_CFG).segments.map((seg,i) => <span key={i} style={{color:seg.color}}>{seg.text}</span>)}
+              </div>
+              {/* Versionsnummer ganz rechts neben dem Titel, wie im Flugbuch —
+                  vertikal auf Titelhöhe zentriert (relativ zu diesem inneren
+                  Wrapper, nicht zum ganzen Block inkl. Copyright-Zeile
+                  darunter), damit sie bei jeder frei wählbaren
+                  Titel-Schriftgrösse gut sitzt. */}
+              <span style={{position:"absolute",right:0,top:"50%",transform:"translateY(-50%)",fontSize:11,fontWeight:700,color:"#ffffff",textShadow:"0 2px 6px rgba(0,0,0,0.85)"}}>
+                v{formatVersion(APP_VERSION)}
+              </span>
             </div>
-            {/* Versionsnummer ganz rechts neben dem Titel, wie im Flugbuch —
-                vertikal auf Titelhöhe zentriert, damit sie bei jeder frei
-                wählbaren Titel-Schriftgrösse gut sitzt. */}
-            <span style={{position:"absolute",right:0,top:"50%",transform:"translateY(-50%)",fontSize:11,fontWeight:700,color:"#ffffff",textShadow:"0 2px 6px rgba(0,0,0,0.85)"}}>
-              v{formatVersion(APP_VERSION)}
-            </span>
+            <div style={{fontSize:9,color:"rgba(255,255,255,0.6)",textShadow:"0 1px 4px rgba(0,0,0,0.6)",marginTop:2}}>
+              © Claude Mair-Noack
+            </div>
           </div>
         </div>
       </div>
@@ -567,8 +574,7 @@ function HomeApp() {
         </button>
       </div>
 
-      <div style={{flex:"0 0 auto",textAlign:"center",padding:"6px 16px 2px",fontSize:9,color:"rgba(232,244,253,0.25)"}}>claudemn61.github.io/Tauchbuch</div>
-      <div style={{flex:"0 0 auto",textAlign:"center",padding:"0 16px calc(6px + env(safe-area-inset-bottom, 0px))",fontSize:9,color:"rgba(232,244,253,0.2)"}}>© Claude Mair-Noack</div>
+      <div style={{flex:"0 0 auto",textAlign:"center",padding:"6px 16px calc(6px + env(safe-area-inset-bottom, 0px))",fontSize:9,color:"rgba(232,244,253,0.25)"}}>claudemn61.github.io/Tauchbuch</div>
 
       </div>
 
