@@ -1804,14 +1804,18 @@ function TauchbuchApp() {
   // nicht über applyViews eigene rohe Setter), da die Liste dann nicht
   // mehr exakt der gespeicherten Konfiguration entspricht.
   const [activeViewName, setActiveViewNameRaw] = useState(null);
-  useEffect(() => {
-    (async () => {
-      try {
-        const r = await window.storage.get("tauchbuchSavedViews");
-        if (r && r.value) { const v = JSON.parse(r.value); if (Array.isArray(v)) setSavedViewsRaw(v); }
-      } catch (e) {}
-    })();
+  // In eigene Funktion ausgelagert (statt nur inline im Mount-Effect), damit
+  // importBackup() nach dem Zurückschreiben von "tauchbuchSavedViews" den
+  // React-State ebenfalls neu laden kann — sonst zeigt die Liste der
+  // Darstellungen nach einem Import weiterhin den alten Stand, bis die
+  // Seite neu geladen wird.
+  const loadSavedViews = useCallback(async () => {
+    try {
+      const r = await window.storage.get("tauchbuchSavedViews");
+      if (r && r.value) { const v = JSON.parse(r.value); if (Array.isArray(v)) setSavedViewsRaw(v); }
+    } catch (e) {}
   }, []);
+  useEffect(() => { loadSavedViews(); }, [loadSavedViews]);
   const setSavedViews = (updater) => {
     setSavedViewsRaw(prev => {
       const next = typeof updater === "function" ? updater(prev) : updater;
@@ -1858,27 +1862,29 @@ function TauchbuchApp() {
   // Stellt die zuletzt benutzten Suchen/Sortieren/Gruppieren-Einstellungen
   // beim Laden wieder her — tauchbuch.html ist eine eigenständige Seite
   // (echter Seitenwechsel, kein Client-Router), React-State setzt sich also
-  // sonst bei jedem Aufruf auf die Defaults zurück.
-  useEffect(() => {
-    (async () => {
-      try {
-        const r = await window.storage.get("tauchbuchListSettings");
-        if (r && r.value) {
-          const s = JSON.parse(r.value);
-          if (typeof s.filterText === "string") setFilterTextRaw(s.filterText);
-          if (s.sortId) setSortIdRaw(s.sortId);
-          if (s.sortDir) setSortDirRaw(s.sortDir);
-          if (typeof s.groupField1 === "string") setGroupField1Raw(s.groupField1);
-          if (s.groupOrder1) setGroupOrder1Raw(s.groupOrder1);
-          if (typeof s.group1SortField === "string") setGroup1SortFieldRaw(s.group1SortField);
-          if (typeof s.groupField2 === "string") setGroupField2Raw(s.groupField2);
-          if (s.groupOrder2) setGroupOrder2Raw(s.groupOrder2);
-          if (typeof s.group2SortField === "string") setGroup2SortFieldRaw(s.group2SortField);
-          if (typeof s.activeViewName === "string") setActiveViewNameRaw(s.activeViewName);
-        }
-      } catch (e) {}
-    })();
+  // sonst bei jedem Aufruf auf die Defaults zurück. Ebenfalls in eigene
+  // Funktion ausgelagert, aus demselben Grund wie loadSavedViews oben —
+  // importBackup() ruft sie nach dem Zurückschreiben von
+  // "tauchbuchListSettings" erneut auf.
+  const loadListSettings = useCallback(async () => {
+    try {
+      const r = await window.storage.get("tauchbuchListSettings");
+      if (r && r.value) {
+        const s = JSON.parse(r.value);
+        if (typeof s.filterText === "string") setFilterTextRaw(s.filterText);
+        if (s.sortId) setSortIdRaw(s.sortId);
+        if (s.sortDir) setSortDirRaw(s.sortDir);
+        if (typeof s.groupField1 === "string") setGroupField1Raw(s.groupField1);
+        if (s.groupOrder1) setGroupOrder1Raw(s.groupOrder1);
+        if (typeof s.group1SortField === "string") setGroup1SortFieldRaw(s.group1SortField);
+        if (typeof s.groupField2 === "string") setGroupField2Raw(s.groupField2);
+        if (s.groupOrder2) setGroupOrder2Raw(s.groupOrder2);
+        if (typeof s.group2SortField === "string") setGroup2SortFieldRaw(s.group2SortField);
+        if (typeof s.activeViewName === "string") setActiveViewNameRaw(s.activeViewName);
+      }
+    } catch (e) {}
   }, []);
+  useEffect(() => { loadListSettings(); }, [loadListSettings]);
   const persistListSettings = (patch) => {
     try {
       window.storage.set("tauchbuchListSettings", JSON.stringify({
@@ -2159,13 +2165,21 @@ function TauchbuchApp() {
           restoredExtras++;
         }
       }
+      // Storage ist jetzt aktuell, aber "tauchbuchSavedViews" und
+      // "tauchbuchListSettings" wurden ausschliesslich in je einem
+      // Mount-Effect in den React-State geladen — ohne diese beiden Aufrufe
+      // hier bliebe die Anzeige (Gespeicherte Darstellungen, aktive Suche/
+      // Sortierung/Gruppierung) auf dem alten Stand, bis die Seite neu
+      // geladen wird.
+      await loadSavedViews();
+      await loadListSettings();
       const withReisen = await ensureReisen(data.dives);
       setDives(sortByNumber(withReisen));
       setBackupMsg(`✓ ${data.dives.length} Tauchgänge${restoredExtras?" + Reisen/Material/Brevet/Einstellungen":""} wiederhergestellt.`);
     } catch (e) {
       setBackupMsg("Fehler beim Import: " + e.message);
     }
-  }, [ensureReisen]);
+  }, [ensureReisen, loadSavedViews, loadListSettings]);
 
   const reiseNumbers = useMemo(() => computeReiseNumbers(dives), [dives]);
 
