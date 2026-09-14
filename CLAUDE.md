@@ -25,10 +25,13 @@ Schwester-Projekt `Flugbuch` (gleicher Autor, gleiches Architekturmuster).
   in Flugbuch, aber pro Seite als eigene IIFE im jeweiligen `.html` dupliziert.
 - Backup-Export/-Import (`tauchbuch.jsx`, `exportBackup`/`importBackup`): erfasst
   `dives` plus alle `window.storage`-Keys mit einem der Präfixe `tauchreisen:`,
-  `settings:`, `material:`, `brevet:`, `home:`. **Anders als Flugbuch gibt es
-  hier kein einzelnes `service:`-Sammelpräfix** — ein neuer dauerhafter Key muss
-  eines der bestehenden Präfixe verwenden (oder die Präfix-Liste in
-  `exportBackup`/`importBackup` erweitert werden), sonst geht er bei einem Reset
+  `settings:`, `material:`, `brevet:`, `home:`, sowie explizit die zwei präfixlosen
+  Keys `tauchbuchSavedViews` (Gespeicherte Darstellungen) und
+  `tauchbuchListSettings` (zuletzt benutzte Suchen/Sortieren/Gruppieren-
+  Einstellungen inkl. aktiver Darstellung). **Anders als Flugbuch gibt es hier
+  kein einzelnes `service:`-Sammelpräfix** — ein neuer dauerhafter Key muss
+  eines der bestehenden Präfixe verwenden oder explizit in der
+  `exportBackup`-Bedingung ergänzt werden, sonst geht er bei einem Reset
   verloren.
 
 ## Dateien

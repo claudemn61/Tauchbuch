@@ -2102,7 +2102,13 @@ function TauchbuchApp() {
     try {
       const keys = await window.storage.list("");
       for (const k of (keys?.keys || [])) {
-        if (k.startsWith("tauchreisen:") || k.startsWith("settings:") || k.startsWith("material:") || k.startsWith("brevet:") || k.startsWith("home:")) {
+        // "tauchbuchSavedViews" (Gespeicherte Darstellungen) und
+        // "tauchbuchListSettings" (zuletzt benutzte Suchen/Sortieren/
+        // Gruppieren-Einstellungen inkl. aktiver Darstellung) sind eigene
+        // Keys ohne Präfix — passen zu keinem der obigen startsWith()-Fälle
+        // und gingen bisher bei jedem Backup verloren.
+        if (k.startsWith("tauchreisen:") || k.startsWith("settings:") || k.startsWith("material:") || k.startsWith("brevet:") || k.startsWith("home:")
+          || k === "tauchbuchSavedViews" || k === "tauchbuchListSettings") {
           const r = await window.storage.get(k);
           if (r) { try { extra[k] = JSON.parse(r.value); } catch { extra[k] = r.value; } }
         }
