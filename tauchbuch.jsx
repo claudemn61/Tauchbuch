@@ -1746,6 +1746,13 @@ async function isGzip(file) {
   return head[0] === 0x1f && head[1] === 0x8b;
 }
 
+// iPadOS meldet sich als "MacIntel", ist aber (im Gegensatz zu echtem macOS)
+// touch-fähig — so lässt sich iPhone/iPad von echtem macOS unterscheiden.
+function isIOSDevice() {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+}
+
 // ── Main App ─────────────────────────────────────────────────────────────
 function TauchbuchApp() {
   const isWide = useIsWide();
@@ -2127,7 +2134,11 @@ function TauchbuchApp() {
     const filename = `tauchbuch-backup-${dateStamp}.json.gz`;
     const blob = await gzipString(json);
 
-    if (navigator.share && navigator.canShare) {
+    // Nur auf iPhone/iPad über das Teilen-Fenster anbieten: dort gibt es
+    // zuverlässig "In Dateien sichern". Auf echtem macOS bietet das
+    // Freigabefenster keine Sichern-Option (nur AirDrop/Mail/Nachrichten/…),
+    // darum dort direkt den normalen Browser-Download auslösen.
+    if (isIOSDevice() && navigator.share && navigator.canShare) {
       try {
         const file = new File([blob], filename, { type: "application/gzip" });
         if (navigator.canShare({ files: [file] })) {

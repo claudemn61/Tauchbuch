@@ -12,7 +12,7 @@ function useIsWide() {
   return isWide;
 }
 
-const APP_VERSION = "2.9.3";
+const APP_VERSION = "2.9.4";
 // Zeigt "2.9" statt "2.9.0", wenn die Patch-Stelle 0 ist (Bugfix-Stelle
 // nur anzeigen, wenn tatsächlich ein Patch-Release vorliegt).
 function formatVersion(v) {
@@ -36,6 +36,9 @@ const CHAPTERS = [
 // Änderungsverlauf — neuste zuerst. Wird beim Erhöhen der Version jeweils
 // von Hand ergänzt.
 const CHANGELOG = [
+  { version: "2.9.4", changes: [
+    "Bugfix Backup-Export auf macOS: das native Teilen-Fenster wurde bevorzugt geöffnet, bietet dort aber (anders als auf iPhone/iPad) keine Sichern-Option — Export läuft auf echtem macOS jetzt direkt über den normalen Browser-Download, das Teilen-Fenster bleibt iPhone/iPad vorbehalten",
+  ]},
   { version: "2.9.3", changes: [
     "Browser wird beim Start jeder Seite um dauerhaften Speicher (Persistent Storage) gebeten, damit die IndexedDB-Daten bei Speicherplatzdruck des Browsers nicht automatisch geräumt werden",
   ]},
