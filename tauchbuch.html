@@ -176,6 +176,14 @@
     };
   })();
 
+  // Bittet den Browser um dauerhaften Speicher (persistent storage), damit
+  // IndexedDB bei Speicherplatzdruck nicht automatisch geräumt wird. Best-
+  // effort: manche Browser gewähren das automatisch, andere gar nicht —
+  // das eigentliche Backup bleibt der Export in Tauchbuch.
+  if (navigator.storage && navigator.storage.persist) {
+    navigator.storage.persist().catch(() => {});
+  }
+
   // Persistenter Log — schreibt Fehler/Ereignisse seitenübergreifend in den
   // gemeinsamen Storage, damit sie im Settings-Panel der Startseite (Log-
   // Dateien) einsehbar sind, unabhängig davon, auf welcher Seite sie auftraten.
