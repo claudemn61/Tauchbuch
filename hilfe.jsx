@@ -370,7 +370,8 @@ function HilfeApp() {
             Brevet-Scans) deutlich Platz; <b>⬆ Backup importieren</b> spielt eine zuvor erstellte
             Sicherungsdatei zurück ein, auch ältere, unkomprimierte <Field>.json</Field>-Backups
             bleiben dabei importierbar. Die Sicherung umfasst alle Tauchgänge, Reisen-Namen,
-            Material-Angaben, alle Brevet-Einträge samt Fotos sowie Startseiten-Titelbild und -Titel.
+            Material-Angaben, alle Brevet-Einträge samt Fotos, Startseiten-Titelbild und -Titel
+            sowie die Gespeicherten Darstellungen (siehe <a href="#h-tb-darstellungen">Kapitel 3.7</a>).
             <Callout kind="warn">Vor grösseren Aktionen (Mehrfachlöschung, neuer CSV-Import) lohnt
             sich vorab ein frisches Backup.</Callout>
           </Sub>
