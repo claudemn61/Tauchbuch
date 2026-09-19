@@ -459,9 +459,10 @@ function groupMapPoints(points) {
   points.forEach(p => {
     const key = p.lat.toFixed(5) + "," + p.lon.toFixed(5);
     let g = groups.get(key);
-    if (!g) { g = { lat: p.lat, lon: p.lon, nums: [], labels: [] }; groups.set(key, g); }
+    if (!g) { g = { lat: p.lat, lon: p.lon, nums: [], labels: [], ids: [] }; groups.set(key, g); }
     if (p.num != null) g.nums.push(p.num);
     if (p.label) g.labels.push(p.label);
+    if (p.id != null) g.ids.push(p.id);
   });
   return [...groups.values()];
 }
@@ -469,7 +470,7 @@ function groupMapPoints(points) {
 // deren Vollbild-Overlay gemeinsam verwendet (zwei unabhängige Karten-
 // Instanzen statt einer zwischen Containern verschobenen, da MapTiler/
 // MapLibre das Umhängen des Canvas-Elements nicht zuverlässig unterstützt).
-function MapCanvas({ points, height, radius, onDoubleClick }) {
+function MapCanvas({ points, height, radius, onDoubleClick, onSelectDive }) {
   const elRef = useRef(null);
   const mapRef = useRef(null);
   const key = JSON.stringify(points);
@@ -487,14 +488,36 @@ function MapCanvas({ points, height, radius, onDoubleClick }) {
     mapRef.current = map;
 
     groupMapPoints(points).forEach(g => {
+      // Eindeutiger Punkt (genau ein Tauchgang): Pin/Nummer öffnen direkt
+      // dessen Detailseite. Mehrere Tauchgänge am selben Punkt: Popup mit
+      // einer anwählbaren Zeile pro Tauchgang, da unklar wäre, welcher
+      // gemeint ist.
+      const single = onSelectDive && g.ids.length === 1;
       const marker = new sdk.Marker().setLngLat([g.lon, g.lat]);
-      if (g.labels.length) marker.setPopup(new sdk.Popup({ offset: 20 }).setText(g.labels.join(" · ")));
+      if (single) {
+        marker.getElement().style.cursor = "pointer";
+        marker.getElement().addEventListener("click", () => onSelectDive(g.ids[0]));
+      } else if (onSelectDive && g.ids.length > 1) {
+        const popupEl = document.createElement("div");
+        g.labels.forEach((label, i) => {
+          const item = document.createElement("div");
+          item.textContent = label;
+          item.style.cssText = "cursor:pointer;padding:3px 0;";
+          item.addEventListener("click", () => onSelectDive(g.ids[i]));
+          popupEl.appendChild(item);
+        });
+        marker.setPopup(new sdk.Popup({ offset: 20 }).setDOMContent(popupEl));
+      } else if (g.labels.length) {
+        marker.setPopup(new sdk.Popup({ offset: 20 }).setText(g.labels.join(" · ")));
+      }
       marker.addTo(map);
       // TG-Nummer(n) ständig sichtbar über dem Marker, nicht erst beim Antippen
       if (g.nums.length) {
         const el = document.createElement("div");
         el.className = "dive-map-tt";
         el.textContent = g.nums.join(", ");
+        if (single) { el.style.cursor = "pointer"; el.addEventListener("click", () => onSelectDive(g.ids[0])); }
+        else if (onSelectDive && g.labels.length) { el.style.cursor = "pointer"; el.addEventListener("click", () => marker.togglePopup()); }
         new sdk.Marker({ element: el, anchor: "bottom", offset: [0, -30] }).setLngLat([g.lon, g.lat]).addTo(map);
       }
     });
@@ -515,11 +538,11 @@ function MapCanvas({ points, height, radius, onDoubleClick }) {
 }
 // Doppelklick/-tap auf die Karte öffnet sie bildschirmfüllend (eigene,
 // zweite Kartenistanz statt Umhängen der ersten — siehe MapCanvas).
-function MiniMap({ points, height }) {
+function MiniMap({ points, height, onSelectDive }) {
   const [fullscreen, setFullscreen] = useState(false);
   return (
     <>
-      <MapCanvas points={points} height={height} onDoubleClick={()=>points.length>0 && setFullscreen(true)} />
+      <MapCanvas points={points} height={height} onDoubleClick={()=>points.length>0 && setFullscreen(true)} onSelectDive={onSelectDive} />
       {fullscreen && (
         <div style={{position:"fixed",inset:0,zIndex:400,background:"#0a1628",display:"flex",flexDirection:"column"}}>
           <div style={{padding:"calc(14px + env(safe-area-inset-top, 0px)) 16px 10px",flexShrink:0,borderBottom:"1px solid rgba(255,255,255,0.08)"}}>
@@ -530,7 +553,7 @@ function MiniMap({ points, height }) {
           </div>
           <div style={{flex:1,position:"relative"}}>
             <div style={{position:"absolute",inset:0}}>
-              <MapCanvas points={points} height="100%" radius={0} />
+              <MapCanvas points={points} height="100%" radius={0} onSelectDive={onSelectDive} />
             </div>
           </div>
         </div>
@@ -2814,13 +2837,17 @@ function TauchbuchApp() {
         {listMapOpen && (() => {
           const source = selectedIds.size ? filtered.filter(d=>selectedIds.has(d.id)) : filtered;
           const pts = source
-            .map(d => { const c = parseCoords(d.koordinaten); return c ? { lat:c.lat, lon:c.lon, num:d.name, label:`${d.name}: ${d.tauchspot||d.ort||""}` } : null; })
+            .map(d => { const c = parseCoords(d.koordinaten); return c ? { lat:c.lat, lon:c.lon, num:d.name, label:`${d.name}: ${d.tauchspot||d.ort||""}`, id:d.id } : null; })
             .filter(Boolean);
+          const openFromMap = (id) => {
+            const dive = dives.find(x => x.id === id);
+            if (dive) { setSelected(dive); setReturnTo(null); setView("detail"); }
+          };
           return (
             <div style={{padding:"12px 16px 0"}}>
               {selectedIds.size>0 && <div style={{fontSize:10,color:"rgba(232,244,253,0.4)",marginBottom:6}}>Nur {selectedIds.size} markierte Tauchgänge</div>}
               {pts.length ? (
-                <MiniMap points={pts} height={260} />
+                <MiniMap points={pts} height={260} onSelectDive={openFromMap} />
               ) : (
                 <div style={{background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:12,padding:"16px",fontSize:12,color:"rgba(232,244,253,0.5)",textAlign:"center"}}>
                   Keine der aktuell angezeigten Tauchgänge hat Koordinaten hinterlegt.
