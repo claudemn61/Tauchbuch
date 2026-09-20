@@ -1235,7 +1235,7 @@ function BulkReiseSelect({ label, value, mixed, names, onChange }) {
 function DiveRow({ d, onClick, sortId, selectMode, isSelected, onToggleSelect }) {
   const showSortValue = sortId && sortId !== "date" && sortId !== "number";
   return (
-    <div onClick={selectMode ? ()=>onToggleSelect(d.id) : onClick}
+    <div id={"dive-row-" + d.name} onClick={selectMode ? ()=>onToggleSelect(d.id) : onClick}
       style={{padding:"11px 16px",borderBottom:"1px solid rgba(255,255,255,0.04)",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",background:isSelected?"rgba(56,189,248,0.1)":"transparent"}}
       onMouseEnter={e=>{ if(!isSelected) e.currentTarget.style.background="rgba(255,255,255,0.03)"; }}
       onMouseLeave={e=>{ if(!isSelected) e.currentTarget.style.background="transparent"; }}>
@@ -1520,7 +1520,7 @@ function SidebarDiveRow({ d, selectedId, onSelect }) {
   );
 }
 
-function DetailContent({ d, dives, setDives, setSelected, setView, saveDive, confirmDelete, setConfirmDelete, returnTo, reiseNumbers, pruneReisen, isWide }) {
+function DetailContent({ d, dives, setDives, setSelected, setView, saveDive, confirmDelete, setConfirmDelete, returnTo, reiseNumbers, pruneReisen, isWide, setScrollToName }) {
   const dIdx = dives.findIndex(x => x.id === d.id);
   const [bemerkungenEditing, setBemerkungenEditing] = useState(false);
   const [bemerkungenVal, setBemerkungenVal] = useState(d.bemerkungen || "");
@@ -1568,7 +1568,10 @@ function DetailContent({ d, dives, setDives, setSelected, setView, saveDive, con
     setBemerkungenVal(next.bemerkungen || "");
   };
 
-  const goBack = () => { if (returnTo) window.location.href = returnTo; else setView("list"); };
+  // Merkt sich die TG-Nummer, damit die Liste beim Zurückkehren zur
+  // passenden Zeile scrollt statt oben zu beginnen — nur bei returnTo==null
+  // relevant, da eine URL-Rückkehr die Seite ohnehin neu lädt.
+  const goBack = () => { if (returnTo) window.location.href = returnTo; else { setScrollToName?.(d.name); setView("list"); } };
 
   // Wischgeste zwischen Tauchgängen: nach links = nächster (neuerer), nach
   // rechts = vorheriger (älterer) — analog zu den ◀/▶-Buttons oben.
@@ -1854,6 +1857,15 @@ function TauchbuchApp() {
   const [showSortMenu, setShowSortMenu] = useState(false);
   const [showSearchMenu, setShowSearchMenu] = useState(false);
   const [listMapOpen, setListMapOpen] = useState(false);
+  // TG-Nummer, zu der beim nächsten Wechsel in die Liste gescrollt werden
+  // soll (gesetzt von DetailContent beim Zurückgehen).
+  const [scrollToName, setScrollToName] = useState(null);
+  useEffect(() => {
+    if (view !== "list" || !scrollToName) return;
+    const el = document.getElementById("dive-row-" + scrollToName);
+    if (el) el.scrollIntoView({ block: "center" });
+    setScrollToName(null);
+  }, [view, scrollToName]);
   // Zwei unabhängige, frei wählbare Gruppierungs-Ebenen (Gr. 1° aussen,
   // Gr. 2° innerhalb von Gr. 1° verschachtelt) — "" bedeutet "Keine"
   // (Ebene aus). Jede Ebene hat zusätzlich ein eigenes, unabhängiges
@@ -2296,7 +2308,8 @@ function TauchbuchApp() {
     return (
       <DetailContent d={selected} dives={sortByNumber(dives)} setDives={setDives} setSelected={setSelected}
         setView={setView} saveDive={saveDive} confirmDelete={confirmDelete} setConfirmDelete={setConfirmDelete}
-        returnTo={returnTo} reiseNumbers={reiseNumbers} pruneReisen={pruneReisen} isWide={isWide} />
+        returnTo={returnTo} reiseNumbers={reiseNumbers} pruneReisen={pruneReisen} isWide={isWide}
+        setScrollToName={setScrollToName} />
     );
   }
 
