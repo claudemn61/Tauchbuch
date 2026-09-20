@@ -1776,6 +1776,52 @@ function isIOSDevice() {
     (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 }
 
+// Sammelt die "Zusatzdaten" fürs Backup: alles unter den bekannten
+// Präfixen, plus "tauchbuchSavedViews" (Gespeicherte Darstellungen) und
+// "tauchbuchListSettings" (zuletzt benutzte Suchen/Sortieren/Gruppieren-
+// Einstellungen) — beide ohne Präfix, passen zu keinem startsWith()-Fall
+// und gingen früher bei jedem Backup verloren. Von exportBackup() und dem
+// Datenabgleich für die Startseiten-Anzeige (home.jsx) gemeinsam genutzt —
+// bei Änderungen hier also auch home.jsx nachführen.
+async function collectExtraStorage() {
+  const extra = {};
+  try {
+    const keys = await window.storage.list("");
+    for (const k of (keys?.keys || [])) {
+      if (k.startsWith("tauchreisen:") || k.startsWith("settings:") || k.startsWith("material:") || k.startsWith("brevet:") || k.startsWith("home:")
+        || k === "tauchbuchSavedViews" || k === "tauchbuchListSettings") {
+        const r = await window.storage.get(k);
+        if (r) { try { extra[k] = JSON.parse(r.value); } catch { extra[k] = r.value; } }
+      }
+    }
+  } catch (e) { console.error("Datenabgleich: Fehler beim Sammeln der Zusatzdaten:", e); }
+  return extra;
+}
+
+// Fingerabdruck über Tauchgänge + Zusatzdaten — damit erkennt die
+// Startseite, ob der aktuelle Datenstand noch dem letzten Backup
+// entspricht (weisse Anzeige) oder sich seither etwas geändert hat
+// (gelbe Anzeige). "settings:lastBackup" selbst wird ausgeklammert, sonst
+// würde der Fingerabdruck durch seinen eigenen letzten Wert beeinflusst.
+function canonicalDatasetJson(dives, extra) {
+  const sortedDives = [...dives].sort((a, b) => String(a.id).localeCompare(String(b.id)));
+  const extraKeys = Object.keys(extra || {}).filter(k => k !== "settings:lastBackup").sort();
+  const sortedExtra = {};
+  extraKeys.forEach(k => { sortedExtra[k] = extra[k]; });
+  return JSON.stringify({ dives: sortedDives, extra: sortedExtra });
+}
+async function hashDataset(dives, extra) {
+  const enc = new TextEncoder().encode(canonicalDatasetJson(dives, extra));
+  const digest = await crypto.subtle.digest("SHA-256", enc);
+  return Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, "0")).join("");
+}
+async function recordLastBackup(type, dives, extra) {
+  try {
+    const hash = await hashDataset(dives, extra);
+    await window.storage.set("settings:lastBackup", JSON.stringify({ ts: new Date().toISOString(), type, hash }));
+  } catch (e) { console.error("lastBackup-Speicherfehler:", e); }
+}
+
 // ── Main App ─────────────────────────────────────────────────────────────
 function TauchbuchApp() {
   const isWide = useIsWide();
@@ -2134,22 +2180,8 @@ function TauchbuchApp() {
 
   // ── Backup / Restore ─────────────────────────────────────────────────────
   const exportBackup = useCallback(async () => {
-    let extra = {};
-    try {
-      const keys = await window.storage.list("");
-      for (const k of (keys?.keys || [])) {
-        // "tauchbuchSavedViews" (Gespeicherte Darstellungen) und
-        // "tauchbuchListSettings" (zuletzt benutzte Suchen/Sortieren/
-        // Gruppieren-Einstellungen inkl. aktiver Darstellung) sind eigene
-        // Keys ohne Präfix — passen zu keinem der obigen startsWith()-Fälle
-        // und gingen bisher bei jedem Backup verloren.
-        if (k.startsWith("tauchreisen:") || k.startsWith("settings:") || k.startsWith("material:") || k.startsWith("brevet:") || k.startsWith("home:")
-          || k === "tauchbuchSavedViews" || k === "tauchbuchListSettings") {
-          const r = await window.storage.get(k);
-          if (r) { try { extra[k] = JSON.parse(r.value); } catch { extra[k] = r.value; } }
-        }
-      }
-    } catch (e) { console.error("Backup: error collecting extra data:", e); }
+    const extra = await collectExtraStorage();
+    await recordLastBackup("export", dives, extra);
 
     const payload = { exportedAt: new Date().toISOString(), dives, extra };
     const json = JSON.stringify(payload);
@@ -2208,6 +2240,14 @@ function TauchbuchApp() {
       await loadSavedViews();
       await loadListSettings();
       const withReisen = await ensureReisen(data.dives);
+      // Fingerabdruck erst jetzt bilden (nicht aus data.dives/data.extra):
+      // ensureReisen() kann beim Import selbst noch "tauchreisen:names"
+      // und einzelne Tauchgänge nachführen (fehlende Reise-Zuordnung,
+      // Nitrox-Normalisierung) — der Fingerabdruck muss den tatsächlich
+      // gespeicherten Endzustand abbilden, sonst würde die Startseite
+      // sofort nach einem frischen Import fälschlich "verändert" anzeigen.
+      const extraNow = await collectExtraStorage();
+      await recordLastBackup("import", withReisen, extraNow);
       setDives(sortByNumber(withReisen));
       setBackupMsg(`✓ ${data.dives.length} Tauchgänge${restoredExtras?" + Reisen/Material/Brevet/Einstellungen":""} wiederhergestellt.`);
     } catch (e) {
