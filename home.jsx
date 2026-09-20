@@ -12,13 +12,53 @@ function useIsWide() {
   return isWide;
 }
 
-const APP_VERSION = "2.9.4";
+const APP_VERSION = "2.9.5";
 // Zeigt "2.9" statt "2.9.0", wenn die Patch-Stelle 0 ist (Bugfix-Stelle
 // nur anzeigen, wenn tatsächlich ein Patch-Release vorliegt).
 function formatVersion(v) {
   const parts = String(v).split(".");
   if (parts.length === 3 && parts[2] === "0") return parts[0] + "." + parts[1];
   return v;
+}
+
+// Sammelt dieselben "Zusatzdaten" wie exportBackup() in tauchbuch.jsx —
+// bei Änderungen dort auch hier nachführen (siehe Kommentar dort).
+async function collectExtraStorage() {
+  const extra = {};
+  try {
+    const keys = await window.storage.list("");
+    for (const k of (keys?.keys || [])) {
+      if (k.startsWith("tauchreisen:") || k.startsWith("settings:") || k.startsWith("material:") || k.startsWith("brevet:") || k.startsWith("home:")
+        || k === "tauchbuchSavedViews" || k === "tauchbuchListSettings") {
+        const r = await window.storage.get(k);
+        if (r) { try { extra[k] = JSON.parse(r.value); } catch { extra[k] = r.value; } }
+      }
+    }
+  } catch (e) { console.error("Datenabgleich: Fehler beim Sammeln der Zusatzdaten:", e); }
+  return extra;
+}
+
+// Identischer Fingerabdruck-Algorithmus wie in tauchbuch.jsx (canonicalDatasetJson/
+// hashDataset) — muss byte-identisch bleiben, sonst stimmt der Vergleich nicht.
+function canonicalDatasetJson(dives, extra) {
+  const sortedDives = [...dives].sort((a, b) => String(a.id).localeCompare(String(b.id)));
+  const extraKeys = Object.keys(extra || {}).filter(k => k !== "settings:lastBackup").sort();
+  const sortedExtra = {};
+  extraKeys.forEach(k => { sortedExtra[k] = extra[k]; });
+  return JSON.stringify({ dives: sortedDives, extra: sortedExtra });
+}
+async function hashDataset(dives, extra) {
+  const enc = new TextEncoder().encode(canonicalDatasetJson(dives, extra));
+  const digest = await crypto.subtle.digest("SHA-256", enc);
+  return Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
+function formatBackupTimestamp(iso) {
+  const dt = new Date(iso);
+  if (isNaN(dt.getTime())) return "";
+  const datePart = dt.toLocaleDateString("de-CH");
+  const timePart = dt.toLocaleTimeString("de-CH", { hour: "2-digit", minute: "2-digit" });
+  return `${datePart}, ${timePart}`;
 }
 
 // ── Startseite ───────────────────────────────────────────────────────────
@@ -36,6 +76,9 @@ const CHAPTERS = [
 // Änderungsverlauf — neuste zuerst. Wird beim Erhöhen der Version jeweils
 // von Hand ergänzt.
 const CHANGELOG = [
+  { version: "2.9.5", changes: [
+    "Startseite: ganz links neben Titel/Version steht jetzt Datum und Zeit des letzten Backup-Imports oder -Exports — weiss, wenn der aktuelle Datenstand noch damit übereinstimmt, gelb, wenn sich seither etwas geändert hat (z.B. eine nachträglich ergänzte Koordinate)",
+  ]},
   { version: "2.9.4", changes: [
     "Bugfix Backup-Export auf macOS: das native Teilen-Fenster wurde bevorzugt geöffnet, bietet dort aber (anders als auf iPhone/iPad) keine Sichern-Option — Export läuft auf echtem macOS jetzt direkt über den normalen Browser-Download, das Teilen-Fenster bleibt iPhone/iPad vorbehalten",
   ]},
@@ -413,6 +456,7 @@ function HomeApp() {
   const [diveCount, setDiveCount] = useState(0);
   const [reiseCount, setReiseCount] = useState(0);
   const [brevetCount, setBrevetCount] = useState(0);
+  const [backupInfo, setBackupInfo] = useState(null); // {ts, matches} oder null
   const [showSettings, setShowSettings] = useState(false);
   const [titleCfg, setTitleCfg] = useState(null);
   const [editingTitle, setEditingTitle] = useState(false);
@@ -445,8 +489,25 @@ function HomeApp() {
         const raw = await Promise.all(ids.map(async k => {
           try { const r = await window.storage.get(k); return r ? JSON.parse(r.value) : null; } catch { return null; }
         }));
-        const reiseSet = new Set(raw.filter(Boolean).map(d => d.customFields?.reise).filter(Boolean));
+        const diveList = raw.filter(Boolean);
+        const reiseSet = new Set(diveList.map(d => d.customFields?.reise).filter(Boolean));
         setReiseCount(reiseSet.size);
+        // Datum/Zeit des letzten Imports/Exports (ganz links neben Titel/
+        // Version): weiss, wenn der Datenstand von damals noch dem
+        // aktuellen entspricht — gelb, wenn sich seither etwas geändert hat
+        // (z.B. eine Koordinate nachträglich ergänzt). Ohne je gemachtes
+        // Backup wird nichts angezeigt.
+        try {
+          const lb = await window.storage.get("settings:lastBackup");
+          if (lb && lb.value) {
+            const parsed = JSON.parse(lb.value);
+            if (parsed && parsed.ts && parsed.hash) {
+              const extra = await collectExtraStorage();
+              const currentHash = await hashDataset(diveList, extra);
+              setBackupInfo({ ts: parsed.ts, matches: currentHash === parsed.hash });
+            }
+          }
+        } catch (e) { console.error("Backup-Datenabgleich fehlgeschlagen:", e); }
       } catch (e) { console.error("Count load error:", e); }
       try {
         const r = await window.storage.get("brevet:list");
@@ -519,6 +580,15 @@ function HomeApp() {
               <span style={{position:"absolute",right:0,top:"50%",transform:"translateY(-50%)",fontSize:11,fontWeight:700,color:"#ffffff",textShadow:"0 2px 6px rgba(0,0,0,0.85)"}}>
                 v{formatVersion(APP_VERSION)}
               </span>
+              {/* Letztes Backup ganz links, spiegelbildlich zur Version:
+                  weiss = Datenstand entspricht noch diesem Backup, gelb =
+                  seither verändert (aber der letzte bekannte Stand wird
+                  trotzdem angezeigt, als "am besten passender" Anhaltspunkt). */}
+              {backupInfo && (
+                <span style={{position:"absolute",left:0,top:"50%",transform:"translateY(-50%)",fontSize:11,fontWeight:700,color:backupInfo.matches?"#ffffff":"#facc15",textShadow:"0 2px 6px rgba(0,0,0,0.85)",whiteSpace:"nowrap"}}>
+                  {formatBackupTimestamp(backupInfo.ts)}
+                </span>
+              )}
             </div>
             <div style={{fontSize:9,color:"rgba(255,255,255,0.6)",textShadow:"0 1px 4px rgba(0,0,0,0.6)",marginTop:2}}>
               © Claude Mair-Noack
