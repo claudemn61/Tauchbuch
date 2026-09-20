@@ -454,6 +454,25 @@ const MAPTILER_API_KEY = "HFElbKEufz9KOHI4w2jB";
 // exakt übereinanderliegende Pins/Nummern-Tooltips, von denen nur der
 // zuletzt gezeichnete sichtbar bzw. anwählbar wäre. 5 Nachkommastellen
 // (~1m Genauigkeit) reichen, um "derselbe Punkt" zuverlässig zu erkennen.
+// Fasst aufeinanderfolgende TG-Nummern zu einem Bereich zusammen
+// ("72-74" statt "72, 73, 74"), damit das Nummern-Label über dem Marker
+// bei vielen Tauchgängen am selben Punkt kurz bleibt. Nummern, die nicht
+// sauber als Ganzzahl durchgehen (z.B. Sonderzeichen), lassen die Funktion
+// unangetastet auf die einfache Auflistung zurückfallen.
+function formatNumRanges(nums) {
+  const parsed = nums.map(n => parseInt(n, 10));
+  if (parsed.some((n, i) => isNaN(n) || String(n) !== String(nums[i]))) return nums.join(", ");
+  const sorted = [...new Set(parsed)].sort((a, b) => a - b);
+  const parts = [];
+  let start = sorted[0], prev = sorted[0];
+  for (let i = 1; i <= sorted.length; i++) {
+    const cur = sorted[i];
+    if (cur === prev + 1) { prev = cur; continue; }
+    parts.push(start === prev ? String(start) : `${start}-${prev}`);
+    start = prev = cur;
+  }
+  return parts.join(", ");
+}
 function groupMapPoints(points) {
   const groups = new Map();
   points.forEach(p => {
@@ -515,7 +534,7 @@ function MapCanvas({ points, height, radius, onDoubleClick, onSelectDive }) {
       if (g.nums.length) {
         const el = document.createElement("div");
         el.className = "dive-map-tt";
-        el.textContent = g.nums.join(", ");
+        el.textContent = formatNumRanges(g.nums);
         if (single) { el.style.cursor = "pointer"; el.addEventListener("click", () => onSelectDive(g.ids[0])); }
         else if (onSelectDive && g.labels.length) { el.style.cursor = "pointer"; el.addEventListener("click", () => marker.togglePopup()); }
         new sdk.Marker({ element: el, anchor: "bottom", offset: [0, -30] }).setLngLat([g.lon, g.lat]).addTo(map);
