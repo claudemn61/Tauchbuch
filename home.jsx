@@ -53,12 +53,18 @@ async function hashDataset(dives, extra) {
   return Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, "0")).join("");
 }
 
-function formatBackupTimestamp(iso) {
+// Kurzformat wie überall sonst im Tauchbuch (z.B. Tauchgangs-Datum): Tag
+// und Monat ohne führende Null, Jahr zweistellig — kein toLocaleDateString,
+// damit es exakt zum Rest der App passt.
+function formatBackupDate(iso) {
   const dt = new Date(iso);
   if (isNaN(dt.getTime())) return "";
-  const datePart = dt.toLocaleDateString("de-CH");
-  const timePart = dt.toLocaleTimeString("de-CH", { hour: "2-digit", minute: "2-digit" });
-  return `${datePart}, ${timePart}`;
+  return `${dt.getDate()}.${dt.getMonth()+1}.${String(dt.getFullYear()).slice(-2)}`;
+}
+function formatBackupTime(iso) {
+  const dt = new Date(iso);
+  if (isNaN(dt.getTime())) return "";
+  return dt.toLocaleTimeString("de-CH", { hour: "2-digit", minute: "2-digit" });
 }
 
 // ── Startseite ───────────────────────────────────────────────────────────
@@ -585,8 +591,9 @@ function HomeApp() {
                   seither verändert (aber der letzte bekannte Stand wird
                   trotzdem angezeigt, als "am besten passender" Anhaltspunkt). */}
               {backupInfo && (
-                <span style={{position:"absolute",left:0,top:"50%",transform:"translateY(-50%)",fontSize:11,fontWeight:700,color:backupInfo.matches?"#ffffff":"#facc15",textShadow:"0 2px 6px rgba(0,0,0,0.85)",whiteSpace:"nowrap"}}>
-                  {formatBackupTimestamp(backupInfo.ts)}
+                <span style={{position:"absolute",left:0,top:"50%",transform:"translateY(-50%)",display:"flex",flexDirection:"column",alignItems:"flex-start",fontSize:11,fontWeight:700,lineHeight:1.25,color:backupInfo.matches?"#ffffff":"#facc15",textShadow:"0 2px 6px rgba(0,0,0,0.85)",whiteSpace:"nowrap"}}>
+                  <span>{formatBackupDate(backupInfo.ts)}</span>
+                  <span>{formatBackupTime(backupInfo.ts)}</span>
                 </span>
               )}
             </div>
