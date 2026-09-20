@@ -1788,6 +1788,13 @@ async function collectExtraStorage() {
   try {
     const keys = await window.storage.list("");
     for (const k of (keys?.keys || [])) {
+      // "settings:lastBackup" ist Meta-Information ÜBER Backups, keine
+      // App-Daten — nie mit ins Backup aufnehmen. Sonst trägt eine
+      // exportierte Datei immer den *vorherigen* Stand in sich (erfasst,
+      // bevor recordLastBackup() den neuen schreibt), und ein späterer
+      // Import dieser Datei würde den eigenen Zeitstempel wieder mit
+      // veralteten Daten überschreiben.
+      if (k === "settings:lastBackup") continue;
       if (k.startsWith("tauchreisen:") || k.startsWith("settings:") || k.startsWith("material:") || k.startsWith("brevet:") || k.startsWith("home:")
         || k === "tauchbuchSavedViews" || k === "tauchbuchListSettings") {
         const r = await window.storage.get(k);
@@ -2227,6 +2234,11 @@ function TauchbuchApp() {
         // roher String (Titelbild) fälschlich nochmals JSON-kodiert und
         // ist danach als Data-URL unbrauchbar.
         for (const [k, v] of Object.entries(data.extra)) {
+          // Ältere, vor diesem Fix exportierte Dateien können noch einen
+          // veralteten "settings:lastBackup"-Marker enthalten (siehe
+          // collectExtraStorage) — nicht restaurieren, gleich danach wird
+          // ohnehin der korrekte, aktuelle Marker geschrieben.
+          if (k === "settings:lastBackup") continue;
           await window.storage.set(k, typeof v === "string" ? v : JSON.stringify(v));
           restoredExtras++;
         }

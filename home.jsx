@@ -12,7 +12,7 @@ function useIsWide() {
   return isWide;
 }
 
-const APP_VERSION = "2.9.5";
+const APP_VERSION = "2.9.6";
 // Zeigt "2.9" statt "2.9.0", wenn die Patch-Stelle 0 ist (Bugfix-Stelle
 // nur anzeigen, wenn tatsächlich ein Patch-Release vorliegt).
 function formatVersion(v) {
@@ -28,6 +28,13 @@ async function collectExtraStorage() {
   try {
     const keys = await window.storage.list("");
     for (const k of (keys?.keys || [])) {
+      // "settings:lastBackup" ist Meta-Information ÜBER Backups, keine
+      // App-Daten — nie mit ins Backup aufnehmen. Sonst trägt eine
+      // exportierte Datei immer den *vorherigen* Stand in sich (erfasst,
+      // bevor recordLastBackup() den neuen schreibt), und ein späterer
+      // Import dieser Datei würde den eigenen Zeitstempel wieder mit
+      // veralteten Daten überschreiben.
+      if (k === "settings:lastBackup") continue;
       if (k.startsWith("tauchreisen:") || k.startsWith("settings:") || k.startsWith("material:") || k.startsWith("brevet:") || k.startsWith("home:")
         || k === "tauchbuchSavedViews" || k === "tauchbuchListSettings") {
         const r = await window.storage.get(k);
@@ -82,6 +89,9 @@ const CHAPTERS = [
 // Änderungsverlauf — neuste zuerst. Wird beim Erhöhen der Version jeweils
 // von Hand ergänzt.
 const CHANGELOG = [
+  { version: "2.9.6", changes: [
+    "Bugfix Backup-Zeitstempel: eine exportierte Datei trug bisher immer den vorherigen Backup-Stand in sich statt ihren eigenen — beim Import einer solchen Datei konnte dadurch ein veralteter Zeitstempel zurückgeschrieben werden, der einen danach importierten neueren Stand wieder überdeckte",
+  ]},
   { version: "2.9.5", changes: [
     "Startseite: ganz links neben Titel/Version steht jetzt Datum und Zeit des letzten Backup-Imports oder -Exports — weiss, wenn der aktuelle Datenstand noch damit übereinstimmt, gelb, wenn sich seither etwas geändert hat (z.B. eine nachträglich ergänzte Koordinate)",
   ]},
