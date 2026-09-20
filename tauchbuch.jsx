@@ -70,20 +70,19 @@ function timeToMinutes(t) {
 }
 
 // Berechnet TG-Nr. (Tauchgang-Nummer innerhalb einer Reise) für alle
-// Tauchgänge neu: pro Kombination aus Ort und Reise beginnt die Zählung
-// beim chronologisch ältesten Tauchgang bei 1 und läuft fortlaufend, bis
-// ein neuer Ort/Reise-Wert folgt. Reise fällt (wie in ensureReisen) auf
-// Ort zurück, wenn kein eigener Reise-Wert gesetzt ist — nur Tauchgänge
-// ganz ohne Ort bleiben aussen vor. Gibt eine Map dive.id -> TG-Nr.
-// (String) zurück; wird sowohl beim Neuanlegen als auch retrospektiv für
-// den gesamten Datenbestand (siehe ensureReisen) verwendet.
+// Tauchgänge neu: pro Wert des Felds "Ort, Reise" (wie in der Detailansicht
+// editiert — customFields.reise, sonst Ort als Fallback, siehe auch
+// ensureReisen) beginnt die Zählung beim chronologisch ältesten Tauchgang
+// bei 1 und läuft fortlaufend, bis ein neuer "Ort, Reise"-Wert folgt. Nur
+// Tauchgänge ganz ohne Ort und Reise bleiben aussen vor. Gibt eine Map
+// dive.id -> TG-Nr. (String) zurück; wird sowohl beim Neuanlegen als auch
+// retrospektiv für den gesamten Datenbestand (siehe ensureReisen)
+// verwendet.
 function computeTgNrs(diveList) {
   const groups = new Map();
   diveList.forEach(d => {
-    const ort = (d.ort || "").trim();
-    if (!ort) return;
-    const reise = (d.customFields?.reise || ort).trim();
-    const key = ort + "\u0000" + reise;
+    const key = (d.customFields?.reise || d.ort || "").trim();
+    if (!key) return;
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key).push(d);
   });
