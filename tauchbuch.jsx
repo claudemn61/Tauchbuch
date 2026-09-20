@@ -64,6 +64,43 @@ function parseDateToTs(d) {
   return new Date(+yy, +mm - 1, +dd).getTime();
 }
 
+function timeToMinutes(t) {
+  const m = String(t || "").trim().match(/^(\d{1,2}):(\d{2})$/);
+  return m ? (+m[1]) * 60 + (+m[2]) : -1;
+}
+
+// Berechnet TG-Nr. (Tauchgang-Nummer innerhalb einer Reise) für alle
+// Tauchgänge neu: pro Kombination aus Ort und Reise beginnt die Zählung
+// beim chronologisch ältesten Tauchgang bei 1 und läuft fortlaufend, bis
+// ein neuer Ort/Reise-Wert folgt. Reise fällt (wie in ensureReisen) auf
+// Ort zurück, wenn kein eigener Reise-Wert gesetzt ist — nur Tauchgänge
+// ganz ohne Ort bleiben aussen vor. Gibt eine Map dive.id -> TG-Nr.
+// (String) zurück; wird sowohl beim Neuanlegen als auch retrospektiv für
+// den gesamten Datenbestand (siehe ensureReisen) verwendet.
+function computeTgNrs(diveList) {
+  const groups = new Map();
+  diveList.forEach(d => {
+    const ort = (d.ort || "").trim();
+    if (!ort) return;
+    const reise = (d.customFields?.reise || ort).trim();
+    const key = ort + "\u0000" + reise;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(d);
+  });
+  const result = new Map();
+  groups.forEach(list => {
+    const sorted = [...list].sort((a, b) => {
+      const ta = parseDateToTs(a.date), tb = parseDateToTs(b.date);
+      if (ta !== tb) return ta - tb;
+      const timeA = timeToMinutes(a.time), timeB = timeToMinutes(b.time);
+      if (timeA !== timeB) return timeA - timeB;
+      return (parseFloat(a.name) || 0) - (parseFloat(b.name) || 0);
+    });
+    sorted.forEach((d, i) => result.set(d.id, String(i + 1)));
+  });
+  return result;
+}
+
 // Wandelt gängige Fremdformate (ISO "yyyy-mm-dd", "dd/mm/yyyy", "mm/dd/yyyy")
 // in unser Standardformat "dd.mm.yyyy" um, damit Sortierung/Jahr (parseDateToTs)
 // funktionieren. Unbekannte Formate werden unverändert übernommen (Rohtext
@@ -2062,15 +2099,19 @@ function TauchbuchApp() {
       try { await window.storage.set("tauchreisen:names", JSON.stringify(names)); } catch {}
     }
     setReisenNames(names);
+    const tgNrMap = computeTgNrs(diveList);
     const updated = [];
     for (const d of diveList) {
       const needsReise = !d.customFields?.reise && d.ort;
       const normalizedNitrox = normalizeNitroxValue(d.nitrox);
       const needsNitroxFix = normalizedNitrox !== d.nitrox;
-      if (needsReise || needsNitroxFix) {
+      const newTgNr = tgNrMap.get(d.id);
+      const needsTgNrFix = newTgNr != null && newTgNr !== d.tgNr;
+      if (needsReise || needsNitroxFix || needsTgNrFix) {
         const upd = {
           ...d,
           ...(needsNitroxFix ? { nitrox: normalizedNitrox } : {}),
+          ...(needsTgNrFix ? { tgNr: newTgNr } : {}),
           customFields: needsReise ? { ...(d.customFields||{}), reise: d.ort } : d.customFields,
         };
         try { await window.storage.set(`dive:${upd.id}`, JSON.stringify(upd)); } catch {}
