@@ -592,7 +592,7 @@ function HomeApp() {
                   oben bündig zu diesem inneren Wrapper (nicht zum ganzen
                   Block inkl. Copyright-Zeile darunter), auf gleicher Höhe
                   wie der Backup-Zeitstempel links. */}
-              <span style={{position:"absolute",right:0,top:0,fontSize:11,fontWeight:700,color:"#ffffff",textShadow:"0 2px 6px rgba(0,0,0,0.85)"}}>
+              <span style={{position:"absolute",right:0,top:0,fontSize:11,fontWeight:700,color:"rgba(255,255,255,0.6)",textShadow:"0 2px 6px rgba(0,0,0,0.85)"}}>
                 v{formatVersion(APP_VERSION)}
               </span>
               {/* Letztes Backup ganz links, oben bündig zur Version:
@@ -600,7 +600,7 @@ function HomeApp() {
                   seither verändert (aber der letzte bekannte Stand wird
                   trotzdem angezeigt, als "am besten passender" Anhaltspunkt). */}
               {backupInfo && (
-                <span style={{position:"absolute",left:0,top:0,display:"flex",flexDirection:"column",alignItems:"flex-start",fontSize:11,fontWeight:700,lineHeight:1.25,color:backupInfo.matches?"#ffffff":"#facc15",textShadow:"0 2px 6px rgba(0,0,0,0.85)",whiteSpace:"nowrap"}}>
+                <span style={{position:"absolute",left:0,top:0,display:"flex",flexDirection:"column",alignItems:"flex-start",fontSize:11,fontWeight:700,lineHeight:1.25,color:backupInfo.matches?"rgba(255,255,255,0.6)":"#facc15",textShadow:"0 2px 6px rgba(0,0,0,0.85)",whiteSpace:"nowrap"}}>
                   <span>{formatBackupDate(backupInfo.ts)}</span>
                   <span>{formatBackupTime(backupInfo.ts)}</span>
                 </span>
