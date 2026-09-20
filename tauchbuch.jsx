@@ -1822,10 +1822,15 @@ async function hashDataset(dives, extra) {
   const digest = await crypto.subtle.digest("SHA-256", enc);
   return Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, "0")).join("");
 }
-async function recordLastBackup(type, dives, extra) {
+// `ts` ist der Zeitpunkt des Backups selbst (beim Export: jetzt; beim
+// Import: exportedAt aus der importierten Datei) — nicht der Zeitpunkt
+// der Aktion. So zeigt die Startseite, welcher Datenstand aktuell aktiv
+// ist, nicht wann zuletzt importiert/exportiert wurde.
+async function recordLastBackup(type, dives, extra, ts) {
   try {
     const hash = await hashDataset(dives, extra);
-    await window.storage.set("settings:lastBackup", JSON.stringify({ ts: new Date().toISOString(), type, hash }));
+    const tsFinal = (ts && !isNaN(new Date(ts).getTime())) ? ts : new Date().toISOString();
+    await window.storage.set("settings:lastBackup", JSON.stringify({ ts: tsFinal, type, hash }));
   } catch (e) { console.error("lastBackup-Speicherfehler:", e); }
 }
 
@@ -2188,11 +2193,12 @@ function TauchbuchApp() {
   // ── Backup / Restore ─────────────────────────────────────────────────────
   const exportBackup = useCallback(async () => {
     const extra = await collectExtraStorage();
-    await recordLastBackup("export", dives, extra);
+    const exportedAt = new Date().toISOString();
+    await recordLastBackup("export", dives, extra, exportedAt);
 
-    const payload = { exportedAt: new Date().toISOString(), dives, extra };
+    const payload = { exportedAt, dives, extra };
     const json = JSON.stringify(payload);
-    const dateStamp = new Date().toISOString().slice(0,10);
+    const dateStamp = exportedAt.slice(0,10);
     const filename = `tauchbuch-backup-${dateStamp}.json.gz`;
     const blob = await gzipString(json);
 
@@ -2259,7 +2265,9 @@ function TauchbuchApp() {
       // gespeicherten Endzustand abbilden, sonst würde die Startseite
       // sofort nach einem frischen Import fälschlich "verändert" anzeigen.
       const extraNow = await collectExtraStorage();
-      await recordLastBackup("import", withReisen, extraNow);
+      // ts = exportedAt der importierten Datei (Stand des Backups selbst),
+      // nicht der Zeitpunkt dieses Imports — siehe recordLastBackup().
+      await recordLastBackup("import", withReisen, extraNow, data.exportedAt);
       setDives(sortByNumber(withReisen));
       setBackupMsg(`✓ ${data.dives.length} Tauchgänge${restoredExtras?" + Reisen/Material/Brevet/Einstellungen":""} wiederhergestellt.`);
     } catch (e) {
