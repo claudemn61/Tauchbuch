@@ -12,7 +12,7 @@ function useIsWide() {
   return isWide;
 }
 
-const APP_VERSION = "2.9.6";
+const APP_VERSION = "2.9.7";
 // Zeigt "2.9" statt "2.9.0", wenn die Patch-Stelle 0 ist (Bugfix-Stelle
 // nur anzeigen, wenn tatsächlich ein Patch-Release vorliegt).
 function formatVersion(v) {
@@ -89,6 +89,9 @@ const CHAPTERS = [
 // Änderungsverlauf — neuste zuerst. Wird beim Erhöhen der Version jeweils
 // von Hand ergänzt.
 const CHANGELOG = [
+  { version: "2.9.7", changes: [
+    "Bugfix Offline-Betrieb: Kartenkacheln (MapTiler) wurden vom Service-Worker nie zwischengespeichert, weil deren Antworten ohne CORS immer als \"fehlgeschlagen\" erschienen — die Karte in Tauchliste und Reisen blieb offline deshalb leer; ausserdem verwies das Titelbild auf einen falschen Dateinamen und wurde dadurch nie geladen (auch online nicht, solange kein eigenes Titelbild gesetzt war)",
+  ]},
   { version: "2.9.6", changes: [
     "Bugfix Backup-Zeitstempel: eine exportierte Datei trug bisher immer den vorherigen Backup-Stand in sich statt ihren eigenen — beim Import einer solchen Datei konnte dadurch ein veralteter Zeitstempel zurückgeschrieben werden, der einen danach importierten neueren Stand wieder überdeckte",
   ]},
@@ -467,7 +470,7 @@ function TitleEditor({ current, onSave, onReset, onClose }) {
 
 function HomeApp() {
   const isWide = useIsWide();
-  const [coverSrc, setCoverSrc] = useState("cover.jpg");
+  const [coverSrc, setCoverSrc] = useState("cover.jpeg");
   const [loaded, setLoaded] = useState(false);
   const [diveCount, setDiveCount] = useState(0);
   const [reiseCount, setReiseCount] = useState(0);
