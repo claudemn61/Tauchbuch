@@ -1912,6 +1912,10 @@ function TauchbuchApp() {
   const [showSortMenu, setShowSortMenu] = useState(false);
   const [showSearchMenu, setShowSearchMenu] = useState(false);
   const [listMapOpen, setListMapOpen] = useState(false);
+  // Leiste mit den 7 Kategorie-Buttons (Import/Backup/Auswahl/Karte/
+  // Gruppierung/Darstellungen/Suche) — per Tap auf den Titel "Logbuch"
+  // aus-/einblendbar.
+  const [showCategoryBar, setShowCategoryBar] = useState(true);
   // TG-Nummer, zu der beim nächsten Wechsel in die Liste gescrollt werden
   // soll (gesetzt von DetailContent beim Zurückgehen).
   const [scrollToName, setScrollToName] = useState(null);
@@ -2396,21 +2400,21 @@ function TauchbuchApp() {
             style={{background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,width:32,height:32,display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,color:"rgba(232,244,253,0.8)",cursor:"pointer",flexShrink:0}}>
             {returnTo?"←":"🏠"}
           </button>
-          <span style={{fontWeight:900,fontSize:18,letterSpacing:-0.5,flex:1,textAlign:"center",marginLeft:-8}}>
+          <span onClick={()=>setShowCategoryBar(v=>!v)} title="Kategorien ein-/ausblenden"
+            style={{fontWeight:900,fontSize:18,letterSpacing:-0.5,flex:1,textAlign:"center",marginLeft:-8,cursor:"pointer",userSelect:"none"}}>
             🤿 Logbuch {dives.length > 0 && <span style={{fontSize:12,fontWeight:600,color:"rgba(232,244,253,0.4)"}}>({dives.length})</span>}
           </span>
           <div style={{display:"flex",gap:6,flexShrink:0,alignItems:"center"}}>
             <button onClick={addNewDive} style={{background:"rgba(34,197,94,0.15)",color:"#4ade80",border:"1px solid rgba(34,197,94,0.25)",borderRadius:20,padding:"7px 12px",fontSize:12,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>+ Tauchgang</button>
-            <button onClick={()=>{window.location.href="hilfe.html";}} title="Hilfe"
-              style={{background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:20,padding:"7px 9px",fontSize:12,fontWeight:700,color:"rgba(232,244,253,0.7)",cursor:"pointer"}}>❓</button>
           </div>
         </div>
 
         {/* Icon-Buttons: Import / Backup / Auswahl / Karte / Gruppierung /
             Darstellungen / Suche+Sortierung — quadratisch-breite Kacheln
             (aspectRatio 2/1), 1:1 im Format wie im Flugbuch. Sortierrichtung
-            und Alle-reduzieren/erweitern stecken im 🔍-Panel darunter. */}
-        <div style={{padding:"10px 16px 0",display:"flex",gap:6}}>
+            und Alle-reduzieren/erweitern stecken im 🔍-Panel darunter.
+            Per Tap auf den Titel "Logbuch" aus-/einblendbar. */}
+        {showCategoryBar && <div style={{padding:"10px 16px 0",display:"flex",gap:6}}>
           <button onClick={()=>{ setShowImportMenu(m=>!m); setShowBackupMenu(false); }} title="CSV Import"
             style={{flex:"1 1 0",minWidth:0,aspectRatio:"2/1",boxSizing:"border-box",display:"flex",alignItems:"center",justifyContent:"center",background:showImportMenu?"rgba(56,189,248,0.15)":"rgba(255,255,255,0.05)",border:`${showImportMenu?2:1}px solid ${showImportMenu?"rgba(56,189,248,0.4)":"rgba(255,255,255,0.1)"}`,borderRadius:10,color:"#fff",fontSize:26,cursor:"pointer"}}>
             📥
@@ -2442,7 +2446,7 @@ function TauchbuchApp() {
             style={{flex:"1 1 0",minWidth:0,aspectRatio:"2/1",boxSizing:"border-box",display:"flex",alignItems:"center",justifyContent:"center",background:(showSearchMenu||filterText)?"rgba(56,189,248,0.15)":"rgba(255,255,255,0.05)",border:`${(showSearchMenu||filterText)?2:1}px solid ${(showSearchMenu||filterText)?"rgba(56,189,248,0.4)":"rgba(255,255,255,0.1)"}`,borderRadius:10,color:"#fff",fontSize:22,cursor:"pointer"}}>
             🔍
           </button>
-        </div>
+        </div>}
 
         {/* 💡 Gespeicherte Darstellungen: speichern/verschieben/löschen/
             anwenden — 1:1 aus dem Flugbuch übernommen. */}
