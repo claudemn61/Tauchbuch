@@ -2387,6 +2387,25 @@ function TauchbuchApp() {
 
   const toggleSelect = (id) => setSelectedIds(prev => { const n = new Set(prev); n.has(id)?n.delete(id):n.add(id); return n; });
 
+  // Tap auf den Titel "Logbuch": Kategorie-Leiste ein-/ausblenden — beim
+  // Ausblenden werden alle 7 Kacheln geschlossen (nicht nur die Leiste
+  // selbst versteckt), sonst bliebe z.B. ein offenes Import-/Backup-/
+  // Darstellungen-Panel unter der ausgeblendeten Leiste sichtbar stehen.
+  const toggleCategoryBar = () => {
+    setShowCategoryBar(v => !v);
+    setShowImportMenu(false);
+    setShowBackupMenu(false);
+    setSelectMode(false);
+    setSelectedIds(new Set());
+    setCopyMsg("");
+    setListMapOpen(false);
+    setShowViewsMenu(false);
+    setViewsMode("none");
+    setSavingViewName(null);
+    setEditingViewId(null);
+    setShowSearchMenu(false);
+  };
+
   return (
     <div style={{maxWidth:isWide?1400:480,margin:"0 auto",minHeight:"100vh",background:"#040e20",color:"#e8f4fd",fontFamily:"-apple-system,BlinkMacSystemFont,sans-serif"}}>
       <input ref={fileRef} type="file" accept=".csv" style={{display:"none"}} onChange={e=>e.target.files[0]&&importCsvFile(e.target.files[0])} />
@@ -2400,7 +2419,7 @@ function TauchbuchApp() {
             style={{background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,width:32,height:32,display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,color:"rgba(232,244,253,0.8)",cursor:"pointer",flexShrink:0}}>
             {returnTo?"←":"🏠"}
           </button>
-          <span onClick={()=>setShowCategoryBar(v=>!v)} title="Kategorien ein-/ausblenden"
+          <span onClick={toggleCategoryBar} title="Kategorien ein-/ausblenden"
             style={{fontWeight:900,fontSize:18,letterSpacing:-0.5,flex:1,textAlign:"center",marginLeft:-8,cursor:"pointer",userSelect:"none"}}>
             🤿 Logbuch {dives.length > 0 && <span style={{fontSize:12,fontWeight:600,color:"rgba(232,244,253,0.4)"}}>({dives.length})</span>}
           </span>
