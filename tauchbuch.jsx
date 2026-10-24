@@ -444,6 +444,29 @@ function fmtTime(t) {
   return (t && t !== "0:00") ? t : "—";
 }
 
+// Einheitliches Anzeigeformat für die Tauchliste: tt.mm.yy, unabhängig
+// davon, ob das Datum im Datensatz (je nach Herkunft/Import) z.B. als
+// "1.5.20" oder "01.05.2020" gespeichert ist.
+function fmtDateShort(d) {
+  const m = String(d || "").match(/(\d{1,2})\.(\d{1,2})\.(\d{2,4})/);
+  if (!m) return d || "";
+  let [, dd, mm, yy] = m;
+  if (yy.length > 2) yy = yy.slice(-2);
+  return `${dd.padStart(2, "0")}.${mm.padStart(2, "0")}.${yy.padStart(2, "0")}`;
+}
+
+// Liefert die an einem anderen Tauchgang mit demselben Tauchspot-Namen
+// bereits erfasste Koordinate, oder "" wenn für diesen Tauchspot noch
+// keine bekannt ist. Wird genutzt, um Koordinaten automatisch zu
+// übernehmen, sobald ein bekannter Tauchspot gesetzt wird — überschreibt
+// nie eine bereits vorhandene (abweichende) Koordinate.
+function findKnownCoords(diveList, tauchspot, excludeId) {
+  const needle = String(tauchspot || "").trim().toLowerCase();
+  if (!needle) return "";
+  const match = diveList.find(d => d.id !== excludeId && d.koordinaten && (d.tauchspot || "").trim().toLowerCase() === needle);
+  return match ? match.koordinaten : "";
+}
+
 // Erkennt Dezimalgrad-Koordinaten aus einem Freitextfeld, z.B.
 // "27.2578, 33.8116" oder "27.2578,33.8116". Liefert null bei allem
 // anderen (auch bei ungültigen Wertebereichen), damit der Globus-Button
@@ -1311,7 +1334,7 @@ function DiveRow({ d, onClick, sortId, selectMode, isSelected, onToggleSelect })
           </div>
         </div>
         <div style={{fontSize:11,color:"rgba(232,244,253,0.4)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-          {d.date} · <span style={parseCoords(d.koordinaten) ? {color:"#86efac"} : undefined}>{d.tauchspot||d.ort||"—"}</span>{d.land?" · "+d.land:""}
+          {fmtDateShort(d.date)} · <span style={parseCoords(d.koordinaten) ? {color:"#86efac"} : undefined}>{d.tauchspot||d.ort||"—"}</span>{d.land?" · "+d.land:""}
         </div>
       </div>
       <div style={{textAlign:"right",flexShrink:0,marginLeft:8}}>
@@ -1567,7 +1590,7 @@ function SidebarDiveRow({ d, selectedId, onSelect }) {
       style={{padding:"10px 14px",cursor:"pointer",borderBottom:"1px solid rgba(255,255,255,0.04)",background:d.id===selectedId?"rgba(14,165,233,0.12)":"transparent",borderLeft:d.id===selectedId?"3px solid #7dd3fc":"3px solid transparent"}}>
       <div style={{display:"flex",alignItems:"center",gap:6}}>
         <span style={{fontWeight:700,fontSize:13,color:"#e8f4fd"}}>{d.name}</span>
-        <span style={{fontSize:11,color:"rgba(232,244,253,0.4)"}}>{d.date}</span>
+        <span style={{fontSize:11,color:"rgba(232,244,253,0.4)"}}>{fmtDateShort(d.date)}</span>
         {d.rating>0 && <span style={{fontSize:11}}><span style={{color:"#fde047"}}>{d.rating}</span><span style={{fontSize:"0.85em"}}>⭐️</span></span>}
       </div>
       <div style={{fontSize:11,color:"rgba(232,244,253,0.5)",marginTop:2}}>{d.tauchspot||d.ort||"—"}</div>
@@ -1759,7 +1782,14 @@ function DetailContent({ d, dives, setDives, setSelected, setView, saveDive, con
           <InlineField label="Land" value={d.land} onSave={v=>saveField({land:v})} />
           <ReiseSelect label="Ort, Reise" value={d.customFields?.reise || d.ort} onSave={saveOrtReiseField} />
           <InlineField label="TG-Nr." value={d.tgNr} onSave={v=>saveField({tgNr:v})} />
-          <InlineField label="Tauchspot" value={d.tauchspot} onSave={v=>saveField({tauchspot:v})} />
+          <InlineField label="Tauchspot" value={d.tauchspot} onSave={v=>{
+            const patch = { tauchspot: v };
+            if (!d.koordinaten) {
+              const known = findKnownCoords(dives, v, d.id);
+              if (known) patch.koordinaten = known;
+            }
+            saveField(patch);
+          }} />
           <InlineField label="Koordinaten" value={d.koordinaten} onSave={v=>saveField({koordinaten:v})}
             extra={d.koordinaten ? <CopyButton text={d.koordinaten} /> : null} />
           <InlineField label="Anzug" value={d.anzug} onSave={v=>saveField({anzug:v})} />
@@ -2103,6 +2133,14 @@ function TauchbuchApp() {
     }
     setReisenNames(names);
     const tgNrMap = computeTgNrs(diveList);
+    // Pro Tauchspot-Name die erste im Datenbestand gefundene Koordinate
+    // merken, damit fehlende Koordinaten bei anderen TG am selben Spot
+    // retrospektiv aufgefüllt werden können (siehe findKnownCoords).
+    const knownCoordsByTauchspot = new Map();
+    diveList.forEach(d => {
+      const key = (d.tauchspot || "").trim().toLowerCase();
+      if (key && d.koordinaten && !knownCoordsByTauchspot.has(key)) knownCoordsByTauchspot.set(key, d.koordinaten);
+    });
     const updated = [];
     for (const d of diveList) {
       const needsReise = !d.customFields?.reise && d.ort;
@@ -2110,11 +2148,14 @@ function TauchbuchApp() {
       const needsNitroxFix = normalizedNitrox !== d.nitrox;
       const newTgNr = tgNrMap.get(d.id);
       const needsTgNrFix = newTgNr != null && newTgNr !== d.tgNr;
-      if (needsReise || needsNitroxFix || needsTgNrFix) {
+      const knownCoords = knownCoordsByTauchspot.get((d.tauchspot || "").trim().toLowerCase());
+      const needsKoordFix = !d.koordinaten && !!knownCoords;
+      if (needsReise || needsNitroxFix || needsTgNrFix || needsKoordFix) {
         const upd = {
           ...d,
           ...(needsNitroxFix ? { nitrox: normalizedNitrox } : {}),
           ...(needsTgNrFix ? { tgNr: newTgNr } : {}),
+          ...(needsKoordFix ? { koordinaten: knownCoords } : {}),
           customFields: needsReise ? { ...(d.customFields||{}), reise: d.ort } : d.customFields,
         };
         try { await window.storage.set(`dive:${upd.id}`, JSON.stringify(upd)); } catch {}
@@ -2205,6 +2246,7 @@ function TauchbuchApp() {
       ort: prev?.ort || "",
       tgNr: (prev && prevTgNr) ? String(prevTgNr + 1) : "",
       tauchspot: prev?.tauchspot || "",
+      koordinaten: prev?.koordinaten || "",
       durationStr: "", durationMin: 0, maxDepth: null, waterTemp: null,
       anzug: prev?.anzug || DEFAULT_ANZUG,
       blei: prev?.blei || "",
