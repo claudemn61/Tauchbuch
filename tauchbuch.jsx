@@ -1225,12 +1225,20 @@ function InlineField({label, value, onSave, multiline, unit, extra}) {
   );
 }
 
+// Sentinel-Wert für den "+ Neue Reise…"-Eintrag in ReiseSelect/
+// BulkReiseSelect — kein echter Reise-Name, schaltet nur auf das
+// Namenseingabe-Feld um.
+const NEW_REISE_SENTINEL = "__new_reise__";
+
 // Reise-Dropdown: Liste stammt aus "tauchreisen:names" — jeder in den
 // Tauchgängen vorkommende Ort wird beim Laden automatisch als eigene Reise
 // angelegt (siehe ensureReisen), zusätzlich frei erweiter-/umbenennbar auf
-// der Reisen-Seite.
+// der Reisen-Seite. "+ Neue Reise…" legt eine neue Reise direkt hier an,
+// ohne auf die Reisen-Seite wechseln zu müssen.
 function ReiseSelect({ label, value, onSave }) {
   const [names, setNames] = useState([]);
+  const [creating, setCreating] = useState(false);
+  const [newName, setNewName] = useState("");
   useEffect(() => {
     (async () => {
       try {
@@ -1240,13 +1248,41 @@ function ReiseSelect({ label, value, onSave }) {
     })();
   }, []);
   const options = value && !names.includes(value) ? [value, ...names] : names;
+  const confirmNew = async () => {
+    const n = newName.trim();
+    setCreating(false);
+    setNewName("");
+    if (!n) return;
+    if (!names.includes(n)) {
+      const next = [n, ...names];
+      setNames(next);
+      try { await window.storage.set("tauchreisen:names", JSON.stringify(next)); } catch {}
+    }
+    onSave(n);
+  };
+  if (creating) {
+    return (
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 0",borderBottom:"1px solid rgba(255,255,255,0.04)",gap:6}}>
+        <span style={{fontSize:13,color:"rgba(232,244,253,0.45)",minWidth:90}}>{label || "Reise"}</span>
+        <div style={{display:"flex",gap:4,alignItems:"center",flex:1,justifyContent:"flex-end"}}>
+          <input autoFocus value={newName} onChange={e=>setNewName(e.target.value)}
+            onKeyDown={e=>{ if(e.key==="Enter") confirmNew(); if(e.key==="Escape") { setCreating(false); setNewName(""); } }}
+            placeholder="Name der neuen Reise"
+            style={{flex:1,minWidth:0,maxWidth:140,background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:8,padding:"4px 8px",color:"#e8f4fd",fontSize:13,textAlign:"right",boxSizing:"border-box"}} />
+          <button onClick={confirmNew} style={{background:"rgba(74,222,128,0.15)",border:"1px solid rgba(74,222,128,0.3)",borderRadius:8,width:24,height:24,color:"#4ade80",fontSize:13,cursor:"pointer",flexShrink:0}}>✓</button>
+          <button onClick={()=>{ setCreating(false); setNewName(""); }} style={{background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:8,width:24,height:24,color:"rgba(232,244,253,0.6)",fontSize:12,cursor:"pointer",flexShrink:0}}>✕</button>
+        </div>
+      </div>
+    );
+  }
   return (
     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 0",borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
       <span style={{fontSize:13,color:"rgba(232,244,253,0.45)",minWidth:90}}>{label || "Reise"}</span>
-      <select value={value||""} onChange={e=>onSave(e.target.value)}
+      <select value={value||""} onChange={e=>{ if (e.target.value === NEW_REISE_SENTINEL) setCreating(true); else onSave(e.target.value); }}
         style={{background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:8,padding:"4px 8px",color:value?"#e8f4fd":"rgba(232,244,253,0.4)",fontSize:13,textAlign:"right",maxWidth:180}}>
         <option value="" style={{background:"#0a1628"}}>—</option>
         {options.map(n => <option key={n} value={n} style={{background:"#0a1628"}}>{n}</option>)}
+        <option value={NEW_REISE_SENTINEL} style={{background:"#0a1628",color:"#f5a623"}}>+ Neue Reise…</option>
       </select>
     </div>
   );
@@ -1632,11 +1668,33 @@ function DetailContent({ d, dives, setDives, setSelected, setView, saveDive, con
     setDives(prev => prev.map(x => x.id === upd.id ? upd : x));
     setSelected(upd);
   };
+  // Nach einer Ort/Reise-Änderung TG-Nr. retrospektiv neu berechnen
+  // (computeTgNrs) statt nur den bearbeiteten TG zu speichern — gehört
+  // der TG jetzt zu einer anderen Reise, startet die Nummerierung dort
+  // bei 1 (bzw. setzt fort, falls er doch zur selben Reise passt); auch
+  // andere TG, deren Nummerierung sich durch den Wechsel verschiebt,
+  // werden gleich mitkorrigiert statt erst beim nächsten Neuladen.
   const saveOrtReiseField = async (v) => {
     const upd = { ...d, ort: v, customFields: { ...(d.customFields||{}), reise: v } };
-    await saveDive(upd);
-    setDives(prev => prev.map(x => x.id === upd.id ? upd : x));
-    setSelected(upd);
+    const newList = dives.map(x => x.id === upd.id ? upd : x);
+    const tgNrMap = computeTgNrs(newList);
+    const finalList = [];
+    let finalSelected = upd;
+    for (const x of newList) {
+      const newTgNr = tgNrMap.get(x.id);
+      const needsTgNrFix = newTgNr != null && newTgNr !== x.tgNr;
+      const isEdited = x.id === upd.id;
+      if (needsTgNrFix || isEdited) {
+        const patched = needsTgNrFix ? { ...x, tgNr: newTgNr } : x;
+        await saveDive(patched);
+        finalList.push(patched);
+        if (isEdited) finalSelected = patched;
+      } else {
+        finalList.push(x);
+      }
+    }
+    setDives(finalList);
+    setSelected(finalSelected);
   };
 
   const goToDive = (delta) => {
@@ -2241,13 +2299,13 @@ function TauchbuchApp() {
       year: yyyy,
       time: "",
       // Neuer Tauchgang übernimmt Ausrüstung/Ort des vorangehenden TG —
-      // nur Datum/Zeit/Dauer/Tiefe/Temp./Bemerkungen/Bewertung starten leer.
+      // nur Datum/Zeit/Dauer/Tiefe/Bemerkungen/Bewertung starten leer.
       land: prev?.land || "",
       ort: prev?.ort || "",
       tgNr: (prev && prevTgNr) ? String(prevTgNr + 1) : "",
       tauchspot: prev?.tauchspot || "",
       koordinaten: prev?.koordinaten || "",
-      durationStr: "", durationMin: 0, maxDepth: null, waterTemp: null,
+      durationStr: "", durationMin: 0, maxDepth: null, waterTemp: prev?.waterTemp ?? null,
       anzug: prev?.anzug || DEFAULT_ANZUG,
       blei: prev?.blei || "",
       flasche: prev?.flasche || "",
