@@ -12,7 +12,7 @@ function useIsWide() {
   return isWide;
 }
 
-const APP_VERSION = "2.9.7";
+const APP_VERSION = "2.9.8";
 // Zeigt "2.9" statt "2.9.0", wenn die Patch-Stelle 0 ist (Bugfix-Stelle
 // nur anzeigen, wenn tatsächlich ein Patch-Release vorliegt).
 function formatVersion(v) {
@@ -89,6 +89,9 @@ const CHAPTERS = [
 // Änderungsverlauf — neuste zuerst. Wird beim Erhöhen der Version jeweils
 // von Hand ergänzt.
 const CHANGELOG = [
+  { version: "2.9.8", changes: [
+    "Tauchliste: ist eine gespeicherte Darstellung aktiv, zeigt die Trefferanzahl-Zeile jetzt zusätzlich deren Filtertext und Gruppierung (📅 Jahr / 🧭 Reise) an — bleibt dadurch auch bei ausgeblendeter Kategorie-Leiste erkennbar",
+  ]},
   { version: "2.9.7", changes: [
     "Bugfix Offline-Betrieb: Kartenkacheln (MapTiler) wurden vom Service-Worker nie zwischengespeichert, weil deren Antworten ohne CORS immer als \"fehlgeschlagen\" erschienen — die Karte in Tauchliste und Reisen blieb offline deshalb leer; ausserdem verwies das Titelbild auf einen falschen Dateinamen und wurde dadurch nie geladen (auch online nicht, solange kein eigenes Titelbild gesetzt war)",
   ]},

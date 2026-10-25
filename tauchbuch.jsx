@@ -3117,10 +3117,20 @@ function TauchbuchApp() {
           Darstellung oder aus der Statistik angepinnt), damit klar ist, dass
           die Liste eingeschränkt ist. Reine Gruppierung/Sortierung zählt
           nicht als Filter. Name der aktiven Darstellung wird blau voran-
-          gestellt, sobald eine angewendet ist. */}
+          gestellt, sobald eine angewendet ist — zusammen mit deren
+          Filtertext und Gruppierung (📅 Jahr / 🧭 Reise), damit das auch bei
+          ausgeblendeter Kategorie-Leiste (Tap auf "Logbuch") sichtbar bleibt. */}
       {(filterText.trim() || pinnedFilter || activeViewName) && (
         <div style={{padding:"10px 16px 0",fontSize:12,color:"rgba(232,244,253,0.4)"}}>
-          {activeViewName && activeViewName.trim().toLowerCase()!=="standard" && <span style={{color:"#7dd3fc"}}>{activeViewName}, </span>}
+          {activeViewName && activeViewName.trim().toLowerCase()!=="standard" && (
+            <span style={{color:"#7dd3fc"}}>
+              {activeViewName}
+              {groupField1==="year" && " 📅"}
+              {groupField1==="reise" && " 🧭"}
+              {filterText.trim() && ` · „${filterText.trim()}"`}
+              {", "}
+            </span>
+          )}
           {filtered.length} {filtered.length===1?"Ergebnis":"Ergebnisse"}
         </div>
       )}
