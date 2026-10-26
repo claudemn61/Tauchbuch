@@ -2481,6 +2481,13 @@ function TauchbuchApp() {
     filtered = filtered.filter(d => {
       const fv = diveFieldValue(d, pinnedFilter.field);
       if (typeof fv === "number") return fv === (parseFloat(String(pinnedFilter.value).replace(",", ".")) || 0);
+      // Buddy wird in der Statistik pro durch Komma getrenntem Namen einzeln
+      // gezählt — beim Zurückverlinken deshalb auch nur gegen die einzelnen
+      // Namen prüfen, nicht gegen den kompletten Feldinhalt.
+      if (pinnedFilter.field === "buddy") {
+        const names = String(fv||"").split(",").map(s=>s.trim().toLowerCase()).filter(Boolean);
+        return names.includes(String(pinnedFilter.value).toLowerCase());
+      }
       return String(fv).toLowerCase() === String(pinnedFilter.value).toLowerCase();
     });
   }
