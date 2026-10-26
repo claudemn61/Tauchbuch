@@ -73,8 +73,24 @@ function computeStats(dives) {
     dives.forEach(d => { const k = getKey(d); if (!k) return; m.set(k, (m.get(k)||0)+1); });
     return [...m.entries()].sort((a,b)=>b[1]-a[1]);
   };
+  // Wie countBy, aber getKeys liefert mehrere Werte pro Tauchgang (z.B. die
+  // durch Komma getrennten Namen in "Buddy") — jeder Name wird einzeln
+  // gezählt, pro Tauchgang aber höchstens einmal je Name.
+  const countByMulti = (getKeys) => {
+    const m = new Map();
+    dives.forEach(d => {
+      const seen = new Set();
+      getKeys(d).forEach(k => {
+        const key = (k||"").trim();
+        if (!key || seen.has(key)) return;
+        seen.add(key);
+        m.set(key, (m.get(key)||0)+1);
+      });
+    });
+    return [...m.entries()].sort((a,b)=>b[1]-a[1]);
+  };
   const topSpots = countBy(d => d.tauchspot);
-  const topBuddies = countBy(d => d.buddy);
+  const topBuddies = countByMulti(d => (d.buddy||"").split(","));
   const byLand = countBy(d => d.land);
   const maxLandCount = Math.max(1, ...byLand.map(([,c])=>c));
   const maxSpotCount = Math.max(1, ...topSpots.map(([,c])=>c));
