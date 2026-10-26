@@ -1281,8 +1281,8 @@ function ReiseSelect({ label, value, onSave }) {
       <select value={value||""} onChange={e=>{ if (e.target.value === NEW_REISE_SENTINEL) setCreating(true); else onSave(e.target.value); }}
         style={{background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:8,padding:"4px 8px",color:value?"#e8f4fd":"rgba(232,244,253,0.4)",fontSize:13,textAlign:"right",maxWidth:180}}>
         <option value="" style={{background:"#0a1628"}}>—</option>
-        {options.map(n => <option key={n} value={n} style={{background:"#0a1628"}}>{n}</option>)}
         <option value={NEW_REISE_SENTINEL} style={{background:"#0a1628",color:"#f5a623"}}>+ Neue Reise…</option>
+        {options.map(n => <option key={n} value={n} style={{background:"#0a1628"}}>{n}</option>)}
       </select>
     </div>
   );
