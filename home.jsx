@@ -12,7 +12,7 @@ function useIsWide() {
   return isWide;
 }
 
-const APP_VERSION = "2.9.8";
+const APP_VERSION = "2.9.9";
 // Zeigt "2.9" statt "2.9.0", wenn die Patch-Stelle 0 ist (Bugfix-Stelle
 // nur anzeigen, wenn tatsächlich ein Patch-Release vorliegt).
 function formatVersion(v) {
@@ -89,6 +89,9 @@ const CHAPTERS = [
 // Änderungsverlauf — neuste zuerst. Wird beim Erhöhen der Version jeweils
 // von Hand ergänzt.
 const CHANGELOG = [
+  { version: "2.9.9", changes: [
+    "Tauchgang-Detail: beim Eingeben des Tauchspots wird ein exakt bekannter Name samt seiner Koordinaten automatisch übernommen; ist der eingegebene Name nur sehr ähnlich zu einem bekannten (vermutlich Tippfehler), fragt die App statt automatisch zu korrigieren erst nach (\"Meintest du …?\")",
+  ]},
   { version: "2.9.8", changes: [
     "Tauchliste: ist eine gespeicherte Darstellung aktiv, zeigt die Trefferanzahl-Zeile jetzt zusätzlich deren Filtertext und Gruppierung (📅 Jahr / 🧭 Reise) an — bleibt dadurch auch bei ausgeblendeter Kategorie-Leiste erkennbar",
   ]},

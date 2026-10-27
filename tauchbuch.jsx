@@ -455,16 +455,73 @@ function fmtDateShort(d) {
   return `${dd.padStart(2, "0")}.${mm.padStart(2, "0")}.${yy.padStart(2, "0")}`;
 }
 
-// Liefert die an einem anderen Tauchgang mit demselben Tauchspot-Namen
-// bereits erfasste Koordinate, oder "" wenn für diesen Tauchspot noch
-// keine bekannt ist. Wird genutzt, um Koordinaten automatisch zu
-// übernehmen, sobald ein bekannter Tauchspot gesetzt wird — überschreibt
-// nie eine bereits vorhandene (abweichende) Koordinate.
-function findKnownCoords(diveList, tauchspot, excludeId) {
+// Normalisierter Textabstand (Levenshtein) zwischen zwei bereits auf
+// Kleinschreibung getrimmten Strings — Grundlage für die Erkennung von
+// Tauchspot-Namen, die vermutlich nur ein Tippfehler eines bekannten
+// Namens sind (siehe findSimilarTauchspot).
+function levenshteinDistance(a, b) {
+  const m = a.length, n = b.length;
+  if (m === 0) return n;
+  if (n === 0) return m;
+  const dp = new Array(n + 1);
+  for (let j = 0; j <= n; j++) dp[j] = j;
+  for (let i = 1; i <= m; i++) {
+    let prev = dp[0];
+    dp[0] = i;
+    for (let j = 1; j <= n; j++) {
+      const tmp = dp[j];
+      dp[j] = a[i - 1] === b[j - 1] ? prev : Math.min(prev, dp[j], dp[j - 1]) + 1;
+      prev = tmp;
+    }
+  }
+  return dp[n];
+}
+
+// Liefert für einen eingegebenen Tauchspot-Namen den exakt (Gross-/
+// Kleinschreibung und Leerraum ignorierend) bereits bekannten Tauchspot
+// aus dem übrigen Datenbestand — mit dessen kanonischer Schreibweise und,
+// falls an einem anderen TG erfasst, dessen Koordinate. null, wenn der
+// Name noch nirgends vorkommt.
+function findKnownTauchspot(diveList, tauchspot, excludeId) {
   const needle = String(tauchspot || "").trim().toLowerCase();
-  if (!needle) return "";
-  const match = diveList.find(d => d.id !== excludeId && d.koordinaten && (d.tauchspot || "").trim().toLowerCase() === needle);
-  return match ? match.koordinaten : "";
+  if (!needle) return null;
+  let found = null;
+  for (const d of diveList) {
+    if (d.id === excludeId) continue;
+    const ts = (d.tauchspot || "").trim();
+    if (!ts || ts.toLowerCase() !== needle) continue;
+    if (!found) found = { name: ts, koordinaten: d.koordinaten || "" };
+    else if (d.koordinaten && !found.koordinaten) found.koordinaten = d.koordinaten;
+  }
+  return found;
+}
+
+// Liefert den ähnlichsten bekannten Tauchspot-Namen aus dem übrigen
+// Datenbestand, wenn er nicht identisch, aber vermutlich nur ein
+// Tippfehler ist (Levenshtein-Distanz ≤3 und ≤25% der Zeichenlänge) — oder
+// null, wenn keiner nahe genug ist. Namen unter 5 Zeichen werden ausge-
+// nommen, da dort schon wenige Buchstaben Unterschied einen völlig
+// anderen, eigenständigen Ort ergeben können (z.B. "Nord" vs. "Süd").
+function findSimilarTauchspot(diveList, tauchspot, excludeId) {
+  const needle = String(tauchspot || "").trim().toLowerCase();
+  if (needle.length < 5) return null;
+  const candidates = new Map();
+  diveList.forEach(d => {
+    if (d.id === excludeId) return;
+    const ts = (d.tauchspot || "").trim();
+    const key = ts.toLowerCase();
+    if (!key || key === needle) return;
+    if (!candidates.has(key)) candidates.set(key, { name: ts, koordinaten: d.koordinaten || "" });
+    else if (d.koordinaten && !candidates.get(key).koordinaten) candidates.get(key).koordinaten = d.koordinaten;
+  });
+  let best = null, bestDist = Infinity;
+  candidates.forEach((info, key) => {
+    const dist = levenshteinDistance(needle, key);
+    if (dist < bestDist) { bestDist = dist; best = info; }
+  });
+  if (!best) return null;
+  const ratio = bestDist / Math.max(needle.length, best.name.length);
+  return (bestDist <= 3 && ratio <= 0.25) ? { ...best, distance: bestDist } : null;
 }
 
 // Erkennt Dezimalgrad-Koordinaten aus einem Freitextfeld, z.B.
@@ -1641,6 +1698,12 @@ function DetailContent({ d, dives, setDives, setSelected, setView, saveDive, con
   const [tileConfig, setTileConfig] = useState(DEFAULT_TAUCH_TILE_KEYS);
   const [tilePickerIdx, setTilePickerIdx] = useState(null);
   const [mapOpen, setMapOpen] = useState(false);
+  // Rückfrage "Meintest du …?", wenn ein eingegebener Tauchspot keinem
+  // bekannten exakt entspricht, aber einem sehr ähnlich ist (vermutlich
+  // Tippfehler) — null, solange keine Rückfrage offen ist. Wird beim
+  // Wechsel auf einen anderen TG zurückgesetzt.
+  const [tauchspotSuggestion, setTauchspotSuggestion] = useState(null);
+  useEffect(() => { setTauchspotSuggestion(null); }, [d.id]);
   const coords = parseCoords(d.koordinaten);
   const touchStartRef = useRef(null);
 
@@ -1841,13 +1904,40 @@ function DetailContent({ d, dives, setDives, setSelected, setView, saveDive, con
           <ReiseSelect label="Ort, Reise" value={d.customFields?.reise || d.ort} onSave={saveOrtReiseField} />
           <InlineField label="TG-Nr." value={d.tgNr} onSave={v=>saveField({tgNr:v})} />
           <InlineField label="Tauchspot" value={d.tauchspot} onSave={v=>{
-            const patch = { tauchspot: v };
-            if (!d.koordinaten) {
-              const known = findKnownCoords(dives, v, d.id);
-              if (known) patch.koordinaten = known;
+            setTauchspotSuggestion(null);
+            const trimmed = v.trim();
+            if (!trimmed) { saveField({ tauchspot: v }); return; }
+            // Exakt (Gross-/Kleinschreibung, Leerraum) bekannt: kanonische
+            // Schreibweise übernehmen und Koordinaten gleich mit einsetzen.
+            const exact = findKnownTauchspot(dives, trimmed, d.id);
+            if (exact) {
+              const patch = { tauchspot: exact.name };
+              if (!d.koordinaten && exact.koordinaten) patch.koordinaten = exact.koordinaten;
+              saveField(patch);
+              return;
             }
-            saveField(patch);
+            // Nicht identisch, aber sehr ähnlich (vermutlich Tippfehler):
+            // wie eingegeben speichern, aber nachfragen statt automatisch
+            // zu korrigieren/Koordinaten zu übernehmen.
+            const similar = findSimilarTauchspot(dives, trimmed, d.id);
+            if (similar) { setTauchspotSuggestion({ suggestion: similar }); }
+            saveField({ tauchspot: v });
           }} />
+          {tauchspotSuggestion && (
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,padding:"6px 0",borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
+              <span style={{fontSize:12,color:"rgba(232,244,253,0.5)"}}>Meintest du „{tauchspotSuggestion.suggestion.name}"?</span>
+              <div style={{display:"flex",gap:6,flexShrink:0}}>
+                <button onClick={()=>{
+                  const patch = { tauchspot: tauchspotSuggestion.suggestion.name };
+                  if (!d.koordinaten && tauchspotSuggestion.suggestion.koordinaten) patch.koordinaten = tauchspotSuggestion.suggestion.koordinaten;
+                  saveField(patch);
+                  setTauchspotSuggestion(null);
+                }} style={{background:"rgba(74,222,128,0.15)",border:"1px solid rgba(74,222,128,0.3)",borderRadius:8,padding:"4px 10px",color:"#4ade80",fontSize:12,fontWeight:600,cursor:"pointer"}}>Übernehmen</button>
+                <button onClick={()=>setTauchspotSuggestion(null)}
+                  style={{background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:8,padding:"4px 10px",color:"rgba(232,244,253,0.6)",fontSize:12,cursor:"pointer"}}>So lassen</button>
+              </div>
+            </div>
+          )}
           <InlineField label="Koordinaten" value={d.koordinaten} onSave={v=>saveField({koordinaten:v})}
             extra={d.koordinaten ? <CopyButton text={d.koordinaten} /> : null} />
           <InlineField label="Anzug" value={d.anzug} onSave={v=>saveField({anzug:v})} />
