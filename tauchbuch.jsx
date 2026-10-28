@@ -496,12 +496,17 @@ function findKnownTauchspot(diveList, tauchspot, excludeId) {
   return found;
 }
 
-// Liefert den ähnlichsten bekannten Tauchspot-Namen aus dem übrigen
-// Datenbestand, wenn er nicht identisch, aber vermutlich nur ein
-// Tippfehler ist (Levenshtein-Distanz ≤3 und ≤25% der Zeichenlänge) — oder
-// null, wenn keiner nahe genug ist. Namen unter 5 Zeichen werden ausge-
-// nommen, da dort schon wenige Buchstaben Unterschied einen völlig
-// anderen, eigenständigen Ort ergeben können (z.B. "Nord" vs. "Süd").
+// Liefert einen bekannten Tauchspot-Namen aus dem übrigen Datenbestand,
+// der nicht identisch mit dem eingegebenen Text ist, aber stark darauf
+// hindeutet — oder null, wenn keiner nahe genug bzw. eindeutig genug ist.
+// Namen unter 5 Zeichen werden ausgenommen, da dort schon wenige
+// Buchstaben Unterschied einen völlig anderen, eigenständigen Ort
+// ergeben können (z.B. "Nord" vs. "Süd"). Zwei Erkennungsarten:
+// 1. Teilstring-Treffer: der eingegebene Text kommt als Teil genau eines
+//    bekannten Namens vor (z.B. "malahi" in "Sha'ab Malahi") — nur bei
+//    genau einem Treffer, sonst ist nicht klar, welcher gemeint ist.
+// 2. Sonst Tippfehler-Erkennung: ähnlichster Name per Levenshtein-Distanz
+//    (≤3 und ≤25% der Zeichenlänge, z.B. "Camel Dock" vs. "Camel Rock").
 function findSimilarTauchspot(diveList, tauchspot, excludeId) {
   const needle = String(tauchspot || "").trim().toLowerCase();
   if (needle.length < 5) return null;
@@ -514,6 +519,8 @@ function findSimilarTauchspot(diveList, tauchspot, excludeId) {
     if (!candidates.has(key)) candidates.set(key, { name: ts, koordinaten: d.koordinaten || "" });
     else if (d.koordinaten && !candidates.get(key).koordinaten) candidates.get(key).koordinaten = d.koordinaten;
   });
+  const substringMatches = [...candidates.values()].filter(c => c.name.toLowerCase().includes(needle));
+  if (substringMatches.length === 1) return substringMatches[0];
   let best = null, bestDist = Infinity;
   candidates.forEach((info, key) => {
     const dist = levenshteinDistance(needle, key);
@@ -521,7 +528,7 @@ function findSimilarTauchspot(diveList, tauchspot, excludeId) {
   });
   if (!best) return null;
   const ratio = bestDist / Math.max(needle.length, best.name.length);
-  return (bestDist <= 3 && ratio <= 0.25) ? { ...best, distance: bestDist } : null;
+  return (bestDist <= 3 && ratio <= 0.25) ? best : null;
 }
 
 // Erkennt Dezimalgrad-Koordinaten aus einem Freitextfeld, z.B.
