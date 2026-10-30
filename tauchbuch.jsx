@@ -1442,15 +1442,17 @@ function DiveRow({ d, onClick, sortId, selectMode, isSelected, onToggleSelect })
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:6,marginBottom:2}}>
           <div style={{display:"flex",alignItems:"center",gap:6,minWidth:0}}>
             <span style={{fontWeight:700,fontSize:15,flexShrink:0}}>{d.name}</span>
-            <span style={{fontSize:11,fontWeight:600,color:(d.time&&d.time!=="0:00")?"#38bdf8":"rgba(232,244,253,0.25)",flexShrink:0}}>{fmtTime(d.time)}</span>
-            {d.buddy && <span style={{fontSize:11,fontWeight:600,color:"#f87171",flexShrink:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>👤 {d.buddy}</span>}
+            <span style={{fontSize:11,color:"rgba(232,244,253,0.4)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+              <span style={{color:"#38bdf8",fontWeight:600}}>{fmtDateShort(d.date)}</span> · <span style={parseCoords(d.koordinaten) ? {color:"#86efac"} : undefined}>{d.tauchspot||d.ort||"—"}</span>{d.land?" · "+d.land:""}
+            </span>
           </div>
           <div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
             {d.rating>0 && <span style={{fontSize:10,fontWeight:700,color:"#fde047"}}>{d.rating}⭐️</span>}
           </div>
         </div>
-        <div style={{fontSize:11,color:"rgba(232,244,253,0.4)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-          {fmtDateShort(d.date)} · <span style={parseCoords(d.koordinaten) ? {color:"#86efac"} : undefined}>{d.tauchspot||d.ort||"—"}</span>{d.land?" · "+d.land:""}
+        <div style={{display:"flex",alignItems:"center",gap:6}}>
+          <span style={{fontSize:11,fontWeight:600,color:"rgba(232,244,253,0.4)",flexShrink:0}}>{fmtTime(d.time)}</span>
+          {d.buddy && <span style={{fontSize:11,fontWeight:600,color:"#f87171",flexShrink:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>👤 {d.buddy}</span>}
         </div>
       </div>
       <div style={{textAlign:"right",flexShrink:0,marginLeft:8}}>
