@@ -490,8 +490,8 @@ function findKnownTauchspot(diveList, tauchspot, excludeId) {
     if (d.id === excludeId) continue;
     const ts = (d.tauchspot || "").trim();
     if (!ts || ts.toLowerCase() !== needle) continue;
-    if (!found) found = { name: ts, koordinaten: d.koordinaten || "" };
-    else if (d.koordinaten && !found.koordinaten) found.koordinaten = d.koordinaten;
+    if (!found) found = { name: ts, koordinaten: normalizeCoordsSeparator(d.koordinaten || "") };
+    else if (d.koordinaten && !found.koordinaten) found.koordinaten = normalizeCoordsSeparator(d.koordinaten);
   }
   return found;
 }
@@ -516,8 +516,8 @@ function findSimilarTauchspot(diveList, tauchspot, excludeId) {
     const ts = (d.tauchspot || "").trim();
     const key = ts.toLowerCase();
     if (!key || key === needle) return;
-    if (!candidates.has(key)) candidates.set(key, { name: ts, koordinaten: d.koordinaten || "" });
-    else if (d.koordinaten && !candidates.get(key).koordinaten) candidates.get(key).koordinaten = d.koordinaten;
+    if (!candidates.has(key)) candidates.set(key, { name: ts, koordinaten: normalizeCoordsSeparator(d.koordinaten || "") });
+    else if (d.koordinaten && !candidates.get(key).koordinaten) candidates.get(key).koordinaten = normalizeCoordsSeparator(d.koordinaten);
   });
   const substringMatches = [...candidates.values()].filter(c => c.name.toLowerCase().includes(needle));
   if (substringMatches.length === 1) return substringMatches[0];
@@ -562,6 +562,22 @@ function parseCoords(str) {
   const lon = coordTokenToDecimal(matches[1]);
   if (isNaN(lat) || isNaN(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) return null;
   return { lat, lon };
+}
+
+// Vereinheitlicht nur den Trenner zwischen Breiten- und Längengrad auf
+// ein Komma (z.B. "26.15791° 34.24649°" -> "26.15791°, 34.24649°") — das
+// Format der einzelnen Werte selbst (Dezimalgrad, DMM, DMS, mit/ohne
+// Himmelsrichtung) bleibt unverändert. Text ohne zwei erkennbare
+// Koordinaten-Tokens (leer, nicht parsbar) wird unverändert zurückgegeben.
+function normalizeCoordsSeparator(str) {
+  if (!str) return str;
+  const s = String(str).trim();
+  const matches = [...s.matchAll(COORD_TOKEN_RE)].filter(m => /\d/.test(m[0]));
+  if (matches.length < 2) return str;
+  const lat = coordTokenToDecimal(matches[0]);
+  const lon = coordTokenToDecimal(matches[1]);
+  if (isNaN(lat) || isNaN(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) return str;
+  return `${matches[0][0].trim()}, ${matches[1][0].trim()}`;
 }
 
 // Leichtgewichtige Karte (MapTiler SDK direkt, ohne Leaflet-Adapter —
@@ -1945,7 +1961,7 @@ function DetailContent({ d, dives, setDives, setSelected, setView, saveDive, con
               </div>
             </div>
           )}
-          <InlineField label="Koordinaten" value={d.koordinaten} onSave={v=>saveField({koordinaten:v})}
+          <InlineField label="Koordinaten" value={d.koordinaten} onSave={v=>saveField({koordinaten:normalizeCoordsSeparator(v)})}
             extra={d.koordinaten ? <CopyButton text={d.koordinaten} /> : null} />
           <InlineField label="Anzug" value={d.anzug} onSave={v=>saveField({anzug:v})} />
           <SelectField label="Blei" value={d.blei} options={BLEI_OPTIONS} unit="kg" onSave={v=>saveField({blei:v})} />
@@ -2290,11 +2306,11 @@ function TauchbuchApp() {
     const tgNrMap = computeTgNrs(diveList);
     // Pro Tauchspot-Name die erste im Datenbestand gefundene Koordinate
     // merken, damit fehlende Koordinaten bei anderen TG am selben Spot
-    // retrospektiv aufgefüllt werden können (siehe findKnownCoords).
+    // retrospektiv aufgefüllt werden können (siehe findKnownTauchspot).
     const knownCoordsByTauchspot = new Map();
     diveList.forEach(d => {
       const key = (d.tauchspot || "").trim().toLowerCase();
-      if (key && d.koordinaten && !knownCoordsByTauchspot.has(key)) knownCoordsByTauchspot.set(key, d.koordinaten);
+      if (key && d.koordinaten && !knownCoordsByTauchspot.has(key)) knownCoordsByTauchspot.set(key, normalizeCoordsSeparator(d.koordinaten));
     });
     const updated = [];
     for (const d of diveList) {
@@ -2305,12 +2321,16 @@ function TauchbuchApp() {
       const needsTgNrFix = newTgNr != null && newTgNr !== d.tgNr;
       const knownCoords = knownCoordsByTauchspot.get((d.tauchspot || "").trim().toLowerCase());
       const needsKoordFix = !d.koordinaten && !!knownCoords;
-      if (needsReise || needsNitroxFix || needsTgNrFix || needsKoordFix) {
+      // Lon/Lat sollen immer mit Komma getrennt sein — bei älteren bzw.
+      // importierten TG steht dort teils nur ein Leerzeichen.
+      const normalizedOwnCoords = normalizeCoordsSeparator(d.koordinaten);
+      const needsCoordSeparatorFix = !!d.koordinaten && normalizedOwnCoords !== d.koordinaten;
+      if (needsReise || needsNitroxFix || needsTgNrFix || needsKoordFix || needsCoordSeparatorFix) {
         const upd = {
           ...d,
           ...(needsNitroxFix ? { nitrox: normalizedNitrox } : {}),
           ...(needsTgNrFix ? { tgNr: newTgNr } : {}),
-          ...(needsKoordFix ? { koordinaten: knownCoords } : {}),
+          ...(needsKoordFix ? { koordinaten: knownCoords } : needsCoordSeparatorFix ? { koordinaten: normalizedOwnCoords } : {}),
           customFields: needsReise ? { ...(d.customFields||{}), reise: d.ort } : d.customFields,
         };
         try { await window.storage.set(`dive:${upd.id}`, JSON.stringify(upd)); } catch {}
@@ -2401,7 +2421,7 @@ function TauchbuchApp() {
       ort: prev?.ort || "",
       tgNr: (prev && prevTgNr) ? String(prevTgNr + 1) : "",
       tauchspot: prev?.tauchspot || "",
-      koordinaten: prev?.koordinaten || "",
+      koordinaten: normalizeCoordsSeparator(prev?.koordinaten || ""),
       durationStr: "", durationMin: 0, maxDepth: null, waterTemp: prev?.waterTemp ?? null,
       anzug: prev?.anzug || DEFAULT_ANZUG,
       blei: prev?.blei || "",
