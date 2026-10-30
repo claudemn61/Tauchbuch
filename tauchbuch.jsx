@@ -1443,7 +1443,7 @@ function DiveRow({ d, onClick, sortId, selectMode, isSelected, onToggleSelect })
           <div style={{display:"flex",alignItems:"center",gap:6,minWidth:0}}>
             <span style={{fontWeight:700,fontSize:15,flexShrink:0}}>{d.name}</span>
             <span style={{fontSize:11,color:"rgba(232,244,253,0.4)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-              <span style={{color:"#38bdf8",fontWeight:600}}>{fmtDateShort(d.date)}</span> · <span style={parseCoords(d.koordinaten) ? {color:"#86efac"} : undefined}>{d.tauchspot||d.ort||"—"}</span>{d.land?" · "+d.land:""}
+              <span style={{color:"#38bdf8",fontWeight:600}}>{fmtDateShort(d.date)}</span> · <span style={{color:"#86efac"}}>{d.tauchspot||d.ort||"—"}</span>{d.land?" · "+d.land:""}{parseCoords(d.koordinaten) && <span style={{fontSize:9}}> 🌎</span>}
             </span>
           </div>
           <div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
