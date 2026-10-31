@@ -484,7 +484,7 @@ function HomeApp() {
   const [diveCount, setDiveCount] = useState(0);
   const [reiseCount, setReiseCount] = useState(0);
   const [brevetCount, setBrevetCount] = useState(0);
-  const [backupInfo, setBackupInfo] = useState(null); // {ts, matches} oder null
+  const [backupInfo, setBackupInfo] = useState(null); // {ts, matches, lastTgNr} oder null
   const [showSettings, setShowSettings] = useState(false);
   const [titleCfg, setTitleCfg] = useState(null);
   const [editingTitle, setEditingTitle] = useState(false);
@@ -532,7 +532,7 @@ function HomeApp() {
             if (parsed && parsed.ts && parsed.hash) {
               const extra = await collectExtraStorage();
               const currentHash = await hashDataset(diveList, extra);
-              setBackupInfo({ ts: parsed.ts, matches: currentHash === parsed.hash });
+              setBackupInfo({ ts: parsed.ts, matches: currentHash === parsed.hash, lastTgNr: parsed.lastTgNr });
             }
           }
         } catch (e) { console.error("Backup-Datenabgleich fehlgeschlagen:", e); }
@@ -615,6 +615,7 @@ function HomeApp() {
                 <span style={{position:"absolute",left:0,top:0,display:"flex",flexDirection:"column",alignItems:"flex-start",fontSize:11,fontWeight:700,lineHeight:1.25,color:backupInfo.matches?"rgba(255,255,255,0.6)":"#facc15",textShadow:"0 2px 6px rgba(0,0,0,0.85)",whiteSpace:"nowrap"}}>
                   <span>{formatBackupDate(backupInfo.ts)}</span>
                   <span>{formatBackupTime(backupInfo.ts)}</span>
+                  {backupInfo.lastTgNr != null && <span>TG {backupInfo.lastTgNr}</span>}
                 </span>
               )}
             </div>
