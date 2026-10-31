@@ -615,7 +615,7 @@ function HomeApp() {
                 <span style={{position:"absolute",left:0,top:0,display:"flex",flexDirection:"column",alignItems:"flex-start",fontSize:11,fontWeight:700,lineHeight:1.25,color:backupInfo.matches?"rgba(255,255,255,0.6)":"#facc15",textShadow:"0 2px 6px rgba(0,0,0,0.85)",whiteSpace:"nowrap"}}>
                   <span>{formatBackupDate(backupInfo.ts)}</span>
                   <span>{formatBackupTime(backupInfo.ts)}</span>
-                  {backupInfo.lastTgNr != null && <span>TG {backupInfo.lastTgNr}</span>}
+                  {backupInfo.lastTgNr != null && <span>{backupInfo.lastTgNr}</span>}
                 </span>
               )}
             </div>
