@@ -2091,7 +2091,10 @@ async function recordLastBackup(type, dives, extra, ts) {
   try {
     const hash = await hashDataset(dives, extra);
     const tsFinal = (ts && !isNaN(new Date(ts).getTime())) ? ts : new Date().toISOString();
-    await window.storage.set("settings:lastBackup", JSON.stringify({ ts: tsFinal, type, hash }));
+    // Höchste TG-Nummer (dive.name) im Backup — zeigt auf der Startseite
+    // neben Datum/Zeit an, bis zu welchem TG der jeweilige Datenstand reicht.
+    const lastTgNr = dives.length ? Math.max(...dives.map(d => parseFloat(d.name) || 0)) : null;
+    await window.storage.set("settings:lastBackup", JSON.stringify({ ts: tsFinal, type, hash, lastTgNr }));
   } catch (e) { console.error("lastBackup-Speicherfehler:", e); }
 }
 
