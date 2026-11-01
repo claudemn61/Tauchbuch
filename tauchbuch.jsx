@@ -93,6 +93,12 @@ function computeTgNrs(diveList) {
       if (ta !== tb) return ta - tb;
       const timeA = timeToMinutes(a.time), timeB = timeToMinutes(b.time);
       if (timeA !== timeB) return timeA - timeB;
+      // Zeit bei beiden unbekannt: Zeitpunkt der TG-Anlegung (createdAt)
+      // als Tiebreak, wenn vorhanden — bei älteren/importierten TG ohne
+      // createdAt bleibt die TG-Nummer (name) der letzte Rückfall.
+      const ca = a.createdAt ? new Date(a.createdAt).getTime() : null;
+      const cb = b.createdAt ? new Date(b.createdAt).getTime() : null;
+      if (ca != null && cb != null && ca !== cb) return ca - cb;
       return (parseFloat(a.name) || 0) - (parseFloat(b.name) || 0);
     });
     sorted.forEach((d, i) => result.set(d.id, String(i + 1)));
@@ -1795,10 +1801,14 @@ function DetailContent({ d, dives, setDives, setSelected, setView, saveDive, con
     let finalSelected = upd;
     for (const x of newList) {
       const newTgNr = tgNrMap.get(x.id);
-      const needsTgNrFix = newTgNr != null && newTgNr !== x.tgNr;
       const isEdited = x.id === upd.id;
+      // Die Reise-Änderung selbst darf eine zuvor manuell gesetzte TG-Nr.
+      // des bearbeiteten TG übersteuern (neue Reise = neuer Kontext); bei
+      // anderen TG, die durch die Umgruppierung nur mitverschoben werden,
+      // bleibt eine manuelle TG-Nr. dagegen erhalten.
+      const needsTgNrFix = newTgNr != null && newTgNr !== x.tgNr && (isEdited || !x.tgNrManual);
       if (needsTgNrFix || isEdited) {
-        const patched = needsTgNrFix ? { ...x, tgNr: newTgNr } : x;
+        const patched = needsTgNrFix ? { ...x, tgNr: newTgNr, tgNrManual: isEdited ? false : x.tgNrManual } : x;
         await saveDive(patched);
         finalList.push(patched);
         if (isEdited) finalSelected = patched;
@@ -1952,7 +1962,7 @@ function DetailContent({ d, dives, setDives, setSelected, setView, saveDive, con
           <InlineField label="Datum" value={d.date} onSave={v=>saveField({date:v, year: parseDateToTs(v)?String(new Date(parseDateToTs(v)).getFullYear()):d.year})} />
           <InlineField label="Land" value={d.land} onSave={v=>saveField({land:v})} suggestions={distinctValuesByFrequency(dives, "land")} />
           <ReiseSelect label="Ort, Reise" value={d.customFields?.reise || d.ort} onSave={saveOrtReiseField} />
-          <InlineField label="TG-Nr." value={d.tgNr} onSave={v=>saveField({tgNr:v})} />
+          <InlineField label="TG-Nr." value={d.tgNr} onSave={v=>saveField({tgNr:v, tgNrManual:true})} />
           <InlineField label="Tauchspot" value={d.tauchspot} onSave={v=>{
             setTauchspotSuggestion(null);
             const trimmed = v.trim();
@@ -2348,7 +2358,10 @@ function TauchbuchApp() {
       const normalizedNitrox = normalizeNitroxValue(d.nitrox);
       const needsNitroxFix = normalizedNitrox !== d.nitrox;
       const newTgNr = tgNrMap.get(d.id);
-      const needsTgNrFix = newTgNr != null && newTgNr !== d.tgNr;
+      // Manuell gesetzte TG-Nr. (siehe InlineField "TG-Nr.") bleibt
+      // erhalten — die retrospektive Auto-Nummerierung darf eine bewusste
+      // Korrektur des Nutzers nicht beim nächsten Laden wieder überschreiben.
+      const needsTgNrFix = !d.tgNrManual && newTgNr != null && newTgNr !== d.tgNr;
       const knownCoords = knownCoordsByTauchspot.get((d.tauchspot || "").trim().toLowerCase());
       const needsKoordFix = !d.koordinaten && !!knownCoords;
       // Lon/Lat sollen immer mit Komma getrennt sein — bei älteren bzw.
@@ -2445,6 +2458,9 @@ function TauchbuchApp() {
       date: `${dd}.${mm}.${yyyy}`,
       year: yyyy,
       time: "",
+      // Zeitpunkt der TG-Anlegung — Tiebreak für computeTgNrs, wenn die
+      // eigentliche Tauchgang-Zeit (noch) unbekannt ist.
+      createdAt: now.toISOString(),
       // Neuer Tauchgang übernimmt Ausrüstung/Ort des vorangehenden TG —
       // nur Datum/Zeit/Dauer/Tiefe/Bemerkungen/Bewertung starten leer.
       land: prev?.land || "",
