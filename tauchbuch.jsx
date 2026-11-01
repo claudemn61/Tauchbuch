@@ -1989,6 +1989,7 @@ function DetailContent({ d, dives, setDives, setSelected, setView, saveDive, con
             </div>
           )}
           <InlineField label="Koordinaten" value={d.koordinaten} onSave={v=>saveField({koordinaten:normalizeCoordsSeparator(v)})}
+            suggestions={distinctValuesByFrequency(dives, "koordinaten")}
             extra={d.koordinaten ? <CopyButton text={d.koordinaten} /> : null} />
           <InlineField label="Anzug" value={d.anzug} onSave={v=>saveField({anzug:v})} />
           <SelectField label="Blei" value={d.blei} options={BLEI_OPTIONS} unit="kg" onSave={v=>saveField({blei:v})} />
