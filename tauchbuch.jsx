@@ -1278,10 +1278,15 @@ function CopyButton({ text }) {
     </button>
   );
 }
-function InlineField({label, value, onSave, multiline, unit, extra}) {
+// `suggestions`: Liste früherer Werte dieses Felds (häufigster zuerst) —
+// wird als natives <datalist> angehängt, damit der Browser beim Tippen
+// passende frühere Einträge vorschlägt. Nur für einzeilige Felder
+// (Textarea unterstützt kein list-Attribut).
+function InlineField({label, value, onSave, multiline, unit, extra, suggestions}) {
   const [editing, setEditing] = useState(false);
   const [val, setVal] = useState(value||"");
   const commit = () => { setEditing(false); if(val!==(value||"")) onSave(val); };
+  const listId = suggestions ? "suggest-" + label.replace(/[^a-zA-Z0-9]+/g, "-").toLowerCase() : undefined;
   return (
     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 0",borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
       <span style={{fontSize:13,color:"rgba(232,244,253,0.45)",minWidth:90}}>{label}</span>
@@ -1290,9 +1295,16 @@ function InlineField({label, value, onSave, multiline, unit, extra}) {
           multiline
             ? <textarea value={val} onChange={e=>setVal(e.target.value)} onBlur={commit} autoFocus
                 style={{flex:1,background:"rgba(255,255,255,0.08)",border:"1px solid rgba(56,189,248,0.4)",borderRadius:8,padding:"4px 8px",color:"#e8f4fd",fontSize:13,resize:"vertical",minHeight:48}} />
-            : <input value={val} onChange={e=>setVal(e.target.value)} onBlur={commit} autoFocus
-                onKeyDown={e=>{ if(e.key==="Enter"){e.preventDefault();commit();} }}
-                style={{flex:1,background:"rgba(255,255,255,0.08)",border:"1px solid rgba(56,189,248,0.4)",borderRadius:8,padding:"4px 8px",color:"#e8f4fd",fontSize:13,textAlign:"right"}} />
+            : <>
+                <input value={val} onChange={e=>setVal(e.target.value)} onBlur={commit} autoFocus list={listId}
+                  onKeyDown={e=>{ if(e.key==="Enter"){e.preventDefault();commit();} }}
+                  style={{flex:1,background:"rgba(255,255,255,0.08)",border:"1px solid rgba(56,189,248,0.4)",borderRadius:8,padding:"4px 8px",color:"#e8f4fd",fontSize:13,textAlign:"right"}} />
+                {suggestions && (
+                  <datalist id={listId}>
+                    {suggestions.map(s => <option key={s} value={s} />)}
+                  </datalist>
+                )}
+              </>
         ) : (
           <span onClick={()=>{setVal(value||"");setEditing(true);}}
             style={{fontSize:13,fontWeight:500,color:value?"#e8f4fd":"rgba(232,244,253,0.25)",cursor:"pointer",minWidth:60,textAlign:"right"}}>
@@ -1716,6 +1728,19 @@ function SidebarDiveRow({ d, selectedId, onSelect }) {
   );
 }
 
+// Liefert die unterschiedlichen, nicht-leeren Werte eines Felds über alle
+// Tauchgänge, häufigster zuerst — Grundlage für die Vorschlagsliste
+// (<datalist>) beim Eintippen in Land/Tauchspot/Buddy.
+function distinctValuesByFrequency(diveList, field) {
+  const counts = new Map();
+  diveList.forEach(d => {
+    const v = (d[field] || "").trim();
+    if (!v) return;
+    counts.set(v, (counts.get(v) || 0) + 1);
+  });
+  return [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([v]) => v);
+}
+
 function DetailContent({ d, dives, setDives, setSelected, setView, saveDive, confirmDelete, setConfirmDelete, returnTo, reiseNumbers, pruneReisen, isWide, setScrollToName }) {
   const dIdx = dives.findIndex(x => x.id === d.id);
   const [bemerkungenEditing, setBemerkungenEditing] = useState(false);
@@ -1925,7 +1950,7 @@ function DetailContent({ d, dives, setDives, setSelected, setView, saveDive, con
         {/* Übrige Felder */}
         <div style={{background:"rgba(255,255,255,0.04)",borderRadius:14,padding:"4px 15px",marginBottom:14,border:"1px solid rgba(255,255,255,0.06)"}}>
           <InlineField label="Datum" value={d.date} onSave={v=>saveField({date:v, year: parseDateToTs(v)?String(new Date(parseDateToTs(v)).getFullYear()):d.year})} />
-          <InlineField label="Land" value={d.land} onSave={v=>saveField({land:v})} />
+          <InlineField label="Land" value={d.land} onSave={v=>saveField({land:v})} suggestions={distinctValuesByFrequency(dives, "land")} />
           <ReiseSelect label="Ort, Reise" value={d.customFields?.reise || d.ort} onSave={saveOrtReiseField} />
           <InlineField label="TG-Nr." value={d.tgNr} onSave={v=>saveField({tgNr:v})} />
           <InlineField label="Tauchspot" value={d.tauchspot} onSave={v=>{
@@ -1947,7 +1972,7 @@ function DetailContent({ d, dives, setDives, setSelected, setView, saveDive, con
             const similar = findSimilarTauchspot(dives, trimmed, d.id);
             if (similar) { setTauchspotSuggestion({ suggestion: similar }); }
             saveField({ tauchspot: v });
-          }} />
+          }} suggestions={distinctValuesByFrequency(dives, "tauchspot")} />
           {tauchspotSuggestion && (
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,padding:"6px 0",borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
               <span style={{fontSize:12,color:"rgba(232,244,253,0.5)"}}>Meintest du „{tauchspotSuggestion.suggestion.name}"?</span>
@@ -1970,7 +1995,7 @@ function DetailContent({ d, dives, setDives, setSelected, setView, saveDive, con
           <SelectField label="Flasche" value={d.flasche} options={FLASCHE_OPTIONS} onSave={v=>saveField({flasche:v})} />
           <SelectField label="Volumen" value={d.volumen} options={VOLUMEN_OPTIONS} onSave={v=>saveField({volumen:v})} />
           <SelectField label="Nitrox" value={d.nitrox} options={NITROX_OPTIONS} onSave={v=>saveField({nitrox:v})} />
-          <InlineField label="Buddy" value={d.buddy} onSave={v=>saveField({buddy:v})} />
+          <InlineField label="Buddy" value={d.buddy} onSave={v=>saveField({buddy:v})} suggestions={distinctValuesByFrequency(dives, "buddy")} />
         </div>
       </div>
 
