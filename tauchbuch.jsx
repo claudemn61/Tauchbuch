@@ -1475,10 +1475,10 @@ function DiveRow({ d, onClick, sortId, selectMode, isSelected, onToggleSelect })
       </div>
       <div style={{textAlign:"right",flexShrink:0,marginLeft:8}}>
         <div style={{fontSize:13,fontWeight:600,color:"#38bdf8"}}>
-          {showSortValue ? formatSortValue(d, sortId) : fmtDuration(d.durationMin)}
+          {showSortValue ? formatSortValue(d, sortId) : (d.maxDepth!=null?d.maxDepth+" m":"")}
         </div>
         {!showSortValue && (
-          <div style={{fontSize:11,color:"rgba(232,244,253,0.3)"}}>{d.maxDepth!=null?d.maxDepth+" m":""}</div>
+          <div style={{fontSize:11,color:"rgba(232,244,253,0.3)"}}>{fmtDuration(d.durationMin)}</div>
         )}
       </div>
     </div>
